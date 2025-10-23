@@ -49,8 +49,8 @@ export async function requireShopifySession(
 }
 
 // Middleware that allows development testing with default shop
-// but still enforces session validation
-export function requireShopifySessionOrDev(
+// In dev mode, bypasses session requirement if no shop param is provided
+export async function requireShopifySessionOrDev(
   req: Request,
   res: Response,
   next: NextFunction
@@ -58,9 +58,10 @@ export function requireShopifySessionOrDev(
   const rawShop = (req.query.shop as string) || req.headers["x-shopify-shop"] as string;
   const shop = rawShop ? shopify.utils.sanitizeShop(rawShop, true) : null;
   
-  // If no shop provided in development, use default dev store
+  // If no shop provided in development, use default dev store without session
   if (!shop && process.env.NODE_ENV === "development") {
     (req as any).shop = "cro-autopilot-dev-store.myshopify.com";
+    console.log("[Dev Mode] Using default shop without session validation");
     return next();
   }
   

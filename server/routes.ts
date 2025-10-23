@@ -6,7 +6,7 @@ import { generateOptimizationRecommendations, analyzeCompetitors } from "./ai-se
 import { insertRecommendationSchema, insertTestSchema } from "@shared/schema";
 import { requireShopifySessionOrDev } from "./middleware/shopify-auth";
 import { syncProductsFromShopify, initializeShopData } from "./sync-service";
-import { getSyncStatus } from "./sync-status";
+import { getSyncStatus, completeSyncSuccess } from "./sync-status";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Health check
@@ -252,6 +252,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get session for this shop
       const session = await sessionStorage.getSessionByShop(shop);
       if (!session) {
+        // In dev mode without session, update sync status and return helpful message
+        if (process.env.NODE_ENV === "development") {
+          completeSyncSuccess(shop, 0);
+          return res.status(200).json({ 
+            success: true,
+            syncedCount: 0,
+            message: "Dev mode: No Shopify session available. Install the app to sync products." 
+          });
+        }
         return res.status(401).json({ error: "No valid session found. Please reinstall the app." });
       }
 

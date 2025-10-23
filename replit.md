@@ -41,6 +41,8 @@ server/
   ├── routes.ts          # API routes
   ├── shopify.ts         # Shopify API integration
   ├── ai-service.ts      # OpenAI integration for recommendations
+  ├── sync-service.ts    # Product sync from Shopify
+  ├── sync-status.ts     # Sync status tracking per shop
   └── storage.ts         # Data storage interface
 shared/
   └── schema.ts          # Shared TypeScript types and Drizzle schemas
@@ -77,7 +79,10 @@ shared/
 
 ### Metrics
 - `GET /api/metrics` - Get performance metrics
-- `GET /api/dashboard` - Get dashboard summary
+- `GET /api/dashboard` - Get dashboard summary with sync status
+
+### Sync
+- `POST /api/sync/products` - Manually sync products from Shopify
 
 ## Features
 
@@ -99,6 +104,16 @@ shared/
 - Active test tracking
 - Performance charts
 - AI recommendation cards
+- Live sync status indicator with last sync time
+
+### Product Sync System
+- **Automatic sync** on app installation via OAuth callback
+- **Manual sync button** in dashboard header with loading state
+- **Real-time status tracking** - Dashboard shows "Syncing...", "Just now", "5 min ago", etc.
+- **Smart polling** - Checks every 2 seconds during sync, every 30 seconds otherwise
+- **Error notifications** - Toast messages surface specific sync failures to merchants
+- **Background sync** - Products sync automatically without blocking installation flow
+- All sync operations properly isolated by shop (multi-tenant safe)
 
 ## Development
 
@@ -109,11 +124,22 @@ npm run dev
 ```
 
 ## Recent Changes (October 23, 2025)
-- Implemented full-stack architecture with Shopify integration
-- Created AI recommendation engine with OpenAI
-- Built test preview system with device toggles
-- Added comprehensive data schema for products, tests, and metrics
-- Integrated Shopify Admin GraphQL API
+- **Product Sync Implementation**
+  - Automatic product sync after OAuth installation
+  - Manual "Sync Products" button with real-time loading states
+  - Comprehensive sync status tracking system (in-memory, PostgreSQL-ready)
+  - Error notification system that surfaces specific failures to merchants
+  - Smart polling that adjusts frequency based on sync state
+- **Core Architecture**
+  - Implemented full-stack architecture with Shopify integration
+  - Created AI recommendation engine with OpenAI
+  - Built test preview system with device toggles
+  - Added comprehensive data schema for products, tests, and metrics
+  - Integrated Shopify Admin GraphQL API
+- **Security & Isolation**
+  - Shop-based tenant isolation in all endpoints and storage
+  - Proper session validation and error handling
+  - Sanitized shop domain validation to prevent malformed domain attacks
 
 ## Next Steps
 - Deploy test changes to actual Shopify products
