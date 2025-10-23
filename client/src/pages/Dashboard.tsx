@@ -315,6 +315,71 @@ export default function Dashboard() {
     setPreviewOpen(true);
   };
 
+  const handleApproveAndLaunch = async () => {
+    if (!selectedRecommendation) return;
+
+    try {
+      // Step 1: Create the test
+      const recommendation = selectedRecommendation;
+      const product = products.find(p => p.id === recommendation.productId);
+      
+      if (!product) {
+        throw new Error("Product not found");
+      }
+
+      const controlData: Record<string, any> = {
+        title: product.title,
+        description: product.description,
+        price: parseFloat(product.price),
+      };
+
+      const variantData: Record<string, any> = {
+        ...controlData,
+        ...recommendation.proposedChanges,
+      };
+
+      const testData = {
+        productId: product.id,
+        recommendationId: recommendation.id,
+        testType: recommendation.testType,
+        status: "draft",
+        controlData,
+        variantData,
+        arpu: "0",
+        arpuLift: "0",
+        impressions: 0,
+        conversions: 0,
+        revenue: "0",
+      };
+
+      const createRes = await apiRequest("POST", "/api/tests", testData);
+      const createdTest = await createRes.json();
+
+      // Step 2: Update recommendation status
+      await apiRequest("PATCH", `/api/recommendations/${recommendation.id}`, { status: "accepted" });
+
+      // Step 3: Activate the test
+      await apiRequest("POST", `/api/tests/${createdTest.id}/activate`);
+
+      toast({
+        title: "Test Launched!",
+        description: "Your A/B test is now live in your Shopify store",
+      });
+
+      // Step 4: Close modal and refresh data
+      setPreviewOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/recommendations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+    } catch (error) {
+      toast({
+        title: "Failed to Launch Test",
+        description: error instanceof Error ? error.message : "Could not create and launch test",
+        variant: "destructive",
+      });
+    }
+  };
+
   const latestMetric = dashboardData?.latestMetric || metricsData[0];
   
   // Format chart data
@@ -458,6 +523,7 @@ export default function Dashboard() {
           }}
           changes={Object.keys(selectedRecommendation.proposedChanges)}
           insights={selectedRecommendation.insights}
+          onApprove={handleApproveAndLaunch}
         />
       )}
     </div>
