@@ -3,10 +3,10 @@
 ## Overview
 Shoptimizer is an embedded Shopify app that uses AI to automatically analyze products and recommend conversion rate optimization tests. The app helps Shopify store owners improve sales on autopilot by:
 
-- Generating AI-powered product optimization recommendations
+- Generating AI-powered product optimization recommendations with psychological insights and SEO analysis
 - Creating and managing A/B tests for product titles, descriptions, and prices
-- Analyzing competitor pricing and market positioning
-- Tracking performance metrics and revenue lift
+- Tracking ARPU (Average Revenue Per User) as the primary success metric
+- Automatic conversion tracking via Shopify webhooks
 
 ## Tech Stack
 
@@ -95,19 +95,19 @@ shared/
 ### AI Recommendations
 - Powered by OpenAI GPT-4
 - Analyzes product titles, descriptions, and prices
-- Provides confidence scores and estimated impact
-- Includes psychological insights, SEO optimization, and competitor analysis
+- Provides actionable optimization suggestions with concrete proposed changes
+- Includes psychological insights and SEO optimization explanations
 
 ### Test Preview System
 - Side-by-side comparison of control vs. variant
 - Multiple device viewports (desktop, tablet, mobile)
 - Visual diff highlighting of changes
-- AI insights panel explaining why changes will work
-- Confidence scores and risk assessment
+- AI insights panel explaining the psychology and SEO rationale
 
 ### Dashboard
-- Real-time metrics (conversion rate, AOV, revenue lift)
-- Active test tracking
+- Real-time metrics (ARPU, total revenue, conversions, active tests)
+- ARPU (Average Revenue Per User) as primary success metric
+- Active test tracking with per-test ARPU display
 - Performance charts
 - AI recommendation cards
 - Live sync status indicator with last sync time
@@ -133,10 +133,11 @@ shared/
   - Non-blocking registration (doesn't fail installation)
   - HMAC signature verification using raw body for security
   
-- **Conversion Attribution**
+- **Conversion Attribution & ARPU Tracking**
   - Order webhooks automatically attribute conversions to active tests
   - Matches ordered products to running tests by Shopify product ID
-  - Updates test metrics: conversions, revenue, performance
+  - Calculates and updates test metrics: conversions, revenue, ARPU
+  - ARPU computed as total revenue ÷ total conversions
   - Real-time tracking without manual intervention
   
 - **Safe Rollback**
@@ -154,6 +155,34 @@ npm run dev
 ```
 
 ## Recent Changes (October 23, 2025)
+
+### Removed Fake Metrics & Implemented ARPU Tracking
+- **Removed AI-Generated Fake Metrics**
+  - Removed confidence scores, estimated impact, and risk levels from all UI components
+  - Updated AI service to stop generating unreliable predictions
+  - Cleaned up AIRecommendationCard, TestPreviewModal, and AIInsightsPanel
+  - Maintained valuable AI insights (psychology, SEO explanations)
+  
+- **Schema Updates**
+  - Removed confidence, estimatedImpact, and riskLevel fields from recommendations table
+  - Added ARPU and arpuLift fields to tests table
+  - Added TODO comments for future data-driven enhancements
+  
+- **ARPU as Primary Metric**
+  - Updated dashboard to display ARPU, total revenue, and conversions
+  - Modified TestHistoryTable to show ARPU per test
+  - Webhook now calculates ARPU automatically (revenue ÷ conversions)
+  - Real-time ARPU updates as orders come through
+  
+- **Removed Competitor Analysis**
+  - Removed mock competitor analysis feature (was generating fake data)
+  - Kept "competitor" insight type for AI to explain competitive positioning
+  
+- **Future Enhancements (TODOs in code)**
+  - TODO: Implement impression tracking (product page views) for true ARPU calculation
+  - TODO: Track baseline ARPU before test activation for accurate lift calculation
+  - TODO: Calculate real confidence intervals from historical test data
+  - TODO: Build data-driven impact estimates based on similar past tests
 
 ### Test Deployment & Conversion Tracking System
 - **Test Activation Endpoint** (`POST /api/tests/:id/activate`)
@@ -238,14 +267,14 @@ npm run dev
 ✅ **OAuth Flow**: Complete installation flow with automatic product sync on first install
 ✅ **Pagination Support**: Handles stores with more than 50 products via cursor-based pagination
 ✅ **Test Deployment**: Live A/B test activation/deactivation with Shopify product updates
-✅ **Conversion Tracking**: Webhook-based order attribution with automatic metric updates
+✅ **Conversion Tracking**: Webhook-based order attribution with automatic ARPU calculation
 ✅ **Safe Rollback**: Complete product state restoration including edge cases
+✅ **Data-Driven Metrics**: Removed fake AI predictions, focusing on real ARPU data
 
 ## Next Steps
-- End-to-end testing: Activate test → place order → verify metrics → deactivate test
-- Add automated tests for control snapshot persistence and rollback edge cases
-- Monitor webhook logs to verify ongoing HMAC validation success
+- Implement impression tracking for more accurate ARPU (revenue per visitor vs. revenue per conversion)
+- Track baseline ARPU before test activation to enable accurate lift calculations
+- End-to-end testing: Activate test → place order → verify ARPU updates → deactivate test
 - Add billing integration for subscription tiers
-- Create automated test scheduling
-- Build advanced competitor scraping
+- Build data-driven confidence scores from historical test performance
 - Optimize logging for production (consider redacting sensitive data)
