@@ -54,9 +54,7 @@ export const insertRecommendationSchema = createInsertSchema(recommendations).om
 export type InsertRecommendation = z.infer<typeof insertRecommendationSchema>;
 export type Recommendation = typeof recommendations.$inferSelect;
 
-// A/B Tests table
-// TODO: Implement impression tracking (product page views) for true ARPU calculation
-// TODO: Track baseline ARPU before test activation for accurate lift calculation
+// A/B Tests table - Now tracks control vs variant metrics separately
 export const tests = pgTable("tests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   productId: varchar("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
@@ -65,11 +63,22 @@ export const tests = pgTable("tests", {
   status: text("status").notNull().default("draft"), // "draft", "active", "completed", "cancelled"
   controlData: jsonb("control_data").$type<Record<string, any>>().notNull(),
   variantData: jsonb("variant_data").$type<Record<string, any>>().notNull(),
-  arpu: decimal("arpu", { precision: 10, scale: 2 }).default("0"), // Average Revenue Per User (revenue / conversions for now)
-  arpuLift: decimal("arpu_lift", { precision: 5, scale: 2 }).default("0"), // ARPU lift percentage vs baseline
-  impressions: integer("impressions").default(0), // TODO: Track product page views
+  
+  // Per-variant metrics for true A/B testing
+  controlImpressions: integer("control_impressions").default(0),
+  variantImpressions: integer("variant_impressions").default(0),
+  controlConversions: integer("control_conversions").default(0),
+  variantConversions: integer("variant_conversions").default(0),
+  controlRevenue: decimal("control_revenue", { precision: 10, scale: 2 }).default("0"),
+  variantRevenue: decimal("variant_revenue", { precision: 10, scale: 2 }).default("0"),
+  
+  // Legacy aggregate fields (kept for backwards compatibility, calculated from per-variant metrics)
+  arpu: decimal("arpu", { precision: 10, scale: 2 }).default("0"),
+  arpuLift: decimal("arpu_lift", { precision: 5, scale: 2 }).default("0"),
+  impressions: integer("impressions").default(0),
   conversions: integer("conversions").default(0),
   revenue: decimal("revenue", { precision: 10, scale: 2 }).default("0"),
+  
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
