@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { shopify, fetchProducts, updateProduct, sessionStorage } from "./shopify";
+import { shopify, fetchProducts, updateProduct, getProductVariants, sessionStorage } from "./shopify";
 import { generateOptimizationRecommendations, analyzeCompetitors } from "./ai-service";
 import { insertRecommendationSchema, insertTestSchema } from "@shared/schema";
 import { requireShopifySessionOrDev } from "./middleware/shopify-auth";
@@ -57,6 +57,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Store session for later use
       const stored = await sessionStorage.storeSession(session);
       console.log(`[OAuth Callback] Session storage result: ${stored ? 'success' : 'failed'}`);
+      
+      // Register webhook for order tracking
+      try {
+        const { registerOrderWebhook } = await import("./shopify");
+        const webhookUrl = `${process.env.REPLIT_DEV_DOMAIN ? 'https://' : 'http://'}${process.env.REPLIT_DEV_DOMAIN || 'localhost:5000'}/api/webhooks/orders/create`;
+        console.log(`[OAuth Callback] Registering webhook: ${webhookUrl}`);
+        await registerOrderWebhook(session, webhookUrl);
+        console.log(`[OAuth Callback] Webhook registered successfully`);
+      } catch (error) {
+        console.error("[OAuth Callback] Error registering webhook:", error);
+        // Don't fail installation if webhook registration fails
+      }
       
       // Initialize shop data in background (sync products from Shopify)
       console.log(`[OAuth Callback] Starting background product sync for ${session.shop}`);
@@ -266,6 +278,183 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Activate test - deploy variant to Shopify
+  app.post("/api/tests/:id/activate", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      const testId = req.params.id;
+      
+      // Get the test
+      const test = await storage.getTest(shop, testId);
+      if (!test) {
+        return res.status(404).json({ error: "Test not found" });
+      }
+      
+      if (test.status !== "draft") {
+        return res.status(400).json({ error: "Only draft tests can be activated" });
+      }
+      
+      // Get the product
+      const product = await storage.getProduct(shop, test.productId);
+      if (!product) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+      
+      // Get Shopify session
+      const session = await sessionStorage.getSessionByShop(shop);
+      if (!session) {
+        return res.status(401).json({ error: "No valid Shopify session found" });
+      }
+      
+      console.log(`[Test Activation] Deploying test ${testId} for product ${product.title}`);
+      console.log(`[Test Activation] Variant data:`, test.variantData);
+      
+      // CRITICAL: Fetch current product state from Shopify before making changes
+      // This ensures we can safely revert even if product was edited after test creation
+      const currentProductData = await getProductVariants(session, product.shopifyProductId);
+      const currentProduct = currentProductData?.product;
+      
+      if (!currentProduct) {
+        throw new Error("Failed to fetch current product state from Shopify");
+      }
+      
+      // Capture the actual current state as control data (all fields that might be changed)
+      // CRITICAL: Always capture all fields, even if empty, to ensure complete rollback
+      const actualControlData: Record<string, any> = {
+        title: currentProduct.title,
+        description: currentProduct.descriptionHtml || "", // Always capture, even if empty
+      };
+      
+      // Get current price from first variant
+      const currentVariants = currentProduct.variants?.edges || [];
+      if (currentVariants.length > 0) {
+        actualControlData.price = parseFloat(currentVariants[0].node.price);
+      }
+      
+      console.log(`[Test Activation] Captured current product state:`, actualControlData);
+      
+      // Build Shopify update payload
+      const updatePayload: any = {};
+      
+      if (test.variantData.title) {
+        updatePayload.title = test.variantData.title;
+      }
+      
+      if (test.variantData.description) {
+        updatePayload.descriptionHtml = test.variantData.description;
+      }
+      
+      // For price updates, we need variant IDs
+      if (test.variantData.price && currentVariants.length > 0) {
+        updatePayload.variants = currentVariants.map((edge: any) => ({
+          id: edge.node.id,
+          price: test.variantData.price.toString(),
+        }));
+      }
+      
+      // Update product in Shopify
+      await updateProduct(session, product.shopifyProductId, updatePayload);
+      
+      console.log(`[Test Activation] Successfully updated Shopify product`);
+      
+      // Update test status to active AND store actual control data
+      const activatedTest = await storage.updateTest(shop, testId, {
+        status: "active",
+        startDate: new Date(),
+        controlData: actualControlData, // Store the current state for safe rollback
+      });
+      
+      res.json({
+        success: true,
+        test: activatedTest,
+        message: "Test activated successfully",
+      });
+    } catch (error) {
+      console.error("Error activating test:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to activate test";
+      res.status(500).json({ error: errorMessage });
+    }
+  });
+  
+  // Deactivate test - revert to original product values
+  app.post("/api/tests/:id/deactivate", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      const testId = req.params.id;
+      
+      // Get the test
+      const test = await storage.getTest(shop, testId);
+      if (!test) {
+        return res.status(404).json({ error: "Test not found" });
+      }
+      
+      if (test.status !== "active") {
+        return res.status(400).json({ error: "Only active tests can be deactivated" });
+      }
+      
+      // Get the product
+      const product = await storage.getProduct(shop, test.productId);
+      if (!product) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+      
+      // Get Shopify session
+      const session = await sessionStorage.getSessionByShop(shop);
+      if (!session) {
+        return res.status(401).json({ error: "No valid Shopify session found" });
+      }
+      
+      console.log(`[Test Deactivation] Reverting test ${testId} for product ${product.title}`);
+      console.log(`[Test Deactivation] Control data:`, test.controlData);
+      
+      // Build Shopify update payload to revert to control
+      // CRITICAL: Check field existence, not truthiness, to handle empty strings
+      const updatePayload: any = {};
+      
+      if ("title" in test.controlData) {
+        updatePayload.title = test.controlData.title;
+      }
+      
+      if ("description" in test.controlData) {
+        updatePayload.descriptionHtml = test.controlData.description;
+      }
+      
+      // For price updates, we need to get variant IDs first
+      if (test.controlData.price) {
+        const variantsData = await getProductVariants(session, product.shopifyProductId);
+        const variants = variantsData?.product?.variants?.edges || [];
+        
+        if (variants.length > 0) {
+          updatePayload.variants = variants.map((edge: any) => ({
+            id: edge.node.id,
+            price: test.controlData.price.toString(),
+          }));
+        }
+      }
+      
+      // Update product in Shopify to revert changes
+      await updateProduct(session, product.shopifyProductId, updatePayload);
+      
+      console.log(`[Test Deactivation] Successfully reverted Shopify product`);
+      
+      // Update test status to completed
+      const deactivatedTest = await storage.updateTest(shop, testId, {
+        status: "completed",
+        endDate: new Date(),
+      });
+      
+      res.json({
+        success: true,
+        test: deactivatedTest,
+        message: "Test deactivated and product reverted successfully",
+      });
+    } catch (error) {
+      console.error("Error deactivating test:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to deactivate test";
+      res.status(500).json({ error: errorMessage });
+    }
+  });
+
   // Metrics API (protected)
   app.get("/api/metrics", requireShopifySessionOrDev, async (req, res) => {
     try {
@@ -315,6 +504,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       res.status(500).json({ error: "Failed to fetch dashboard data" });
+    }
+  });
+
+  // Webhook endpoint for Shopify order events
+  app.post("/api/webhooks/orders/create", async (req, res) => {
+    try {
+      const hmac = req.get("X-Shopify-Hmac-Sha256");
+      const topic = req.get("X-Shopify-Topic");
+      const shop = req.get("X-Shopify-Shop-Domain");
+      
+      console.log(`[Webhook] Received ${topic} webhook from ${shop}`);
+      
+      if (!hmac || !shop) {
+        console.error('[Webhook] Missing required headers');
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      // Verify webhook authenticity (CRITICAL: use raw body, not parsed JSON)
+      const rawBody = (req as any).rawBody as Buffer;
+      
+      if (!rawBody) {
+        console.error('[Webhook] Missing raw body for HMAC verification');
+        return res.status(400).json({ error: "Missing raw body" });
+      }
+      
+      const verified = await shopify.webhooks.validate({
+        rawBody: rawBody.toString('utf8'),
+        rawRequest: req,
+        rawResponse: res,
+      });
+      
+      if (!verified) {
+        console.error('[Webhook] Failed to verify webhook signature');
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      console.log('[Webhook] Webhook verified successfully');
+      
+      const orderData = req.body;
+      console.log(`[Webhook] Processing order ${orderData.id} with ${orderData.line_items?.length || 0} items`);
+      
+      // Extract product IDs from line items
+      const shopifyProductIds = (orderData.line_items || []).map((item: any) => 
+        `gid://shopify/Product/${item.product_id}`
+      );
+      
+      if (shopifyProductIds.length === 0) {
+        console.log('[Webhook] No line items in order, skipping attribution');
+        return res.status(200).json({ received: true });
+      }
+      
+      // Find matching products in our database
+      const allProducts = await storage.getProducts(shop);
+      const orderedProducts = allProducts.filter(p => 
+        shopifyProductIds.includes(p.shopifyProductId)
+      );
+      
+      console.log(`[Webhook] Found ${orderedProducts.length} matching products in database`);
+      
+      // For each product, check if there's an active test
+      for (const product of orderedProducts) {
+        const activeTests = await storage.getTestsByProduct(shop, product.id);
+        const activeTest = activeTests.find(t => t.status === "active");
+        
+        if (activeTest) {
+          // Find the line item for this product to get quantity and price
+          const lineItem = orderData.line_items.find((item: any) => 
+            `gid://shopify/Product/${item.product_id}` === product.shopifyProductId
+          );
+          
+          if (lineItem) {
+            const revenue = parseFloat(lineItem.price) * lineItem.quantity;
+            
+            console.log(`[Webhook] Attributing conversion to test ${activeTest.id}: ${lineItem.quantity}x ${product.title} = $${revenue}`);
+            
+            // Update test metrics
+            await storage.updateTest(shop, activeTest.id, {
+              conversions: (activeTest.conversions || 0) + lineItem.quantity,
+              revenue: (parseFloat(activeTest.revenue || "0") + revenue).toString(),
+            });
+          }
+        }
+      }
+      
+      res.status(200).json({ received: true });
+    } catch (error) {
+      console.error("[Webhook] Error processing order webhook:", error);
+      res.status(500).json({ error: "Failed to process webhook" });
     }
   });
 

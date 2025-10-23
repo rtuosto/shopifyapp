@@ -107,6 +107,10 @@ export async function fetchProducts(session: Session) {
 export async function updateProduct(session: Session, productId: string, updates: {
   title?: string;
   descriptionHtml?: string;
+  variants?: Array<{
+    id: string;
+    price?: string;
+  }>;
 }) {
   const client = new shopify.clients.Graphql({ session });
 
@@ -117,6 +121,14 @@ export async function updateProduct(session: Session, productId: string, updates
           id
           title
           descriptionHtml
+          variants(first: 1) {
+            edges {
+              node {
+                id
+                price
+              }
+            }
+          }
         }
         userErrors {
           field
@@ -134,6 +146,80 @@ export async function updateProduct(session: Session, productId: string, updates
     }
   );
   
+  if (response.data?.productUpdate?.userErrors?.length > 0) {
+    console.error('[Shopify API] Product update errors:', response.data.productUpdate.userErrors);
+    throw new Error(`Product update failed: ${JSON.stringify(response.data.productUpdate.userErrors)}`);
+  }
+  
+  return response.data;
+}
+
+// Get product variants to update pricing
+export async function getProductVariants(session: Session, productId: string) {
+  const client = new shopify.clients.Graphql({ session });
+  
+  const response = await client.request(`
+    query getProduct($id: ID!) {
+      product(id: $id) {
+        id
+        title
+        descriptionHtml
+        variants(first: 10) {
+          edges {
+            node {
+              id
+              price
+            }
+          }
+        }
+      }
+    }
+  `, {
+    variables: { id: productId }
+  });
+  
+  return response.data;
+}
+
+// Register webhooks for order tracking
+export async function registerOrderWebhook(session: Session, webhookUrl: string) {
+  const client = new shopify.clients.Graphql({ session });
+  
+  const response = await client.request(`
+    mutation webhookSubscriptionCreate($topic: WebhookSubscriptionTopic!, $webhookSubscription: WebhookSubscriptionInput!) {
+      webhookSubscriptionCreate(topic: $topic, webhookSubscription: $webhookSubscription) {
+        webhookSubscription {
+          id
+          topic
+          endpoint {
+            __typename
+            ... on WebhookHttpEndpoint {
+              callbackUrl
+            }
+          }
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `, {
+    variables: {
+      topic: "ORDERS_CREATE",
+      webhookSubscription: {
+        callbackUrl: webhookUrl,
+        format: "JSON",
+      },
+    },
+  });
+  
+  if (response.data?.webhookSubscriptionCreate?.userErrors?.length > 0) {
+    console.error('[Shopify Webhook] Registration errors:', response.data.webhookSubscriptionCreate.userErrors);
+    throw new Error(`Webhook registration failed: ${JSON.stringify(response.data.webhookSubscriptionCreate.userErrors)}`);
+  }
+  
+  console.log('[Shopify Webhook] Successfully registered ORDERS_CREATE webhook');
   return response.data;
 }
 

@@ -148,19 +148,12 @@ export default function Dashboard() {
         revenue: "0",
       };
 
-      const res = await apiRequest<Test>("/api/tests", {
-        method: "POST",
-        body: JSON.stringify(testData),
-      });
-      
-      return res;
+      const res = await apiRequest("POST", "/api/tests", testData);
+      return res.json();
     },
     onSuccess: async (data, variables) => {
       // Update recommendation status to "testing"
-      await apiRequest(`/api/recommendations/${variables.recommendationId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: "testing" }),
-      });
+      await apiRequest("PATCH", `/api/recommendations/${variables.recommendationId}`, { status: "testing" });
       
       toast({
         title: "Test Created",
@@ -176,6 +169,54 @@ export default function Dashboard() {
       toast({
         title: "Failed to Create Test",
         description: error.message || "Could not create test from recommendation",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Activate test mutation
+  const activateTestMutation = useMutation({
+    mutationFn: async (testId: string) => {
+      const res = await apiRequest("POST", `/api/tests/${testId}/activate`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Test Activated",
+        description: "Test is now live in your Shopify store",
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to activate test",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Deactivate test mutation
+  const deactivateTestMutation = useMutation({
+    mutationFn: async (testId: string) => {
+      const res = await apiRequest("POST", `/api/tests/${testId}/deactivate`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Test Deactivated",
+        description: "Product reverted to original values",
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to deactivate test",
         variant: "destructive",
       });
     },
@@ -384,7 +425,11 @@ export default function Dashboard() {
       )}
 
       {formattedTests.length > 0 && (
-        <TestHistoryTable tests={formattedTests} />
+        <TestHistoryTable 
+          tests={formattedTests} 
+          onStartTest={(testId) => activateTestMutation.mutate(testId)}
+          onStopTest={(testId) => deactivateTestMutation.mutate(testId)}
+        />
       )}
 
       {selectedRecommendation && selectedProduct && (
