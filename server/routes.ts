@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { shopify, fetchProducts, updateProduct, getProductVariants, sessionStorage } from "./shopify";
-import { generateOptimizationRecommendations, analyzeCompetitors } from "./ai-service";
+import { generateOptimizationRecommendations } from "./ai-service";
 import { insertRecommendationSchema, insertTestSchema } from "@shared/schema";
 import { requireShopifySessionOrDev } from "./middleware/shopify-auth";
 import { syncProductsFromShopify, initializeShopData } from "./sync-service";

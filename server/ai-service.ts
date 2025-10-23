@@ -121,24 +121,3 @@ Return your response as a JSON object with a "recommendations" array.`;
   }
 }
 
-export async function analyzeCompetitors(
-  productTitle: string,
-  price: number
-): Promise<{
-  averagePrice: number;
-  pricePosition: "low" | "average" | "high";
-  recommendations: string[];
-}> {
-  // Simplified competitor analysis
-  // In production, this would scrape actual competitor data
-  const averagePrice = price * 1.15; // Mock: assume we're 15% below average
-  
-  return {
-    averagePrice,
-    pricePosition: price < averagePrice * 0.9 ? "low" : price > averagePrice * 1.1 ? "high" : "average",
-    recommendations: [
-      `Your price of $${price} is competitive. Consider testing $${(price * 0.9).toFixed(2)} for higher volume.`,
-      "Similar products in this category range from $" + (price * 0.8).toFixed(2) + " to $" + (price * 1.4).toFixed(2),
-    ],
-  };
-}
