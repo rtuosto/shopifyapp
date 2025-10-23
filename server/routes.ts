@@ -278,7 +278,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Activate test - deploy variant to Shopify
+  // Activate test - enable A/B testing WITHOUT modifying Shopify product
+  // The storefront JavaScript will handle showing control vs variant to users
   app.post("/api/tests/:id/activate", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
@@ -300,69 +301,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Product not found" });
       }
       
-      // Get Shopify session
-      const session = await sessionStorage.getSessionByShop(shop);
-      if (!session) {
-        return res.status(401).json({ error: "No valid Shopify session found" });
-      }
+      console.log(`[Test Activation] Activating A/B test ${testId} for product ${product.title}`);
+      console.log(`[Test Activation] Control:`, test.controlData);
+      console.log(`[Test Activation] Variant:`, test.variantData);
       
-      console.log(`[Test Activation] Deploying test ${testId} for product ${product.title}`);
-      console.log(`[Test Activation] Variant data:`, test.variantData);
-      
-      // CRITICAL: Fetch current product state from Shopify before making changes
-      // This ensures we can safely revert even if product was edited after test creation
-      const currentProductData = await getProductVariants(session, product.shopifyProductId);
-      const currentProduct = currentProductData?.product;
-      
-      if (!currentProduct) {
-        throw new Error("Failed to fetch current product state from Shopify");
-      }
-      
-      // Capture the actual current state as control data (all fields that might be changed)
-      // CRITICAL: Always capture all fields, even if empty, to ensure complete rollback
-      const actualControlData: Record<string, any> = {
-        title: currentProduct.title,
-        description: currentProduct.descriptionHtml || "", // Always capture, even if empty
-      };
-      
-      // Get current price from first variant
-      const currentVariants = currentProduct.variants?.edges || [];
-      if (currentVariants.length > 0) {
-        actualControlData.price = parseFloat(currentVariants[0].node.price);
-      }
-      
-      console.log(`[Test Activation] Captured current product state:`, actualControlData);
-      
-      // Build Shopify update payload
-      const updatePayload: any = {};
-      
-      if (test.variantData.title) {
-        updatePayload.title = test.variantData.title;
-      }
-      
-      if (test.variantData.description) {
-        updatePayload.descriptionHtml = test.variantData.description;
-      }
-      
-      // For price updates, we need variant IDs
-      if (test.variantData.price && currentVariants.length > 0) {
-        updatePayload.variants = currentVariants.map((edge: any) => ({
-          id: edge.node.id,
-          price: test.variantData.price.toString(),
-        }));
-      }
-      
-      // Update product in Shopify
-      await updateProduct(session, product.shopifyProductId, updatePayload);
-      
-      console.log(`[Test Activation] Successfully updated Shopify product`);
-      
-      // Update test status to active AND store actual control data
+      // Simply activate the test in our database - NO Shopify modifications
+      // The storefront JavaScript will dynamically show control/variant to users
       const activatedTest = await storage.updateTest(shop, testId, {
         status: "active",
         startDate: new Date(),
-        controlData: actualControlData, // Store the current state for safe rollback
       });
+      
+      console.log(`[Test Activation] Test activated - storefront will handle A/B display`);
       
       res.json({
         success: true,
@@ -376,7 +326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Deactivate test - revert to original product values
+  // Deactivate test - stop A/B testing (no Shopify changes needed)
   app.post("/api/tests/:id/deactivate", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
@@ -392,61 +342,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Only active tests can be deactivated" });
       }
       
-      // Get the product
-      const product = await storage.getProduct(shop, test.productId);
-      if (!product) {
-        return res.status(404).json({ error: "Product not found" });
-      }
+      console.log(`[Test Deactivation] Stopping A/B test ${testId}`);
       
-      // Get Shopify session
-      const session = await sessionStorage.getSessionByShop(shop);
-      if (!session) {
-        return res.status(401).json({ error: "No valid Shopify session found" });
-      }
-      
-      console.log(`[Test Deactivation] Reverting test ${testId} for product ${product.title}`);
-      console.log(`[Test Deactivation] Control data:`, test.controlData);
-      
-      // Build Shopify update payload to revert to control
-      // CRITICAL: Check field existence, not truthiness, to handle empty strings
-      const updatePayload: any = {};
-      
-      if ("title" in test.controlData) {
-        updatePayload.title = test.controlData.title;
-      }
-      
-      if ("description" in test.controlData) {
-        updatePayload.descriptionHtml = test.controlData.description;
-      }
-      
-      // For price updates, we need to get variant IDs first
-      if (test.controlData.price) {
-        const variantsData = await getProductVariants(session, product.shopifyProductId);
-        const variants = variantsData?.product?.variants?.edges || [];
-        
-        if (variants.length > 0) {
-          updatePayload.variants = variants.map((edge: any) => ({
-            id: edge.node.id,
-            price: test.controlData.price.toString(),
-          }));
-        }
-      }
-      
-      // Update product in Shopify to revert changes
-      await updateProduct(session, product.shopifyProductId, updatePayload);
-      
-      console.log(`[Test Deactivation] Successfully reverted Shopify product`);
-      
-      // Update test status to completed
+      // Simply mark test as completed - NO Shopify modifications needed
+      // Product was never changed, so nothing to revert
       const deactivatedTest = await storage.updateTest(shop, testId, {
         status: "completed",
         endDate: new Date(),
       });
       
+      console.log(`[Test Deactivation] Test stopped - storefront will no longer show variants`);
+      
       res.json({
         success: true,
         test: deactivatedTest,
-        message: "Test deactivated and product reverted successfully",
+        message: "Test deactivated successfully",
       });
     } catch (error) {
       console.error("Error deactivating test:", error);
