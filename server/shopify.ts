@@ -25,47 +25,75 @@ export async function fetchProducts(session: Session) {
     });
     
     const client = new shopify.clients.Graphql({ session });
+    let allProducts: any[] = [];
+    let hasNextPage = true;
+    let cursor: string | null = null;
     
-    console.log('[Shopify API] Executing GraphQL query...');
-    const response = await client.request(`
-      query {
-        products(first: 50) {
-          edges {
-            node {
-              id
-              title
-              description
-              priceRangeV2 {
-                minVariantPrice {
-                  amount
-                  currencyCode
+    while (hasNextPage) {
+      console.log('[Shopify API] Executing GraphQL query...', cursor ? `after: ${cursor}` : 'initial page');
+      
+      const response = await client.request(`
+        query ($cursor: String) {
+          products(first: 50, after: $cursor) {
+            edges {
+              node {
+                id
+                title
+                description
+                priceRangeV2 {
+                  minVariantPrice {
+                    amount
+                    currencyCode
+                  }
+                  maxVariantPrice {
+                    amount
+                    currencyCode
+                  }
                 }
-                maxVariantPrice {
-                  amount
-                  currencyCode
-                }
-              }
-              images(first: 5) {
-                edges {
-                  node {
-                    url
+                images(first: 5) {
+                  edges {
+                    node {
+                      url
+                    }
                   }
                 }
               }
+              cursor
+            }
+            pageInfo {
+              hasNextPage
+              endCursor
             }
           }
         }
-      }
-    `);
+      `, {
+        variables: {
+          cursor
+        }
+      });
 
-    console.log('[Shopify API] Raw response:', JSON.stringify(response, null, 2));
-    console.log('[Shopify API] Response data:', JSON.stringify(response.data, null, 2));
-    
-    if (response.errors) {
-      console.error('[Shopify API] GraphQL errors:', response.errors);
+      if (response.errors) {
+        console.error('[Shopify API] GraphQL errors:', response.errors);
+        throw new Error(`GraphQL errors: ${JSON.stringify(response.errors)}`);
+      }
+      
+      const data = response.data as any;
+      const products = data?.products?.edges || [];
+      allProducts = allProducts.concat(products);
+      
+      hasNextPage = data?.products?.pageInfo?.hasNextPage || false;
+      cursor = data?.products?.pageInfo?.endCursor || null;
+      
+      console.log('[Shopify API] Fetched ${products.length} products, hasNextPage: ${hasNextPage}');
     }
     
-    return response.data;
+    console.log(`[Shopify API] Total products fetched: ${allProducts.length}`);
+    
+    return {
+      products: {
+        edges: allProducts
+      }
+    };
   } catch (error) {
     console.error('[Shopify API] Error fetching products:', error);
     if (error instanceof Error) {
