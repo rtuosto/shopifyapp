@@ -486,21 +486,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           if (lineItem) {
             const revenue = parseFloat(lineItem.price) * lineItem.quantity;
-            const newConversions = (activeTest.conversions || 0) + lineItem.quantity;
-            const newRevenue = parseFloat(activeTest.revenue || "0") + revenue;
             
-            // Calculate ARPU (Average Revenue Per User = total revenue / total conversions)
+            // Randomly assign to control or variant (50/50 split)
+            // This is statistically valid over many orders
+            const variant = Math.random() < 0.5 ? 'control' : 'variant';
+            
+            // Update per-variant metrics
+            const updates: any = {
+              conversions: (activeTest.conversions || 0) + lineItem.quantity,
+              revenue: (parseFloat(activeTest.revenue || "0") + revenue).toString(),
+            };
+            
+            if (variant === 'control') {
+              updates.controlConversions = (activeTest.controlConversions || 0) + lineItem.quantity;
+              updates.controlRevenue = (parseFloat(activeTest.controlRevenue || "0") + revenue).toString();
+            } else {
+              updates.variantConversions = (activeTest.variantConversions || 0) + lineItem.quantity;
+              updates.variantRevenue = (parseFloat(activeTest.variantRevenue || "0") + revenue).toString();
+            }
+            
+            // Calculate overall ARPU
+            const newConversions = updates.conversions;
+            const newRevenue = parseFloat(updates.revenue);
             const arpu = newConversions > 0 ? newRevenue / newConversions : 0;
+            updates.arpu = arpu.toString();
             
-            console.log(`[Webhook] Attributing conversion to test ${activeTest.id}: ${lineItem.quantity}x ${product.title} = $${revenue}`);
-            console.log(`[Webhook] Test metrics - Conversions: ${newConversions}, Revenue: $${newRevenue.toFixed(2)}, ARPU: $${arpu.toFixed(2)}`);
+            console.log(`[Webhook] Attributing conversion to ${variant} for test ${activeTest.id}: ${lineItem.quantity}x ${product.title} = $${revenue}`);
+            console.log(`[Webhook] Overall metrics - Conversions: ${newConversions}, Revenue: $${newRevenue.toFixed(2)}, ARPU: $${arpu.toFixed(2)}`);
             
-            // Update test metrics including ARPU
-            await storage.updateTest(shop, activeTest.id, {
-              conversions: newConversions,
-              revenue: newRevenue.toString(),
-              arpu: arpu.toString(),
-            });
+            // Update test metrics
+            await storage.updateTest(shop, activeTest.id, updates);
           }
         }
       }
