@@ -421,6 +421,8 @@ export default function Dashboard() {
   const handleApproveAndLaunch = async () => {
     if (!selectedRecommendation) return;
 
+    let createdTestId: string | null = null;
+    
     try {
       // Step 1: Create the test
       const recommendation = selectedRecommendation;
@@ -457,12 +459,18 @@ export default function Dashboard() {
 
       const createRes = await apiRequest("POST", "/api/tests", testData);
       const createdTest = await createRes.json();
+      createdTestId = createdTest.id;
 
       // Step 2: Update recommendation status
       await apiRequest("PATCH", `/api/recommendations/${recommendation.id}`, { status: "accepted" });
 
-      // Step 3: Activate the test
-      await apiRequest("POST", `/api/tests/${createdTest.id}/activate`);
+      // Step 3: Activate the test - critical step
+      try {
+        await apiRequest("POST", `/api/tests/${createdTest.id}/activate`);
+      } catch (activationError) {
+        // If activation fails, throw a specific error so we can show recovery guidance
+        throw new Error(`Test created but activation failed. Please activate manually from Active Tests page.`);
+      }
 
       toast({
         title: "Test Launched!",
@@ -471,15 +479,33 @@ export default function Dashboard() {
 
       // Step 4: Close modal and refresh data
       setPreviewOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/recommendations"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/recommendations"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Could not create and launch test";
+      
       toast({
         title: "Failed to Launch Test",
-        description: error instanceof Error ? error.message : "Could not create and launch test",
+        description: errorMessage,
         variant: "destructive",
       });
+
+      // If test was created but activation failed, provide recovery guidance
+      if (createdTestId && errorMessage.includes("activation failed")) {
+        setTimeout(() => {
+          toast({
+            title: "Recovery Option",
+            description: "The test was created but not activated. You can activate it from the Tests page.",
+            variant: "default",
+          });
+        }, 2000);
+      }
+
+      // Refresh to show current state
+      await queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/recommendations"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
     }
   };
 

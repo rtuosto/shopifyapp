@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,9 +16,10 @@ export default function ActiveTests() {
   const { toast } = useToast();
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
 
-  // Fetch all tests
-  const { data: tests = [] } = useQuery<Test[]>({
+  // Fetch all tests with auto-refresh using refetchInterval
+  const { data: tests = [], isLoading: testsLoading } = useQuery<Test[]>({
     queryKey: ["/api/tests"],
+    refetchInterval: autoRefreshEnabled ? 2000 : false,
   });
 
   // Fetch all products
@@ -33,18 +34,6 @@ export default function ActiveTests() {
       ...test,
       productName: products.find((p: Product) => p.id === test.productId)?.title || "Unknown Product",
     }));
-
-  // Auto-refresh every 2 seconds
-  useEffect(() => {
-    if (!autoRefreshEnabled) return;
-
-    const interval = setInterval(() => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [autoRefreshEnabled]);
 
   // Deactivate test mutation
   const deactivateTestMutation = useMutation({
@@ -70,10 +59,13 @@ export default function ActiveTests() {
     },
   });
 
-  // Calculate summary metrics
+  // Calculate summary metrics with safe parsing
   const totalImpressions = activeTests.reduce((sum, t) => sum + (t.impressions || 0), 0);
   const totalConversions = activeTests.reduce((sum, t) => sum + (t.conversions || 0), 0);
-  const totalRevenue = activeTests.reduce((sum, t) => sum + parseFloat(t.revenue || "0"), 0);
+  const totalRevenue = activeTests.reduce((sum, t) => {
+    const revenue = t.revenue ? parseFloat(t.revenue) : 0;
+    return sum + (isNaN(revenue) ? 0 : revenue);
+  }, 0);
   const averageArpu = totalConversions > 0 ? totalRevenue / totalConversions : 0;
   const averageConversionRate = totalImpressions > 0 ? (totalConversions / totalImpressions) * 100 : 0;
 
@@ -156,7 +148,16 @@ export default function ActiveTests() {
       )}
 
       {/* Active Tests List */}
-      {activeTests.length === 0 ? (
+      {testsLoading ? (
+        <Card data-testid="card-loading">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <div className="text-center space-y-2">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+              <p className="text-sm text-muted-foreground">Loading active tests...</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : activeTests.length === 0 ? (
         <Card data-testid="card-no-tests">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <div className="text-center space-y-2">
@@ -233,7 +234,10 @@ export default function ActiveTests() {
                       <div className="space-y-1">
                         <p className="text-xs text-muted-foreground">Revenue</p>
                         <p className="text-2xl font-bold" data-testid={`text-revenue-${index}`}>
-                          ${parseFloat(test.revenue || "0").toFixed(2)}
+                          ${(() => {
+                            const rev = test.revenue ? parseFloat(test.revenue) : 0;
+                            return (isNaN(rev) ? 0 : rev).toFixed(2);
+                          })()}
                         </p>
                       </div>
 
@@ -241,7 +245,10 @@ export default function ActiveTests() {
                       <div className="space-y-1">
                         <p className="text-xs text-muted-foreground">ARPU</p>
                         <p className="text-2xl font-bold" data-testid={`text-arpu-${index}`}>
-                          ${parseFloat(test.arpu || "0").toFixed(2)}
+                          ${(() => {
+                            const arpu = test.arpu ? parseFloat(test.arpu) : 0;
+                            return (isNaN(arpu) ? 0 : arpu).toFixed(2);
+                          })()}
                         </p>
                       </div>
 
@@ -250,7 +257,7 @@ export default function ActiveTests() {
                         <p className="text-xs text-muted-foreground">ARPU Lift</p>
                         <div className="flex items-center gap-1">
                           <p className={`text-2xl font-bold ${arpuLift > 0 ? 'text-chart-4' : arpuLift < 0 ? 'text-destructive' : ''}`} data-testid={`text-arpu-lift-${index}`}>
-                            {formatPercentage(arpuLift)}
+                            {isNaN(arpuLift) ? "0.0%" : formatPercentage(arpuLift)}
                           </p>
                           {arpuLift > 0 && <ArrowUpRight className="w-5 h-5 text-chart-4" />}
                           {arpuLift < 0 && <ArrowDownRight className="w-5 h-5 text-destructive" />}
