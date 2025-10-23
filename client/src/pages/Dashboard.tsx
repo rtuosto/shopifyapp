@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import DashboardHeader from "@/components/DashboardHeader";
 import MetricCard from "@/components/MetricCard";
@@ -10,11 +10,20 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Product, Recommendation, Test, Metric } from "@shared/schema";
 
+interface SyncStatus {
+  syncing: boolean;
+  lastSyncTime?: string;
+  lastSyncSuccess?: boolean;
+  lastSyncError?: string;
+  productCount?: number;
+}
+
 interface DashboardData {
   totalProducts: number;
   pendingRecommendations: number;
   activeTests: number;
   latestMetric?: Metric;
+  syncStatus?: SyncStatus;
 }
 
 interface EnrichedTest extends Test {
@@ -79,10 +88,45 @@ export default function Dashboard() {
     },
   });
 
-  // Fetch dashboard data
+  // Fetch dashboard data (poll more frequently if syncing)
   const { data: dashboardData } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
+    refetchInterval: (query) => {
+      const data = query.state.data as DashboardData | undefined;
+      // Poll every 2 seconds if syncing, otherwise every 30 seconds
+      return data?.syncStatus?.syncing ? 2000 : 30000;
+    },
   });
+
+  // Track previous sync status to detect changes
+  const prevSyncStatusRef = useRef<SyncStatus | undefined>();
+  
+  useEffect(() => {
+    const currentStatus = dashboardData?.syncStatus;
+    const prevStatus = prevSyncStatusRef.current;
+    
+    // Detect sync completion or failure
+    if (prevStatus && currentStatus) {
+      // Sync just completed successfully
+      if (prevStatus.syncing && !currentStatus.syncing && currentStatus.lastSyncSuccess) {
+        toast({
+          title: "Products Synced",
+          description: `Successfully synced ${currentStatus.productCount} products from Shopify`,
+        });
+      }
+      
+      // Sync just failed
+      if (prevStatus.syncing && !currentStatus.syncing && currentStatus.lastSyncSuccess === false) {
+        toast({
+          title: "Sync Failed",
+          description: currentStatus.lastSyncError || "Failed to sync products from Shopify",
+          variant: "destructive",
+        });
+      }
+    }
+    
+    prevSyncStatusRef.current = currentStatus;
+  }, [dashboardData?.syncStatus, toast]);
 
   // Fetch recommendations
   const { data: recommendations = [] } = useQuery<Recommendation[]>({
@@ -153,11 +197,29 @@ export default function Dashboard() {
     startDate: test.startDate ? new Date(test.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not started',
   }));
 
+  // Calculate last sync time
+  const getLastSyncText = () => {
+    const syncStatus = dashboardData?.syncStatus;
+    if (syncStatus?.syncing) return "Syncing...";
+    if (!syncStatus?.lastSyncTime) return "Never";
+    
+    const lastSync = new Date(syncStatus.lastSyncTime);
+    const now = new Date();
+    const diffMs = now.getTime() - lastSync.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins} min ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return lastSync.toLocaleDateString();
+  };
+
   return (
     <div className="space-y-6">
       <DashboardHeader 
         activeTests={activeTestsCount} 
-        lastSync="5 min ago"
+        lastSync={getLastSyncText()}
         onRefresh={() => syncMutation.mutate()}
       />
       

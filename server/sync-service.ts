@@ -2,6 +2,7 @@ import { Session } from "@shopify/shopify-api";
 import { fetchProducts } from "./shopify";
 import { storage } from "./storage";
 import { InsertProduct } from "@shared/schema";
+import { startSync, completeSyncSuccess, completeSyncError } from "./sync-status";
 
 interface ShopifyProduct {
   id: string;
@@ -28,6 +29,7 @@ interface ShopifyProduct {
 
 export async function syncProductsFromShopify(session: Session): Promise<number> {
   try {
+    startSync(session.shop);
     console.log(`Starting product sync for shop: ${session.shop}`);
     
     const response = await fetchProducts(session);
@@ -61,9 +63,12 @@ export async function syncProductsFromShopify(session: Session): Promise<number>
       syncedCount++;
     }
     
+    completeSyncSuccess(session.shop, syncedCount);
     console.log(`Successfully synced ${syncedCount} products for shop: ${session.shop}`);
     return syncedCount;
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    completeSyncError(session.shop, errorMessage);
     console.error("Error syncing products from Shopify:", error);
     throw error;
   }

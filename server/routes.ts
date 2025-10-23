@@ -6,6 +6,7 @@ import { generateOptimizationRecommendations, analyzeCompetitors } from "./ai-se
 import { insertRecommendationSchema, insertTestSchema } from "@shared/schema";
 import { requireShopifySessionOrDev } from "./middleware/shopify-auth";
 import { syncProductsFromShopify, initializeShopData } from "./sync-service";
+import { getSyncStatus } from "./sync-status";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Health check
@@ -222,11 +223,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dashboard", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
-      const [products, recommendations, tests, latestMetric] = await Promise.all([
+      const [products, recommendations, tests, latestMetric, syncStatus] = await Promise.all([
         storage.getProducts(shop),
         storage.getRecommendations(shop, "pending"),
         storage.getTests(shop, "active"),
         storage.getLatestMetric(shop),
+        Promise.resolve(getSyncStatus(shop)),
       ]);
 
       res.json({
@@ -234,6 +236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pendingRecommendations: recommendations.length,
         activeTests: tests.length,
         latestMetric,
+        syncStatus,
       });
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
@@ -261,7 +264,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error syncing products:", error);
-      res.status(500).json({ error: "Failed to sync products from Shopify" });
+      const errorMessage = error instanceof Error ? error.message : "Failed to sync products from Shopify";
+      res.status(500).json({ error: errorMessage });
     }
   });
 
