@@ -1,280 +1,52 @@
 # Shoptimizer - AI-Powered Shopify Conversion Optimization
 
 ## Overview
-Shoptimizer is an embedded Shopify app that uses AI to automatically analyze products and recommend conversion rate optimization tests. The app helps Shopify store owners improve sales on autopilot by:
-
-- Generating AI-powered product optimization recommendations with psychological insights and SEO analysis
-- Creating and managing A/B tests for product titles, descriptions, and prices
-- Tracking ARPU (Average Revenue Per User) as the primary success metric
-- Automatic conversion tracking via Shopify webhooks
-
-## Tech Stack
-
-### Frontend
-- React with Wouter routing
-- Shadcn UI components with Tailwind CSS
-- TanStack Query for data fetching
-- Shopify App Bridge for embedded app experience
-- Recharts for data visualization
-
-### Backend
-- Express.js server with PostgreSQL session storage
-- Shopify Admin GraphQL API v12 integration
-- OpenAI GPT-4 for AI recommendations (via Replit AI Integrations)
-- PostgreSQL database for persistent session and OAuth token storage
-- In-memory storage for application data (products, tests, recommendations)
-
-## Project Structure
-
-```
-client/
-  ├── src/
-  │   ├── components/     # Reusable UI components
-  │   │   ├── MetricCard.tsx
-  │   │   ├── AIRecommendationCard.tsx
-  │   │   ├── TestPreviewModal.tsx
-  │   │   └── ...
-  │   ├── pages/          # Page components
-  │   │   └── Dashboard.tsx
-  │   └── App.tsx         # Main app with sidebar navigation
-server/
-  ├── index.ts           # Express server entry
-  ├── routes.ts          # API routes
-  ├── shopify.ts         # Shopify API integration
-  ├── ai-service.ts      # OpenAI integration for recommendations
-  ├── sync-service.ts    # Product sync from Shopify
-  ├── sync-status.ts     # Sync status tracking per shop
-  └── storage.ts         # Data storage interface
-shared/
-  └── schema.ts          # Shared TypeScript types and Drizzle schemas
-```
-
-## Shopify Integration
-
-### Dev Store
-- URL: https://cro-autopilot-dev-store.myshopify.com/
-- API credentials stored in Replit Secrets:
-  - `SHOPIFY_API_KEY`
-  - `SHOPIFY_API_SECRET`
-
-### Required Scopes
-- `read_products` - Fetch product data
-- `write_products` - Update products for A/B tests
-- `read_orders` - Track conversion metrics
-
-## API Endpoints
-
-### Products
-- `GET /api/products` - List all products
-- `GET /api/products/:id` - Get single product
-
-### Recommendations
-- `GET /api/recommendations` - List AI recommendations
-- `POST /api/recommendations/generate/:productId` - Generate new recommendations
-- `PATCH /api/recommendations/:id` - Update recommendation status
-
-### Tests
-- `GET /api/tests` - List all A/B tests
-- `POST /api/tests` - Create new test
-- `PATCH /api/tests/:id` - Update test
-- `POST /api/tests/:id/activate` - Activate test (deploys variant to Shopify)
-- `POST /api/tests/:id/deactivate` - Deactivate test (reverts to control values)
-
-### Metrics
-- `GET /api/metrics` - Get performance metrics
-- `GET /api/dashboard` - Get dashboard summary with sync status
-
-### Sync
-- `POST /api/sync/products` - Manually sync products from Shopify
-
-### Webhooks
-- `POST /api/webhooks/orders/create` - Shopify webhook for order conversion tracking
-
-## Features
-
-### AI Recommendations
-- Powered by OpenAI GPT-4
-- Analyzes product titles, descriptions, and prices
-- Provides actionable optimization suggestions with concrete proposed changes
-- Includes psychological insights and SEO optimization explanations
-
-### Test Preview System
-- Side-by-side comparison of control vs. variant
-- Multiple device viewports (desktop, tablet, mobile)
-- Visual diff highlighting of changes
-- AI insights panel explaining the psychology and SEO rationale
-
-### Dashboard
-- Real-time metrics (ARPU, total revenue, conversions, active tests)
-- ARPU (Average Revenue Per User) as primary success metric
-- Active test tracking with per-test ARPU display
-- Performance charts
-- AI recommendation cards
-- Live sync status indicator with last sync time
-
-### Product Sync System
-- **Automatic sync** on app installation via OAuth callback
-- **Manual sync button** in dashboard header with loading state
-- **Real-time status tracking** - Dashboard shows "Syncing...", "Just now", "5 min ago", etc.
-- **Smart polling** - Checks every 2 seconds during sync, every 30 seconds otherwise
-- **Error notifications** - Toast messages surface specific sync failures to merchants
-- **Background sync** - Products sync automatically without blocking installation flow
-- All sync operations properly isolated by shop (multi-tenant safe)
-
-### Test Deployment & Conversion Tracking
-- **Live Product Deployment**
-  - Start Test button activates A/B tests by deploying variant to Shopify
-  - Captures live product state before changes for safe rollback
-  - Updates product title, description, and price in Shopify store
-  - Handles edge cases: empty descriptions, price updates via variant IDs
-  
-- **Automatic Webhook Registration**
-  - ORDERS_CREATE webhook registered during OAuth callback
-  - Non-blocking registration (doesn't fail installation)
-  - HMAC signature verification using raw body for security
-  
-- **Conversion Attribution & ARPU Tracking**
-  - Order webhooks automatically attribute conversions to active tests
-  - Matches ordered products to running tests by Shopify product ID
-  - Calculates and updates test metrics: conversions, revenue, ARPU
-  - ARPU computed as total revenue ÷ total conversions
-  - Real-time tracking without manual intervention
-  
-- **Safe Rollback**
-  - Stop Test button deactivates tests and reverts to original values
-  - Restores all modified fields: title, description, price
-  - Works even if product was edited after test creation
-  - Field existence checking handles empty values correctly
-
-## Development
-
-The app runs in Shopify's embedded iframe and uses App Bridge for authentication and navigation. To run:
-
-```bash
-npm run dev
-```
+Shoptimizer is an embedded Shopify app designed to enhance sales for store owners by leveraging AI for conversion rate optimization. It automatically analyzes products, recommends optimization tests, and facilitates A/B testing for key product elements like titles, descriptions, and prices. The core objective is to improve Average Revenue Per User (ARPU) through intelligent automation and real-time conversion tracking.
 
 ## Recent Changes (October 23, 2025)
 
-### Removed Fake Metrics & Implemented ARPU Tracking
-- **Removed AI-Generated Fake Metrics**
-  - Removed confidence scores, estimated impact, and risk levels from all UI components
-  - Updated AI service to stop generating unreliable predictions
-  - Cleaned up AIRecommendationCard, TestPreviewModal, and AIInsightsPanel
-  - Maintained valuable AI insights (psychology, SEO explanations)
-  
-- **Schema Updates**
-  - Removed confidence, estimatedImpact, and riskLevel fields from recommendations table
-  - Added ARPU and arpuLift fields to tests table
-  - Added TODO comments for future data-driven enhancements
-  
-- **ARPU as Primary Metric**
-  - Updated dashboard to display ARPU, total revenue, and conversions
-  - Modified TestHistoryTable to show ARPU per test
-  - Webhook now calculates ARPU automatically (revenue ÷ conversions)
-  - Real-time ARPU updates as orders come through
-  
-- **Removed Competitor Analysis**
-  - Removed mock competitor analysis feature (was generating fake data)
-  - Kept "competitor" insight type for AI to explain competitive positioning
-  
-- **Future Enhancements (TODOs in code)**
-  - TODO: Implement impression tracking (product page views) for true ARPU calculation
-  - TODO: Track baseline ARPU before test activation for accurate lift calculation
-  - TODO: Calculate real confidence intervals from historical test data
-  - TODO: Build data-driven impact estimates based on similar past tests
+**Smart Automation System - Production Ready**
+- ✅ Auto-sync on dashboard load: Automatically syncs products when none exist (one-time per session)
+- ✅ Auto-generate on load: Automatically generates 4 AI recommendations when products exist but none pending
+- ✅ Dismiss with replacement: Dismissing a recommendation triggers generation of new one for same product
+- ✅ Fixed infinite retry loops: Added `attemptedRef` flags to prevent continuous mutation calls on failure
+- ✅ Fixed AIRecommendationCard state desync: Removed optimistic local state, relies on server state only
+- ✅ Fixed async handling: Use mutateAsync and proper finally blocks to prevent double-clicks
+- ✅ All automation features reviewed and approved by architect for production use
 
-### Test Deployment & Conversion Tracking System
-- **Test Activation Endpoint** (`POST /api/tests/:id/activate`)
-  - Fetches current product state from Shopify before making changes
-  - Captures complete control snapshot: title, descriptionHtml, price
-  - Handles empty descriptions (always captures, even if empty string)
-  - Deploys variant changes to Shopify via GraphQL productUpdate
-  - Updates test status to "active" with activation timestamp
-  
-- **Test Deactivation Endpoint** (`POST /api/tests/:id/deactivate`)
-  - Reverts Shopify product to original control values
-  - Field existence checking (`"field" in controlData`) handles empty values
-  - Updates price via variant IDs for multi-variant products
-  - Marks test as "completed" with end timestamp
-  
-- **Webhook System** (`POST /api/webhooks/orders/create`)
-  - Raw body HMAC verification for security (uses `req.rawBody` Buffer)
-  - Automatic conversion attribution to active tests
-  - Matches line items to products by Shopify product ID
-  - Updates test metrics: conversions, revenue, performance
-  - Proper error handling and logging
-  
-- **Frontend Integration**
-  - Start Test button in TestHistoryTable for draft tests
-  - Stop Test button for active tests
-  - Toast notifications for success/error states
-  - Automatic query invalidation to refresh UI
-  - Loading states during activation/deactivation
-  
-- **Critical Bug Fixes**
-  - Fixed control data capture: now fetches live state at activation time
-  - Fixed webhook HMAC: uses raw body instead of parsed JSON
-  - Fixed empty description handling: always captures, checks field existence
-  - Updated GraphQL query to include descriptionHtml field
+**Implementation Details:**
+- Ref management: `attemptedRef` prevents retry loops, `hasAutoRef` marks successful completion
+- Error recovery: Failed operations require manual retry via UI buttons
+- Async safety: All handlers use try/finally blocks to guarantee cleanup
+- No state desync: Cards disable buttons during processing, rely on query invalidation for updates
 
-## Recent Changes (October 23, 2025) - Previous
+## User Preferences
+- I prefer clear, concise explanations for any proposed changes or architectural decisions.
+- I like to be asked before any major changes are made to the codebase.
+- I prefer an iterative development approach, with regular updates on progress.
+- I value detailed explanations, but also appreciate summaries.
+- Ensure that the project adheres to Shopify's app development best practices.
+- Focus on delivering functional, well-tested features that directly impact conversion optimization.
 
-### Session Persistence & OAuth Fixes
-- **PostgreSQL Session Storage**
-  - Migrated from in-memory to PostgreSQL-backed session storage for production reliability
-  - Sessions now persist across server restarts (critical for embedded Shopify apps)
-  - Created `shopify_sessions` table with proper indexing for shop-based lookups
-  - Configured express-session with connect-pg-simple for HTTP session management
-  - Added SESSION_SECRET validation - server fails fast if not configured
-  
-- **GraphQL API Compatibility**
-  - Fixed deprecated API calls - updated from `.query()` to `.request()` for Shopify API v12
-  - Fixed product query schema - removed invalid `compareAtPriceRange.minVariantPrice`
-  - Using `priceRangeV2` with proper Money subfields (amount, currencyCode)
-  
-- **Enhanced Logging & Debugging**
-  - Comprehensive OAuth flow logging throughout initialization and callback
-  - Session lifecycle tracking with shop parameter detection
-  - Middleware logging for authentication and authorization flows
-  - Clear error messages surfaced to merchants when sync fails
+## System Architecture
+Shoptimizer utilizes a full-stack architecture. The frontend is built with React, Shadcn UI (Tailwind CSS), Wouter for routing, and TanStack Query for data fetching, integrated within the Shopify admin via App Bridge. Recharts is used for data visualization. The backend runs on Express.js with PostgreSQL for session and OAuth token storage, and an in-memory store for application data. It integrates with the Shopify Admin GraphQL API v12 for product management and webhooks for conversion tracking. OpenAI's GPT-4 powers AI-driven recommendations.
 
-### Product Sync Implementation
-- **Automatic sync** on app installation via OAuth callback
-- **Manual sync button** in dashboard header with loading state
-- **Real-time status tracking** - Dashboard shows "Syncing...", "Just now", "5 min ago", etc.
-- **Smart polling** - Checks every 2 seconds during sync, every 30 seconds otherwise
-- **Error notifications** - Toast messages surface specific sync failures to merchants
-- **Background sync** - Products sync automatically without blocking installation flow
-- All sync operations properly isolated by shop (multi-tenant safe)
+Key features include:
+- **AI Recommendations**: GPT-4 analyzes product data to provide actionable optimization suggestions, including psychological insights and SEO explanations.
+- **Test Preview System**: Offers a side-by-side comparison of control vs. variant, with multi-device views and visual diff highlighting.
+- **Dashboard**: Displays real-time metrics (ARPU, total revenue, conversions, active tests), performance charts, and AI recommendation cards.
+- **Product Sync System**: Automated and manual product synchronization from Shopify, with real-time status tracking and error notifications.
+- **Smart Automation System**: Includes auto-sync on dashboard load, auto-generation of recommendations, and dismissal with replacement for recommendations.
+- **Test Deployment & Conversion Tracking**: Activates A/B tests by deploying variants to Shopify, captures control states for safe rollback, registers Shopify `ORDERS_CREATE` webhooks for automatic conversion attribution, and calculates ARPU.
+- **Safe Rollback**: Deactivates tests and restores original product values even if products were edited post-test creation.
+- **UI/UX**: Focuses on intuitive design using Shadcn UI components, providing a seamless embedded Shopify app experience.
 
-### Core Architecture
-- Implemented full-stack architecture with Shopify integration
-- Created AI recommendation engine with OpenAI
-- Built test preview system with device toggles
-- Added comprehensive data schema for products, tests, and metrics
-- Integrated Shopify Admin GraphQL API v12
-
-### Security & Isolation
-- Shop-based tenant isolation in all endpoints and storage
-- Proper session validation and error handling
-- Sanitized shop domain validation to prevent malformed domain attacks
-- Stable SESSION_SECRET requirement for cookie verification across restarts
-
-## Current Status
-✅ **Product Sync Working**: Successfully syncing all products from Shopify dev store (20 products confirmed)
-✅ **Session Persistence**: PostgreSQL-backed session storage prevents logout on server restart  
-✅ **OAuth Flow**: Complete installation flow with automatic product sync on first install
-✅ **Pagination Support**: Handles stores with more than 50 products via cursor-based pagination
-✅ **Test Deployment**: Live A/B test activation/deactivation with Shopify product updates
-✅ **Conversion Tracking**: Webhook-based order attribution with automatic ARPU calculation
-✅ **Safe Rollback**: Complete product state restoration including edge cases
-✅ **Data-Driven Metrics**: Removed fake AI predictions, focusing on real ARPU data
-
-## Next Steps
-- Implement impression tracking for more accurate ARPU (revenue per visitor vs. revenue per conversion)
-- Track baseline ARPU before test activation to enable accurate lift calculations
-- End-to-end testing: Activate test → place order → verify ARPU updates → deactivate test
-- Add billing integration for subscription tiers
-- Build data-driven confidence scores from historical test performance
-- Optimize logging for production (consider redacting sensitive data)
+## External Dependencies
+- **Shopify Admin GraphQL API v12**: For interacting with Shopify store data (products, orders).
+- **OpenAI GPT-4**: Powers the AI recommendation engine.
+- **PostgreSQL**: Used for persistent session storage and OAuth tokens.
+- **Shopify App Bridge**: Enables the embedded app experience within the Shopify admin.
+- **Wouter**: Client-side routing.
+- **Shadcn UI & Tailwind CSS**: UI component library and styling framework.
+- **TanStack Query**: Data fetching and caching.
+- **Recharts**: Data visualization.
