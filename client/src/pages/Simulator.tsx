@@ -62,7 +62,7 @@ export default function Simulator() {
 
   // Fetch active tests
   const { data: tests = [], isLoading: testsLoading } = useQuery<EnrichedTest[]>({
-    queryKey: ["/api/tests", "active"],
+    queryKey: ["/api/tests"],
     select: (data) => data.filter((t: Test) => t.status === "active"),
   });
 
