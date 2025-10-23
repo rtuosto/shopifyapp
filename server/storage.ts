@@ -11,41 +11,42 @@ import {
 import { randomUUID } from "crypto";
 
 export interface IStorage {
-  // Products
-  getProduct(id: string): Promise<Product | undefined>;
-  getProducts(): Promise<Product[]>;
-  getProductByShopifyId(shopifyProductId: string): Promise<Product | undefined>;
-  createProduct(product: InsertProduct): Promise<Product>;
-  updateProduct(id: string, product: Partial<InsertProduct>): Promise<Product | undefined>;
-  deleteProduct(id: string): Promise<boolean>;
+  // Products (shop-scoped)
+  getProduct(shop: string, id: string): Promise<Product | undefined>;
+  getProducts(shop: string): Promise<Product[]>;
+  getProductByShopifyId(shop: string, shopifyProductId: string): Promise<Product | undefined>;
+  createProduct(shop: string, product: InsertProduct): Promise<Product>;
+  updateProduct(shop: string, id: string, product: Partial<InsertProduct>): Promise<Product | undefined>;
+  deleteProduct(shop: string, id: string): Promise<boolean>;
 
-  // Recommendations
-  getRecommendation(id: string): Promise<Recommendation | undefined>;
-  getRecommendations(status?: string): Promise<Recommendation[]>;
-  getRecommendationsByProduct(productId: string): Promise<Recommendation[]>;
-  createRecommendation(recommendation: InsertRecommendation): Promise<Recommendation>;
-  updateRecommendation(id: string, recommendation: Partial<InsertRecommendation>): Promise<Recommendation | undefined>;
-  deleteRecommendation(id: string): Promise<boolean>;
+  // Recommendations (shop-scoped)
+  getRecommendation(shop: string, id: string): Promise<Recommendation | undefined>;
+  getRecommendations(shop: string, status?: string): Promise<Recommendation[]>;
+  getRecommendationsByProduct(shop: string, productId: string): Promise<Recommendation[]>;
+  createRecommendation(shop: string, recommendation: InsertRecommendation): Promise<Recommendation>;
+  updateRecommendation(shop: string, id: string, recommendation: Partial<InsertRecommendation>): Promise<Recommendation | undefined>;
+  deleteRecommendation(shop: string, id: string): Promise<boolean>;
 
-  // Tests
-  getTest(id: string): Promise<Test | undefined>;
-  getTests(status?: string): Promise<Test[]>;
-  getTestsByProduct(productId: string): Promise<Test[]>;
-  createTest(test: InsertTest): Promise<Test>;
-  updateTest(id: string, test: Partial<InsertTest>): Promise<Test | undefined>;
-  deleteTest(id: string): Promise<boolean>;
+  // Tests (shop-scoped)
+  getTest(shop: string, id: string): Promise<Test | undefined>;
+  getTests(shop: string, status?: string): Promise<Test[]>;
+  getTestsByProduct(shop: string, productId: string): Promise<Test[]>;
+  createTest(shop: string, test: InsertTest): Promise<Test>;
+  updateTest(shop: string, id: string, test: Partial<InsertTest>): Promise<Test | undefined>;
+  deleteTest(shop: string, id: string): Promise<boolean>;
 
-  // Metrics
-  getMetrics(limit?: number): Promise<Metric[]>;
-  getLatestMetric(): Promise<Metric | undefined>;
-  createMetric(metric: InsertMetric): Promise<Metric>;
+  // Metrics (shop-scoped)
+  getMetrics(shop: string, limit?: number): Promise<Metric[]>;
+  getLatestMetric(shop: string): Promise<Metric | undefined>;
+  createMetric(shop: string, metric: InsertMetric): Promise<Metric>;
 }
 
 export class MemStorage implements IStorage {
-  private products: Map<string, Product>;
-  private recommendations: Map<string, Recommendation>;
-  private tests: Map<string, Test>;
-  private metrics: Map<string, Metric>;
+  // Shop-scoped storage: Map<shop, Map<id, entity>>
+  private products: Map<string, Map<string, Product>>;
+  private recommendations: Map<string, Map<string, Recommendation>>;
+  private tests: Map<string, Map<string, Test>>;
+  private metrics: Map<string, Map<string, Metric>>;
 
   constructor() {
     this.products = new Map();
@@ -53,11 +54,24 @@ export class MemStorage implements IStorage {
     this.tests = new Map();
     this.metrics = new Map();
     
-    // Initialize with sample data
-    this.initializeSampleData();
+    // Initialize with sample data for default dev shop
+    this.initializeSampleData("cro-autopilot-dev-store.myshopify.com");
+  }
+  
+  // Helper to ensure shop namespace exists
+  private ensureShopNamespace<T>(map: Map<string, Map<string, T>>, shop: string): Map<string, T> {
+    if (!map.has(shop)) {
+      map.set(shop, new Map());
+    }
+    return map.get(shop)!;
   }
 
-  private initializeSampleData() {
+  private initializeSampleData(shop: string) {
+    // Ensure namespaces exist
+    const products = this.ensureShopNamespace(this.products, shop);
+    const recommendations = this.ensureShopNamespace(this.recommendations, shop);
+    const tests = this.ensureShopNamespace(this.tests, shop);
+    const metrics = this.ensureShopNamespace(this.metrics, shop);
     // Sample products
     const product1: Product = {
       id: randomUUID(),
@@ -87,8 +101,8 @@ export class MemStorage implements IStorage {
       updatedAt: new Date(),
     };
 
-    this.products.set(product1.id, product1);
-    this.products.set(product2.id, product2);
+    products.set(product1.id, product1);
+    products.set(product2.id, product2);
 
     // Sample recommendations
     const rec1: Recommendation = {
@@ -158,8 +172,8 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
     };
 
-    this.recommendations.set(rec1.id, rec1);
-    this.recommendations.set(rec2.id, rec2);
+    recommendations.set(rec1.id, rec1);
+    recommendations.set(rec2.id, rec2);
 
     // Sample test
     const test1: Test = {
@@ -180,7 +194,7 @@ export class MemStorage implements IStorage {
       updatedAt: new Date(),
     };
 
-    this.tests.set(test1.id, test1);
+    tests.set(test1.id, test1);
 
     // Sample metrics
     const dates = ["Oct 1", "Oct 5", "Oct 10", "Oct 15", "Oct 20", "Oct 23"];
@@ -197,24 +211,28 @@ export class MemStorage implements IStorage {
         activeTests: index > 2 ? 8 : 5,
         createdAt: new Date(),
       };
-      this.metrics.set(metric.id, metric);
+      metrics.set(metric.id, metric);
     });
   }
 
-  // Products
-  async getProduct(id: string): Promise<Product | undefined> {
-    return this.products.get(id);
+  // Products (shop-scoped)
+  async getProduct(shop: string, id: string): Promise<Product | undefined> {
+    const shopProducts = this.ensureShopNamespace(this.products, shop);
+    return shopProducts.get(id);
   }
 
-  async getProducts(): Promise<Product[]> {
-    return Array.from(this.products.values());
+  async getProducts(shop: string): Promise<Product[]> {
+    const shopProducts = this.ensureShopNamespace(this.products, shop);
+    return Array.from(shopProducts.values());
   }
 
-  async getProductByShopifyId(shopifyProductId: string): Promise<Product | undefined> {
-    return Array.from(this.products.values()).find(p => p.shopifyProductId === shopifyProductId);
+  async getProductByShopifyId(shop: string, shopifyProductId: string): Promise<Product | undefined> {
+    const shopProducts = this.ensureShopNamespace(this.products, shop);
+    return Array.from(shopProducts.values()).find(p => p.shopifyProductId === shopifyProductId);
   }
 
-  async createProduct(insertProduct: InsertProduct): Promise<Product> {
+  async createProduct(shop: string, insertProduct: InsertProduct): Promise<Product> {
+    const shopProducts = this.ensureShopNamespace(this.products, shop);
     const id = randomUUID();
     const product: Product = {
       ...insertProduct,
@@ -228,12 +246,13 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    this.products.set(id, product);
+    shopProducts.set(id, product);
     return product;
   }
 
-  async updateProduct(id: string, updates: Partial<InsertProduct>): Promise<Product | undefined> {
-    const product = this.products.get(id);
+  async updateProduct(shop: string, id: string, updates: Partial<InsertProduct>): Promise<Product | undefined> {
+    const shopProducts = this.ensureShopNamespace(this.products, shop);
+    const product = shopProducts.get(id);
     if (!product) return undefined;
     
     const updated: Product = {
@@ -247,32 +266,37 @@ export class MemStorage implements IStorage {
       images: updates.images ? (updates.images as string[]) : product.images,
       updatedAt: new Date(),
     };
-    this.products.set(id, updated);
+    shopProducts.set(id, updated);
     return updated;
   }
 
-  async deleteProduct(id: string): Promise<boolean> {
-    return this.products.delete(id);
+  async deleteProduct(shop: string, id: string): Promise<boolean> {
+    const shopProducts = this.ensureShopNamespace(this.products, shop);
+    return shopProducts.delete(id);
   }
 
-  // Recommendations
-  async getRecommendation(id: string): Promise<Recommendation | undefined> {
-    return this.recommendations.get(id);
+  // Recommendations (shop-scoped)
+  async getRecommendation(shop: string, id: string): Promise<Recommendation | undefined> {
+    const shopRecommendations = this.ensureShopNamespace(this.recommendations, shop);
+    return shopRecommendations.get(id);
   }
 
-  async getRecommendations(status?: string): Promise<Recommendation[]> {
-    const all = Array.from(this.recommendations.values());
+  async getRecommendations(shop: string, status?: string): Promise<Recommendation[]> {
+    const shopRecommendations = this.ensureShopNamespace(this.recommendations, shop);
+    const all = Array.from(shopRecommendations.values());
     if (status) {
       return all.filter(r => r.status === status);
     }
     return all;
   }
 
-  async getRecommendationsByProduct(productId: string): Promise<Recommendation[]> {
-    return Array.from(this.recommendations.values()).filter(r => r.productId === productId);
+  async getRecommendationsByProduct(shop: string, productId: string): Promise<Recommendation[]> {
+    const shopRecommendations = this.ensureShopNamespace(this.recommendations, shop);
+    return Array.from(shopRecommendations.values()).filter(r => r.productId === productId);
   }
 
-  async createRecommendation(insertRec: InsertRecommendation): Promise<Recommendation> {
+  async createRecommendation(shop: string, insertRec: InsertRecommendation): Promise<Recommendation> {
+    const shopRecommendations = this.ensureShopNamespace(this.recommendations, shop);
     const id = randomUUID();
     const recommendation: Recommendation = {
       ...insertRec,
@@ -285,12 +309,13 @@ export class MemStorage implements IStorage {
       }>,
       createdAt: new Date(),
     };
-    this.recommendations.set(id, recommendation);
+    shopRecommendations.set(id, recommendation);
     return recommendation;
   }
 
-  async updateRecommendation(id: string, updates: Partial<InsertRecommendation>): Promise<Recommendation | undefined> {
-    const rec = this.recommendations.get(id);
+  async updateRecommendation(shop: string, id: string, updates: Partial<InsertRecommendation>): Promise<Recommendation | undefined> {
+    const shopRecommendations = this.ensureShopNamespace(this.recommendations, shop);
+    const rec = shopRecommendations.get(id);
     if (!rec) return undefined;
     
     const updated: Recommendation = { 
@@ -302,32 +327,37 @@ export class MemStorage implements IStorage {
         description: string;
       }>) : rec.insights,
     };
-    this.recommendations.set(id, updated);
+    shopRecommendations.set(id, updated);
     return updated;
   }
 
-  async deleteRecommendation(id: string): Promise<boolean> {
-    return this.recommendations.delete(id);
+  async deleteRecommendation(shop: string, id: string): Promise<boolean> {
+    const shopRecommendations = this.ensureShopNamespace(this.recommendations, shop);
+    return shopRecommendations.delete(id);
   }
 
-  // Tests
-  async getTest(id: string): Promise<Test | undefined> {
-    return this.tests.get(id);
+  // Tests (shop-scoped)
+  async getTest(shop: string, id: string): Promise<Test | undefined> {
+    const shopTests = this.ensureShopNamespace(this.tests, shop);
+    return shopTests.get(id);
   }
 
-  async getTests(status?: string): Promise<Test[]> {
-    const all = Array.from(this.tests.values());
+  async getTests(shop: string, status?: string): Promise<Test[]> {
+    const shopTests = this.ensureShopNamespace(this.tests, shop);
+    const all = Array.from(shopTests.values());
     if (status) {
       return all.filter(t => t.status === status);
     }
     return all;
   }
 
-  async getTestsByProduct(productId: string): Promise<Test[]> {
-    return Array.from(this.tests.values()).filter(t => t.productId === productId);
+  async getTestsByProduct(shop: string, productId: string): Promise<Test[]> {
+    const shopTests = this.ensureShopNamespace(this.tests, shop);
+    return Array.from(shopTests.values()).filter(t => t.productId === productId);
   }
 
-  async createTest(insertTest: InsertTest): Promise<Test> {
+  async createTest(shop: string, insertTest: InsertTest): Promise<Test> {
+    const shopTests = this.ensureShopNamespace(this.tests, shop);
     const id = randomUUID();
     const test: Test = {
       ...insertTest,
@@ -343,12 +373,13 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    this.tests.set(id, test);
+    shopTests.set(id, test);
     return test;
   }
 
-  async updateTest(id: string, updates: Partial<InsertTest>): Promise<Test | undefined> {
-    const test = this.tests.get(id);
+  async updateTest(shop: string, id: string, updates: Partial<InsertTest>): Promise<Test | undefined> {
+    const shopTests = this.ensureShopNamespace(this.tests, shop);
+    const test = shopTests.get(id);
     if (!test) return undefined;
     
     const updated: Test = {
@@ -358,28 +389,31 @@ export class MemStorage implements IStorage {
       revenue: updates.revenue?.toString() || test.revenue,
       updatedAt: new Date(),
     };
-    this.tests.set(id, updated);
+    shopTests.set(id, updated);
     return updated;
   }
 
-  async deleteTest(id: string): Promise<boolean> {
-    return this.tests.delete(id);
+  async deleteTest(shop: string, id: string): Promise<boolean> {
+    const shopTests = this.ensureShopNamespace(this.tests, shop);
+    return shopTests.delete(id);
   }
 
-  // Metrics
-  async getMetrics(limit?: number): Promise<Metric[]> {
-    const all = Array.from(this.metrics.values()).sort((a, b) => 
+  // Metrics (shop-scoped)
+  async getMetrics(shop: string, limit?: number): Promise<Metric[]> {
+    const shopMetrics = this.ensureShopNamespace(this.metrics, shop);
+    const all = Array.from(shopMetrics.values()).sort((a, b) => 
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
     return limit ? all.slice(0, limit) : all;
   }
 
-  async getLatestMetric(): Promise<Metric | undefined> {
-    const metrics = await this.getMetrics(1);
+  async getLatestMetric(shop: string): Promise<Metric | undefined> {
+    const metrics = await this.getMetrics(shop, 1);
     return metrics[0];
   }
 
-  async createMetric(insertMetric: InsertMetric): Promise<Metric> {
+  async createMetric(shop: string, insertMetric: InsertMetric): Promise<Metric> {
+    const shopMetrics = this.ensureShopNamespace(this.metrics, shop);
     const id = randomUUID();
     const metric: Metric = {
       ...insertMetric,
@@ -388,9 +422,10 @@ export class MemStorage implements IStorage {
       avgOrderValue: insertMetric.avgOrderValue.toString(),
       revenue: insertMetric.revenue.toString(),
       revenueLift: insertMetric.revenueLift?.toString() || "0",
+      activeTests: insertMetric.activeTests || null,
       createdAt: new Date(),
     };
-    this.metrics.set(id, metric);
+    shopMetrics.set(id, metric);
     return metric;
   }
 }
