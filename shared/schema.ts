@@ -1,18 +1,104 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, decimal, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
+// Products table - stores Shopify product data
+export const products = pgTable("products", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  shopifyProductId: text("shopify_product_id").notNull().unique(),
+  title: text("title").notNull(),
+  description: text("description"),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),
+  images: jsonb("images").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  rating: decimal("rating", { precision: 3, scale: 2 }),
+  reviewCount: integer("review_count").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export const insertProductSchema = createInsertSchema(products).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export type InsertProduct = z.infer<typeof insertProductSchema>;
+export type Product = typeof products.$inferSelect;
+
+// AI Recommendations table
+export const recommendations = pgTable("recommendations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productId: varchar("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  testType: text("test_type").notNull(), // "title", "price", "description", "image"
+  confidence: integer("confidence").notNull(), // 0-100
+  estimatedImpact: text("estimated_impact").notNull(),
+  riskLevel: text("risk_level").notNull(), // "low", "medium", "high"
+  proposedChanges: jsonb("proposed_changes").$type<Record<string, any>>().notNull(),
+  insights: jsonb("insights").$type<Array<{
+    type: "psychology" | "competitor" | "seo" | "data";
+    title: string;
+    description: string;
+  }>>().notNull(),
+  status: text("status").notNull().default("pending"), // "pending", "accepted", "rejected"
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertRecommendationSchema = createInsertSchema(recommendations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertRecommendation = z.infer<typeof insertRecommendationSchema>;
+export type Recommendation = typeof recommendations.$inferSelect;
+
+// A/B Tests table
+export const tests = pgTable("tests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productId: varchar("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  recommendationId: varchar("recommendation_id").references(() => recommendations.id, { onDelete: "set null" }),
+  testType: text("test_type").notNull(),
+  status: text("status").notNull().default("draft"), // "draft", "active", "completed", "cancelled"
+  controlData: jsonb("control_data").$type<Record<string, any>>().notNull(),
+  variantData: jsonb("variant_data").$type<Record<string, any>>().notNull(),
+  performance: decimal("performance", { precision: 5, scale: 2 }).default("0"), // percentage change
+  impressions: integer("impressions").default(0),
+  conversions: integer("conversions").default(0),
+  revenue: decimal("revenue", { precision: 10, scale: 2 }).default("0"),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertTestSchema = createInsertSchema(tests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertTest = z.infer<typeof insertTestSchema>;
+export type Test = typeof tests.$inferSelect;
+
+// Analytics/Metrics table for tracking performance over time
+export const metrics = pgTable("metrics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: timestamp("date").notNull(),
+  conversionRate: decimal("conversion_rate", { precision: 5, scale: 2 }).notNull(),
+  avgOrderValue: decimal("avg_order_value", { precision: 10, scale: 2 }).notNull(),
+  revenue: decimal("revenue", { precision: 10, scale: 2 }).notNull(),
+  revenueLift: decimal("revenue_lift", { precision: 10, scale: 2 }).default("0"),
+  activeTests: integer("active_tests").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertMetricSchema = createInsertSchema(metrics).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertMetric = z.infer<typeof insertMetricSchema>;
+export type Metric = typeof metrics.$inferSelect;
