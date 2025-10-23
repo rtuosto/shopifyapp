@@ -157,24 +157,24 @@ export async function updateProduct(session: Session, productId: string, updates
 
   // Update variant prices separately if provided
   if (variants && variants.length > 0) {
-    for (const variant of variants) {
-      if (variant.price) {
-        await updateVariantPrice(session, variant.id, variant.price);
-      }
+    // Filter variants that have price updates
+    const variantsWithPrices = variants.filter(v => v.price !== undefined) as Array<{ id: string; price: string }>;
+    if (variantsWithPrices.length > 0) {
+      await updateVariantPrices(session, productId, variantsWithPrices);
     }
   }
   
   return response.data;
 }
 
-// Update variant price separately
-async function updateVariantPrice(session: Session, variantId: string, price: string) {
+// Update variant prices using bulk update mutation
+async function updateVariantPrices(session: Session, productId: string, variants: Array<{ id: string; price: string }>) {
   const client = new shopify.clients.Graphql({ session });
   
   const response = await client.request(
-    `mutation productVariantUpdate($input: ProductVariantInput!) {
-      productVariantUpdate(input: $input) {
-        productVariant {
+    `mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+        productVariants {
           id
           price
         }
@@ -186,17 +186,15 @@ async function updateVariantPrice(session: Session, variantId: string, price: st
     }`,
     {
       variables: {
-        input: {
-          id: variantId,
-          price: price,
-        },
+        productId: productId,
+        variants: variants,
       },
     }
   );
 
-  if (response.data?.productVariantUpdate?.userErrors?.length > 0) {
-    console.error('[Shopify API] Variant update errors:', response.data.productVariantUpdate.userErrors);
-    throw new Error(`Variant update failed: ${JSON.stringify(response.data.productVariantUpdate.userErrors)}`);
+  if (response.data?.productVariantsBulkUpdate?.userErrors?.length > 0) {
+    console.error('[Shopify API] Variant update errors:', response.data.productVariantsBulkUpdate.userErrors);
+    throw new Error(`Variant update failed: ${JSON.stringify(response.data.productVariantsBulkUpdate.userErrors)}`);
   }
 
   return response.data;
