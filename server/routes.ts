@@ -576,13 +576,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           if (lineItem) {
             const revenue = parseFloat(lineItem.price) * lineItem.quantity;
+            const newConversions = (activeTest.conversions || 0) + lineItem.quantity;
+            const newRevenue = parseFloat(activeTest.revenue || "0") + revenue;
+            
+            // Calculate ARPU (Average Revenue Per User = total revenue / total conversions)
+            const arpu = newConversions > 0 ? newRevenue / newConversions : 0;
             
             console.log(`[Webhook] Attributing conversion to test ${activeTest.id}: ${lineItem.quantity}x ${product.title} = $${revenue}`);
+            console.log(`[Webhook] Test metrics - Conversions: ${newConversions}, Revenue: $${newRevenue.toFixed(2)}, ARPU: $${arpu.toFixed(2)}`);
             
-            // Update test metrics
+            // Update test metrics including ARPU
             await storage.updateTest(shop, activeTest.id, {
-              conversions: (activeTest.conversions || 0) + lineItem.quantity,
-              revenue: (parseFloat(activeTest.revenue || "0") + revenue).toString(),
+              conversions: newConversions,
+              revenue: newRevenue.toString(),
+              arpu: arpu.toString(),
             });
           }
         }

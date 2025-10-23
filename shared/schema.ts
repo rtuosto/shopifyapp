@@ -55,6 +55,8 @@ export type InsertRecommendation = z.infer<typeof insertRecommendationSchema>;
 export type Recommendation = typeof recommendations.$inferSelect;
 
 // A/B Tests table
+// TODO: Implement impression tracking (product page views) for true ARPU calculation
+// TODO: Track baseline ARPU before test activation for accurate lift calculation
 export const tests = pgTable("tests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   productId: varchar("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
@@ -63,8 +65,9 @@ export const tests = pgTable("tests", {
   status: text("status").notNull().default("draft"), // "draft", "active", "completed", "cancelled"
   controlData: jsonb("control_data").$type<Record<string, any>>().notNull(),
   variantData: jsonb("variant_data").$type<Record<string, any>>().notNull(),
-  performance: decimal("performance", { precision: 5, scale: 2 }).default("0"), // percentage change
-  impressions: integer("impressions").default(0),
+  arpu: decimal("arpu", { precision: 10, scale: 2 }).default("0"), // Average Revenue Per User (revenue / conversions for now)
+  arpuLift: decimal("arpu_lift", { precision: 5, scale: 2 }).default("0"), // ARPU lift percentage vs baseline
+  impressions: integer("impressions").default(0), // TODO: Track product page views
   conversions: integer("conversions").default(0),
   revenue: decimal("revenue", { precision: 10, scale: 2 }).default("0"),
   startDate: timestamp("start_date"),
