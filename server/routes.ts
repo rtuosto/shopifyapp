@@ -141,6 +141,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/recommendations/generate-all", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      const products = await storage.getProducts(shop);
+      
+      if (products.length === 0) {
+        return res.json({ message: "No products found", count: 0 });
+      }
+
+      console.log(`[AI] Generating recommendations for ${products.length} products`);
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const product of products) {
+        try {
+          // Delete existing pending recommendations for this product to prevent duplicates
+          const existingRecs = await storage.getRecommendationsByProduct(shop, product.id);
+          const pendingRecs = existingRecs.filter(rec => rec.status === "pending");
+          if (pendingRecs.length > 0) {
+            console.log(`[AI] Deleting ${pendingRecs.length} pending recommendations for: ${product.title}`);
+            await Promise.all(
+              pendingRecs.map(rec => storage.deleteRecommendation(shop, rec.id))
+            );
+          }
+          
+          const aiRecommendations = await generateOptimizationRecommendations({
+            title: product.title,
+            description: product.description || "",
+            price: parseFloat(product.price),
+          });
+
+          await Promise.all(
+            aiRecommendations.map(rec =>
+              storage.createRecommendation(shop, {
+                productId: product.id,
+                ...rec,
+              })
+            )
+          );
+          
+          successCount++;
+          console.log(`[AI] Generated ${aiRecommendations.length} recommendations for: ${product.title}`);
+        } catch (error) {
+          errorCount++;
+          console.error(`[AI] Failed to generate recommendations for ${product.title}:`, error);
+        }
+      }
+
+      res.json({ 
+        message: `Generated recommendations for ${successCount} products`, 
+        successCount,
+        errorCount,
+        total: products.length
+      });
+    } catch (error) {
+      console.error("Error generating bulk recommendations:", error);
+      res.status(500).json({ error: "Failed to generate recommendations" });
+    }
+  });
+
   app.patch("/api/recommendations/:id", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;

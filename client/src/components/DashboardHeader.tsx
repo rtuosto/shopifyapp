@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, RefreshCw } from "lucide-react";
+import { Plus, RefreshCw, Sparkles } from "lucide-react";
 import { useState } from "react";
 
 interface DashboardHeaderProps {
@@ -8,13 +8,17 @@ interface DashboardHeaderProps {
   lastSync?: string;
   onCreateTest?: () => void;
   onRefresh?: () => void;
+  onGenerateRecommendations?: () => void;
+  isGeneratingRecommendations?: boolean;
 }
 
 export default function DashboardHeader({ 
   activeTests, 
   lastSync = "5 min ago",
   onCreateTest,
-  onRefresh 
+  onRefresh,
+  onGenerateRecommendations,
+  isGeneratingRecommendations = false
 }: DashboardHeaderProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -30,6 +34,11 @@ export default function DashboardHeader({
     console.log("Creating new test...");
   };
 
+  const handleGenerateRecommendations = () => {
+    onGenerateRecommendations?.();
+    console.log("Generating AI recommendations...");
+  };
+
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
       <div>
@@ -43,7 +52,7 @@ export default function DashboardHeader({
           </span>
         </div>
       </div>
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <Button 
           variant="outline" 
           size="default"
@@ -53,6 +62,16 @@ export default function DashboardHeader({
         >
           <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
           Refresh
+        </Button>
+        <Button 
+          variant="outline"
+          size="default"
+          onClick={handleGenerateRecommendations}
+          disabled={isGeneratingRecommendations}
+          data-testid="button-generate-recommendations"
+        >
+          <Sparkles className={`w-4 h-4 ${isGeneratingRecommendations ? "animate-pulse" : ""}`} />
+          {isGeneratingRecommendations ? "Generating..." : "AI Recommendations"}
         </Button>
         <Button onClick={handleCreateTest} data-testid="button-create-test">
           <Plus className="w-4 h-4" />

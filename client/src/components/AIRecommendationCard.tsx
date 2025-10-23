@@ -44,8 +44,10 @@ export default function AIRecommendationCard({
     console.log("Opening preview for:", title);
   };
 
+  const titleSlug = title ? title.toLowerCase().replace(/\s+/g, '-') : 'unknown';
+
   return (
-    <Card className="p-6 border-l-4 border-l-chart-3" data-testid={`card-recommendation-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+    <Card className="p-6 border-l-4 border-l-chart-3" data-testid={`card-recommendation-${titleSlug}`}>
       <div className="space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 space-y-2">

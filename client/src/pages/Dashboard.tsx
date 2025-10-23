@@ -88,6 +88,30 @@ export default function Dashboard() {
     },
   });
 
+  // Generate AI recommendations for all products
+  const generateRecommendationsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/recommendations/generate-all");
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "AI Analysis Complete",
+        description: data.message || `Generated recommendations for ${data.successCount} products`,
+      });
+      // Invalidate relevant queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ["/api/recommendations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Generation Failed",
+        description: error.message || "Failed to generate AI recommendations. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Fetch dashboard data (poll more frequently if syncing)
   const { data: dashboardData } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
@@ -221,6 +245,8 @@ export default function Dashboard() {
         activeTests={activeTestsCount} 
         lastSync={getLastSyncText()}
         onRefresh={() => syncMutation.mutate()}
+        onGenerateRecommendations={() => generateRecommendationsMutation.mutate()}
+        isGeneratingRecommendations={generateRecommendationsMutation.isPending}
       />
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
