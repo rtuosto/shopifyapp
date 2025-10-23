@@ -91,15 +91,28 @@ export default function Dashboard() {
   // Generate AI recommendations for all products
   const generateRecommendationsMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/recommendations/generate-all");
-      return res.json();
+      // Start polling for new recommendations while generating
+      const pollingInterval = setInterval(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/recommendations"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      }, 2000); // Poll every 2 seconds
+
+      try {
+        const res = await apiRequest("POST", "/api/recommendations/generate-all");
+        const data = await res.json();
+        clearInterval(pollingInterval);
+        return data;
+      } catch (error) {
+        clearInterval(pollingInterval);
+        throw error;
+      }
     },
     onSuccess: (data: any) => {
       toast({
         title: "AI Analysis Complete",
         description: data.message || `Generated recommendations for ${data.successCount} products`,
       });
-      // Invalidate relevant queries to refresh data
+      // Final refresh to ensure all data is up to date
       queryClient.invalidateQueries({ queryKey: ["/api/recommendations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
     },
@@ -464,11 +477,19 @@ export default function Dashboard() {
         />
       </div>
 
-      {recommendations.length > 0 && (
+      {(recommendations.length > 0 || generateRecommendationsMutation.isPending) && (
         <div>
-          <h2 className="text-xl font-semibold mb-4" data-testid="text-recommendations-heading">
-            AI Recommendations
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold" data-testid="text-recommendations-heading">
+              AI Recommendations
+            </h2>
+            {generateRecommendationsMutation.isPending && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                Generating recommendations...
+              </div>
+            )}
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {recommendations.slice(0, 4).map((rec) => (
               <AIRecommendationCard
@@ -480,6 +501,17 @@ export default function Dashboard() {
                 onPreview={() => handlePreview(rec.id)}
               />
             ))}
+            {generateRecommendationsMutation.isPending && recommendations.length === 0 && (
+              <>
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="rounded-lg border bg-card p-6 animate-pulse">
+                    <div className="h-6 bg-muted rounded w-3/4 mb-3"></div>
+                    <div className="h-4 bg-muted rounded w-full mb-2"></div>
+                    <div className="h-4 bg-muted rounded w-5/6"></div>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         </div>
       )}
