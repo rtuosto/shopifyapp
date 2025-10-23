@@ -1,19 +1,40 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import pg from "pg";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 
-// Configure session middleware for OAuth
+// Configure PostgreSQL session store
+const PgSession = connectPgSimple(session);
+const pgPool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+// Ensure SESSION_SECRET is set
+if (!process.env.SESSION_SECRET) {
+  console.error("ERROR: SESSION_SECRET environment variable is required but not set.");
+  console.error("Sessions will not persist across server restarts without a stable secret.");
+  process.exit(1);
+}
+
+// Configure session middleware with PostgreSQL storage
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'shopify-app-session-secret-' + Math.random(),
+  store: new PgSession({
+    pool: pgPool,
+    tableName: 'session',
+    createTableIfMissing: true,
+  }),
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     sameSite: 'lax',
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
   }
 }));
 

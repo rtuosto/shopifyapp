@@ -18,13 +18,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/auth", async (req, res) => {
     const shop = req.query.shop as string;
     
+    console.log(`[OAuth] Initiating OAuth for shop: ${shop}`);
+    
     if (!shop) {
+      console.log('[OAuth] Missing shop parameter');
       return res.status(400).json({ error: "Missing shop parameter" });
     }
 
+    const sanitizedShop = shopify.utils.sanitizeShop(shop, true);
+    console.log(`[OAuth] Sanitized shop: ${sanitizedShop}`);
+
     // shopify.auth.begin handles the redirect internally
     await shopify.auth.begin({
-      shop: shopify.utils.sanitizeShop(shop, true)!,
+      shop: sanitizedShop!,
       callbackPath: "/api/auth/callback",
       isOnline: false,
       rawRequest: req,
@@ -34,6 +40,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/auth/callback", async (req, res) => {
     try {
+      console.log('[OAuth Callback] Processing OAuth callback...');
+      
       const callback = await shopify.auth.callback({
         rawRequest: req,
         rawResponse: res,
@@ -41,18 +49,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { session } = callback;
       
+      console.log(`[OAuth Callback] OAuth successful for shop: ${session.shop}`);
+      console.log(`[OAuth Callback] Session ID: ${session.id}`);
+      console.log(`[OAuth Callback] Access token: ${session.accessToken ? 'present' : 'missing'}`);
+      console.log(`[OAuth Callback] Scopes: ${session.scope}`);
+      
       // Store session for later use
-      await sessionStorage.storeSession(session);
-      console.log("Session stored for shop:", session.shop);
+      const stored = await sessionStorage.storeSession(session);
+      console.log(`[OAuth Callback] Session storage result: ${stored ? 'success' : 'failed'}`);
       
       // Initialize shop data in background (sync products from Shopify)
+      console.log(`[OAuth Callback] Starting background product sync for ${session.shop}`);
       initializeShopData(session).catch(error => {
-        console.error("Error initializing shop data:", error);
+        console.error("[OAuth Callback] Error initializing shop data:", error);
       });
       
+      console.log(`[OAuth Callback] Redirecting to /?shop=${session.shop}`);
       res.redirect(`/?shop=${session.shop}`);
     } catch (error) {
-      console.error("Auth callback error:", error);
+      console.error("[OAuth Callback] Auth callback error:", error);
       res.status(500).json({ error: "Authentication failed" });
     }
   });

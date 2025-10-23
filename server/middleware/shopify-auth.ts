@@ -58,13 +58,23 @@ export async function requireShopifySessionOrDev(
   const rawShop = (req.query.shop as string) || req.headers["x-shopify-shop"] as string;
   const shop = rawShop ? shopify.utils.sanitizeShop(rawShop, true) : null;
   
+  console.log(`[Auth] Request to ${req.path}, shop param: ${rawShop || 'none'}`);
+  
+  // If shop is provided, require proper session
+  if (shop) {
+    console.log(`[Auth] Shop detected: ${shop}, checking session...`);
+    return requireShopifySession(req, res, next);
+  }
+  
   // If no shop provided in development, use default dev store without session
-  if (!shop && process.env.NODE_ENV === "development") {
+  if (process.env.NODE_ENV === "development") {
     (req as any).shop = "cro-autopilot-dev-store.myshopify.com";
-    console.log("[Dev Mode] Using default shop without session validation");
+    console.log("[Dev Mode] No shop param - using default shop without session validation");
     return next();
   }
   
-  // Otherwise require proper session
-  return requireShopifySession(req, res, next);
+  // Production requires shop parameter
+  return res.status(401).json({ 
+    error: "Missing shop parameter" 
+  });
 }

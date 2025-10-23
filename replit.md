@@ -18,10 +18,11 @@ Shoptimizer is an embedded Shopify app that uses AI to automatically analyze pro
 - Recharts for data visualization
 
 ### Backend
-- Express.js server
-- Shopify Admin GraphQL API integration
+- Express.js server with PostgreSQL session storage
+- Shopify Admin GraphQL API v12 integration
 - OpenAI GPT-4 for AI recommendations (via Replit AI Integrations)
-- In-memory storage (can be upgraded to PostgreSQL)
+- PostgreSQL database for persistent session and OAuth token storage
+- In-memory storage for application data (products, tests, recommendations)
 
 ## Project Structure
 
@@ -124,22 +125,47 @@ npm run dev
 ```
 
 ## Recent Changes (October 23, 2025)
-- **Product Sync Implementation**
-  - Automatic product sync after OAuth installation
-  - Manual "Sync Products" button with real-time loading states
-  - Comprehensive sync status tracking system (in-memory, PostgreSQL-ready)
-  - Error notification system that surfaces specific failures to merchants
-  - Smart polling that adjusts frequency based on sync state
-- **Core Architecture**
-  - Implemented full-stack architecture with Shopify integration
-  - Created AI recommendation engine with OpenAI
-  - Built test preview system with device toggles
-  - Added comprehensive data schema for products, tests, and metrics
-  - Integrated Shopify Admin GraphQL API
-- **Security & Isolation**
-  - Shop-based tenant isolation in all endpoints and storage
-  - Proper session validation and error handling
-  - Sanitized shop domain validation to prevent malformed domain attacks
+
+### Session Persistence & OAuth Fixes
+- **PostgreSQL Session Storage**
+  - Migrated from in-memory to PostgreSQL-backed session storage for production reliability
+  - Sessions now persist across server restarts (critical for embedded Shopify apps)
+  - Created `shopify_sessions` table with proper indexing for shop-based lookups
+  - Configured express-session with connect-pg-simple for HTTP session management
+  - Added SESSION_SECRET validation - server fails fast if not configured
+  
+- **GraphQL API Compatibility**
+  - Fixed deprecated API calls - updated from `.query()` to `.request()` for Shopify API v12
+  - Fixed product query schema - removed invalid `compareAtPriceRange.minVariantPrice`
+  - Using `priceRangeV2` with proper Money subfields (amount, currencyCode)
+  
+- **Enhanced Logging & Debugging**
+  - Comprehensive OAuth flow logging throughout initialization and callback
+  - Session lifecycle tracking with shop parameter detection
+  - Middleware logging for authentication and authorization flows
+  - Clear error messages surfaced to merchants when sync fails
+
+### Product Sync Implementation
+- **Automatic sync** on app installation via OAuth callback
+- **Manual sync button** in dashboard header with loading state
+- **Real-time status tracking** - Dashboard shows "Syncing...", "Just now", "5 min ago", etc.
+- **Smart polling** - Checks every 2 seconds during sync, every 30 seconds otherwise
+- **Error notifications** - Toast messages surface specific sync failures to merchants
+- **Background sync** - Products sync automatically without blocking installation flow
+- All sync operations properly isolated by shop (multi-tenant safe)
+
+### Core Architecture
+- Implemented full-stack architecture with Shopify integration
+- Created AI recommendation engine with OpenAI
+- Built test preview system with device toggles
+- Added comprehensive data schema for products, tests, and metrics
+- Integrated Shopify Admin GraphQL API v12
+
+### Security & Isolation
+- Shop-based tenant isolation in all endpoints and storage
+- Proper session validation and error handling
+- Sanitized shop domain validation to prevent malformed domain attacks
+- Stable SESSION_SECRET requirement for cookie verification across restarts
 
 ## Next Steps
 - Deploy test changes to actual Shopify products
