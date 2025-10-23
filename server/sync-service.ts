@@ -11,12 +11,12 @@ interface ShopifyProduct {
   priceRangeV2: {
     minVariantPrice: {
       amount: string;
+      currencyCode: string;
     };
-  };
-  compareAtPriceRange: {
-    minVariantPrice: {
-      amount: string | null;
-    } | null;
+    maxVariantPrice: {
+      amount: string;
+      currencyCode: string;
+    };
   };
   images: {
     edges: Array<{
@@ -33,7 +33,10 @@ export async function syncProductsFromShopify(session: Session): Promise<number>
     console.log(`Starting product sync for shop: ${session.shop}`);
     
     const response = await fetchProducts(session);
-    const shopifyProducts = (response as any).data?.products?.edges || [];
+    console.log(`[Sync] GraphQL response:`, JSON.stringify(response, null, 2));
+    
+    const shopifyProducts = (response as any).products?.edges || [];
+    console.log(`[Sync] Found ${shopifyProducts.length} products`);
     
     let syncedCount = 0;
     
@@ -45,11 +48,13 @@ export async function syncProductsFromShopify(session: Session): Promise<number>
         title: shopifyProduct.title,
         description: shopifyProduct.description || null,
         price: shopifyProduct.priceRangeV2.minVariantPrice.amount,
-        compareAtPrice: shopifyProduct.compareAtPriceRange?.minVariantPrice?.amount || null,
+        compareAtPrice: null,
         images: shopifyProduct.images.edges.map(img => img.node.url),
         rating: null,
         reviewCount: 0,
       };
+      
+      console.log(`[Sync] Processing product: ${shopifyProduct.title}`);
       
       // Check if product already exists using shopifyProductId
       const existing = await storage.getProductByShopifyId(session.shop, shopifyProduct.id);
