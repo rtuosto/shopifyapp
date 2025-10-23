@@ -77,6 +77,8 @@ shared/
 - `GET /api/tests` - List all A/B tests
 - `POST /api/tests` - Create new test
 - `PATCH /api/tests/:id` - Update test
+- `POST /api/tests/:id/activate` - Activate test (deploys variant to Shopify)
+- `POST /api/tests/:id/deactivate` - Deactivate test (reverts to control values)
 
 ### Metrics
 - `GET /api/metrics` - Get performance metrics
@@ -84,6 +86,9 @@ shared/
 
 ### Sync
 - `POST /api/sync/products` - Manually sync products from Shopify
+
+### Webhooks
+- `POST /api/webhooks/orders/create` - Shopify webhook for order conversion tracking
 
 ## Features
 
@@ -116,6 +121,30 @@ shared/
 - **Background sync** - Products sync automatically without blocking installation flow
 - All sync operations properly isolated by shop (multi-tenant safe)
 
+### Test Deployment & Conversion Tracking
+- **Live Product Deployment**
+  - Start Test button activates A/B tests by deploying variant to Shopify
+  - Captures live product state before changes for safe rollback
+  - Updates product title, description, and price in Shopify store
+  - Handles edge cases: empty descriptions, price updates via variant IDs
+  
+- **Automatic Webhook Registration**
+  - ORDERS_CREATE webhook registered during OAuth callback
+  - Non-blocking registration (doesn't fail installation)
+  - HMAC signature verification using raw body for security
+  
+- **Conversion Attribution**
+  - Order webhooks automatically attribute conversions to active tests
+  - Matches ordered products to running tests by Shopify product ID
+  - Updates test metrics: conversions, revenue, performance
+  - Real-time tracking without manual intervention
+  
+- **Safe Rollback**
+  - Stop Test button deactivates tests and reverts to original values
+  - Restores all modified fields: title, description, price
+  - Works even if product was edited after test creation
+  - Field existence checking handles empty values correctly
+
 ## Development
 
 The app runs in Shopify's embedded iframe and uses App Bridge for authentication and navigation. To run:
@@ -125,6 +154,42 @@ npm run dev
 ```
 
 ## Recent Changes (October 23, 2025)
+
+### Test Deployment & Conversion Tracking System
+- **Test Activation Endpoint** (`POST /api/tests/:id/activate`)
+  - Fetches current product state from Shopify before making changes
+  - Captures complete control snapshot: title, descriptionHtml, price
+  - Handles empty descriptions (always captures, even if empty string)
+  - Deploys variant changes to Shopify via GraphQL productUpdate
+  - Updates test status to "active" with activation timestamp
+  
+- **Test Deactivation Endpoint** (`POST /api/tests/:id/deactivate`)
+  - Reverts Shopify product to original control values
+  - Field existence checking (`"field" in controlData`) handles empty values
+  - Updates price via variant IDs for multi-variant products
+  - Marks test as "completed" with end timestamp
+  
+- **Webhook System** (`POST /api/webhooks/orders/create`)
+  - Raw body HMAC verification for security (uses `req.rawBody` Buffer)
+  - Automatic conversion attribution to active tests
+  - Matches line items to products by Shopify product ID
+  - Updates test metrics: conversions, revenue, performance
+  - Proper error handling and logging
+  
+- **Frontend Integration**
+  - Start Test button in TestHistoryTable for draft tests
+  - Stop Test button for active tests
+  - Toast notifications for success/error states
+  - Automatic query invalidation to refresh UI
+  - Loading states during activation/deactivation
+  
+- **Critical Bug Fixes**
+  - Fixed control data capture: now fetches live state at activation time
+  - Fixed webhook HMAC: uses raw body instead of parsed JSON
+  - Fixed empty description handling: always captures, checks field existence
+  - Updated GraphQL query to include descriptionHtml field
+
+## Recent Changes (October 23, 2025) - Previous
 
 ### Session Persistence & OAuth Fixes
 - **PostgreSQL Session Storage**
@@ -172,10 +237,14 @@ npm run dev
 ✅ **Session Persistence**: PostgreSQL-backed session storage prevents logout on server restart  
 ✅ **OAuth Flow**: Complete installation flow with automatic product sync on first install
 ✅ **Pagination Support**: Handles stores with more than 50 products via cursor-based pagination
+✅ **Test Deployment**: Live A/B test activation/deactivation with Shopify product updates
+✅ **Conversion Tracking**: Webhook-based order attribution with automatic metric updates
+✅ **Safe Rollback**: Complete product state restoration including edge cases
 
 ## Next Steps
-- Deploy test changes to actual Shopify products
-- Implement webhook handlers for order tracking
+- End-to-end testing: Activate test → place order → verify metrics → deactivate test
+- Add automated tests for control snapshot persistence and rollback edge cases
+- Monitor webhook logs to verify ongoing HMAC validation success
 - Add billing integration for subscription tiers
 - Create automated test scheduling
 - Build advanced competitor scraping
