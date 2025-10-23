@@ -142,7 +142,8 @@ export default function Dashboard() {
         status: "draft",
         controlData,
         variantData,
-        performance: "0",
+        arpu: "0",
+        arpuLift: "0",
         impressions: 0,
         conversions: 0,
         revenue: "0",
@@ -325,11 +326,14 @@ export default function Dashboard() {
       revenue: parseFloat(m.revenue),
     }));
 
-  // Calculate metrics from latest data
-  const conversionRate = latestMetric?.conversionRate ? parseFloat(latestMetric.conversionRate).toFixed(2) + '%' : '3.42%';
-  const avgOrderValue = latestMetric?.avgOrderValue ? '$' + parseFloat(latestMetric.avgOrderValue).toFixed(2) : '$87.50';
-  const revenueLift = latestMetric?.revenueLift ? '$' + parseFloat(latestMetric.revenueLift).toFixed(0) : '$12,450';
-  const activeTestsCount = dashboardData?.activeTests || tests.filter(t => t.status === 'active').length;
+  // Calculate metrics from latest data and active tests
+  const activeTests = tests.filter(t => t.status === 'active');
+  const totalRevenue = activeTests.reduce((sum, t) => sum + parseFloat(t.revenue || "0"), 0);
+  const totalConversions = activeTests.reduce((sum, t) => sum + (t.conversions || 0), 0);
+  const currentArpu = totalConversions > 0 ? totalRevenue / totalConversions : 0;
+  
+  const revenueLift = latestMetric?.revenueLift ? '$' + parseFloat(latestMetric.revenueLift).toFixed(0) : '$0';
+  const activeTestsCount = dashboardData?.activeTests || activeTests.length;
 
   // Format tests for table
   const formattedTests = tests.map(test => ({
@@ -337,7 +341,10 @@ export default function Dashboard() {
     productName: test.productName,
     testType: test.testType,
     status: test.status as "active" | "completed" | "draft",
-    performance: test.performance ? parseFloat(test.performance) : 0,
+    arpu: test.arpu ? parseFloat(test.arpu) : 0,
+    arpuLift: test.arpuLift ? parseFloat(test.arpuLift) : 0,
+    conversions: test.conversions || 0,
+    revenue: test.revenue ? parseFloat(test.revenue) : 0,
     startDate: test.startDate ? new Date(test.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not started',
   }));
 
@@ -371,25 +378,19 @@ export default function Dashboard() {
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard 
-          title="Conversion Rate" 
-          value={conversionRate}
-          change={12.5} 
-          trend="up"
-          subtitle="vs. last 30 days"
+          title="ARPU" 
+          value={currentArpu > 0 ? `$${currentArpu.toFixed(2)}` : '$0.00'}
+          subtitle="avg revenue per user"
         />
         <MetricCard 
-          title="Avg Order Value" 
-          value={avgOrderValue}
-          change={-3.2} 
-          trend="down"
-          subtitle="vs. last 30 days"
+          title="Total Revenue" 
+          value={`$${totalRevenue.toFixed(2)}`}
+          subtitle="from active tests"
         />
         <MetricCard 
-          title="Revenue Lift" 
-          value={revenueLift}
-          change={24.8} 
-          trend="up"
-          subtitle="from optimizations"
+          title="Conversions" 
+          value={totalConversions.toString()}
+          subtitle="total purchases"
         />
         <MetricCard 
           title="Active Tests" 

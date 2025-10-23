@@ -8,7 +8,10 @@ interface Test {
   productName: string;
   testType: string;
   status: "active" | "completed" | "draft";
-  performance: number;
+  arpu: number;
+  arpuLift: number;
+  conversions: number;
+  revenue: number;
   startDate: string;
 }
 
@@ -65,7 +68,8 @@ export default function TestHistoryTable({ tests, onViewTest, onStartTest, onSto
                 <th className="pb-3 font-medium">Product</th>
                 <th className="pb-3 font-medium">Test Type</th>
                 <th className="pb-3 font-medium">Status</th>
-                <th className="pb-3 font-medium text-right">Performance</th>
+                <th className="pb-3 font-medium text-right">ARPU</th>
+                <th className="pb-3 font-medium text-right">Conversions</th>
                 <th className="pb-3 font-medium">Started</th>
                 <th className="pb-3 font-medium text-right">Actions</th>
               </tr>
@@ -88,11 +92,11 @@ export default function TestHistoryTable({ tests, onViewTest, onStartTest, onSto
                       {test.status}
                     </Badge>
                   </td>
-                  <td className={`py-3 text-right font-semibold tabular-nums ${getPerformanceColor(test.performance)}`} data-testid={`text-performance-${index}`}>
-                    <div className="flex items-center justify-end gap-1">
-                      {test.performance > 0 ? <TrendingUp className="w-4 h-4" /> : test.performance < 0 ? <TrendingDown className="w-4 h-4" /> : null}
-                      {test.performance > 0 ? "+" : ""}{test.performance}%
-                    </div>
+                  <td className="py-3 text-right font-semibold tabular-nums" data-testid={`text-arpu-${index}`}>
+                    {test.arpu > 0 ? `$${test.arpu.toFixed(2)}` : '$0.00'}
+                  </td>
+                  <td className="py-3 text-right tabular-nums text-muted-foreground" data-testid={`text-conversions-${index}`}>
+                    {test.conversions}
                   </td>
                   <td className="py-3 text-sm text-muted-foreground" data-testid={`text-date-${index}`}>
                     {test.startDate}
