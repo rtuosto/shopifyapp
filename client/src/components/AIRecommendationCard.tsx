@@ -95,7 +95,7 @@ export default function AIRecommendationCard({
               disabled={isProcessing}
             >
               <CheckCircle2 className="w-4 h-4" />
-              Accept & Create Test
+              Accept & Launch Test
             </Button>
             <Button 
               variant="outline" 

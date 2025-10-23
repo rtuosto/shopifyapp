@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import DashboardHeader from "@/components/DashboardHeader";
 import MetricCard from "@/components/MetricCard";
 import AIRecommendationCard from "@/components/AIRecommendationCard";
@@ -353,11 +356,18 @@ export default function Dashboard() {
     const recommendation = recommendations.find(r => r.id === recommendationId);
     if (!recommendation) return;
 
-    // Use mutateAsync to properly await completion
-    await createTestMutation.mutateAsync({
-      recommendationId,
-      productId: recommendation.productId,
-    });
+    try {
+      // Step 1: Create the test
+      const createdTest = await createTestMutation.mutateAsync({
+        recommendationId,
+        productId: recommendation.productId,
+      });
+      
+      // Step 2: Immediately activate it
+      await activateTestMutation.mutateAsync(createdTest.id);
+    } catch (error) {
+      // Errors already handled by mutations
+    }
   };
 
   const handleDismiss = async (recommendationId: string) => {
@@ -493,8 +503,9 @@ export default function Dashboard() {
   const revenueLift = latestMetric?.revenueLift ? '$' + parseFloat(latestMetric.revenueLift).toFixed(0) : '$0';
   const activeTestsCount = dashboardData?.activeTests || activeTests.length;
 
-  // Format tests for table
-  const formattedTests = tests.map(test => ({
+  // Format tests for table - show only completed tests on dashboard
+  const completedTests = tests.filter(t => t.status === 'completed');
+  const formattedTests = completedTests.map(test => ({
     id: test.id,
     productName: test.productName,
     testType: test.testType,
@@ -601,12 +612,35 @@ export default function Dashboard() {
         <PerformanceChart data={chartData} />
       )}
 
+      {activeTestsCount > 0 && (
+        <Card className="mb-6">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold mb-1">Active Tests</h3>
+                <p className="text-sm text-muted-foreground">
+                  You have {activeTestsCount} test{activeTestsCount === 1 ? '' : 's'} running live in your store
+                </p>
+              </div>
+              <Link href="/active-tests">
+                <Button variant="outline" data-testid="button-view-active-tests">
+                  View All Active Tests
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {formattedTests.length > 0 && (
-        <TestHistoryTable 
-          tests={formattedTests} 
-          onStartTest={(testId) => activateTestMutation.mutate(testId)}
-          onStopTest={(testId) => deactivateTestMutation.mutate(testId)}
-        />
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Completed Tests</h2>
+          <TestHistoryTable 
+            tests={formattedTests} 
+            onStartTest={(testId) => activateTestMutation.mutate(testId)}
+            onStopTest={(testId) => deactivateTestMutation.mutate(testId)}
+          />
+        </div>
       )}
 
       {selectedRecommendation && selectedProduct && (

@@ -25,7 +25,7 @@ const menuItems = [
   },
   {
     title: "Active Tests",
-    url: "/tests",
+    url: "/active-tests",
     icon: Beaker,
   },
   {
