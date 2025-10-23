@@ -16,9 +16,6 @@ interface OptimizationRecommendation {
   title: string;
   description: string;
   testType: "title" | "price" | "description" | "image";
-  confidence: number;
-  estimatedImpact: string;
-  riskLevel: "low" | "medium" | "high";
   proposedChanges: Record<string, any>;
   insights: Array<{
     type: "psychology" | "competitor" | "seo" | "data";
@@ -43,10 +40,7 @@ For each recommendation, provide:
 2. title: A brief title for the recommendation
 3. description: Why this change will work
 4. proposedChanges: An object containing the ACTUAL new values (e.g., {"title": "new title here"} or {"price": 99.99} or {"description": "new description"})
-5. confidence: Confidence level (0-100)
-6. estimatedImpact: Expected impact (e.g., "+15% CTR")
-7. riskLevel: "low", "medium", or "high"
-8. insights: Array of objects with type, title, and description
+5. insights: Array of objects with type, title, and description explaining the psychology/SEO/competitive reasoning
 
 CRITICAL: The proposedChanges object MUST contain the actual new value(s), not instructions or descriptions.
 
@@ -95,9 +89,6 @@ Return your response as a JSON object with a "recommendations" array.`;
       title: rec.title,
       description: rec.description,
       testType: rec.testType || "title",
-      confidence: rec.confidence || 75,
-      estimatedImpact: rec.estimatedImpact || "+10% conversions",
-      riskLevel: rec.riskLevel || "low",
       proposedChanges: rec.proposedChanges || {},
       insights: rec.insights || [],
     }));
@@ -110,9 +101,6 @@ Return your response as a JSON object with a "recommendations" array.`;
         title: "Optimize Product Title for SEO",
         description: "Enhance your product title with relevant keywords and power words to improve search visibility and click-through rates.",
         testType: "title",
-        confidence: 75,
-        estimatedImpact: "+12% CTR",
-        riskLevel: "low",
         proposedChanges: {
           title: `Premium ${product.title} - Professional Quality`,
         },

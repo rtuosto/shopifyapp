@@ -28,15 +28,14 @@ export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
 
 // AI Recommendations table
+// TODO: Add data-driven confidence scores based on historical test performance
+// TODO: Add estimated impact calculations from similar past tests in this category
 export const recommendations = pgTable("recommendations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   productId: varchar("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   description: text("description").notNull(),
   testType: text("test_type").notNull(), // "title", "price", "description", "image"
-  confidence: integer("confidence").notNull(), // 0-100
-  estimatedImpact: text("estimated_impact").notNull(),
-  riskLevel: text("risk_level").notNull(), // "low", "medium", "high"
   proposedChanges: jsonb("proposed_changes").$type<Record<string, any>>().notNull(),
   insights: jsonb("insights").$type<Array<{
     type: "psychology" | "competitor" | "seo" | "data";
