@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, CheckCircle2, XCircle } from "lucide-react";
+import { Sparkles, CheckCircle2, XCircle, Eye } from "lucide-react";
 import { useState } from "react";
 
 interface AIRecommendationCardProps {
@@ -12,6 +12,7 @@ interface AIRecommendationCardProps {
   estimatedImpact: string;
   onAccept?: () => void;
   onReject?: () => void;
+  onPreview?: () => void;
 }
 
 export default function AIRecommendationCard({
@@ -22,6 +23,7 @@ export default function AIRecommendationCard({
   estimatedImpact,
   onAccept,
   onReject,
+  onPreview,
 }: AIRecommendationCardProps) {
   const [status, setStatus] = useState<"pending" | "accepted" | "rejected">("pending");
 
@@ -35,6 +37,11 @@ export default function AIRecommendationCard({
     setStatus("rejected");
     onReject?.();
     console.log("Recommendation rejected:", title);
+  };
+
+  const handlePreview = () => {
+    onPreview?.();
+    console.log("Opening preview for:", title);
   };
 
   return (
@@ -74,22 +81,33 @@ export default function AIRecommendationCard({
         </div>
 
         {status === "pending" && (
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2">
             <Button 
-              onClick={handleAccept} 
-              className="flex-1 gap-2"
-              data-testid="button-accept-recommendation"
+              variant="outline"
+              onClick={handlePreview}
+              className="w-full gap-2"
+              data-testid="button-preview-test"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              Accept & Create Test
+              <Eye className="w-4 h-4" />
+              Preview Changes
             </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleReject}
-              data-testid="button-reject-recommendation"
-            >
-              <XCircle className="w-4 h-4" />
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleAccept} 
+                className="flex-1 gap-2"
+                data-testid="button-accept-recommendation"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Accept & Create Test
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={handleReject}
+                data-testid="button-reject-recommendation"
+              >
+                <XCircle className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         )}
 
