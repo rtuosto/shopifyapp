@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import DashboardHeader from "@/components/DashboardHeader";
 import MetricCard from "@/components/MetricCard";
 import AIRecommendationCard from "@/components/AIRecommendationCard";
 import TestHistoryTable from "@/components/TestHistoryTable";
 import PerformanceChart from "@/components/PerformanceChart";
 import TestPreviewModal from "@/components/TestPreviewModal";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Product, Recommendation, Test, Metric } from "@shared/schema";
 
 interface DashboardData {
@@ -20,9 +22,62 @@ interface EnrichedTest extends Test {
 }
 
 export default function Dashboard() {
+  const { toast } = useToast();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [selectedRecommendation, setSelectedRecommendation] = useState<Recommendation | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
+  // Sync products from Shopify
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      try {
+        const res = await apiRequest("POST", "/api/sync/products");
+        const data = await res.json();
+        if (!data.success) {
+          throw new Error(data.error || "Failed to sync products");
+        }
+        return data;
+      } catch (error: any) {
+        // apiRequest throws Response object on error, parse it
+        if (error instanceof Response) {
+          let errorMessage = `HTTP ${error.status}: Failed to sync products`;
+          
+          // Try to parse error body (JSON or text) exactly once
+          try {
+            const errorData = await error.json();
+            errorMessage = errorData.error || errorData.message || errorMessage;
+          } catch {
+            try {
+              const errorText = await error.text();
+              errorMessage = errorText || errorMessage;
+            } catch {
+              // Use default message if both parsing attempts fail
+            }
+          }
+          
+          throw new Error(errorMessage);
+        }
+        // If it's already an Error, rethrow it
+        throw error;
+      }
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Products Synced",
+        description: data.message || `Successfully synced ${data.syncedCount} products`,
+      });
+      // Invalidate relevant queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to sync products from Shopify. Please try again or reinstall the app if the problem persists.",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Fetch dashboard data
   const { data: dashboardData } = useQuery<DashboardData>({
@@ -100,7 +155,11 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <DashboardHeader activeTests={activeTestsCount} lastSync="5 min ago" />
+      <DashboardHeader 
+        activeTests={activeTestsCount} 
+        lastSync="5 min ago"
+        onRefresh={() => syncMutation.mutate()}
+      />
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard 

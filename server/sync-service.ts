@@ -1,7 +1,7 @@
 import { Session } from "@shopify/shopify-api";
 import { fetchProducts } from "./shopify";
 import { storage } from "./storage";
-import { Product } from "@shared/schema";
+import { InsertProduct } from "@shared/schema";
 
 interface ShopifyProduct {
   id: string;
@@ -31,17 +31,17 @@ export async function syncProductsFromShopify(session: Session): Promise<number>
     console.log(`Starting product sync for shop: ${session.shop}`);
     
     const response = await fetchProducts(session);
-    const products = (response as any).data?.products?.edges || [];
+    const shopifyProducts = (response as any).data?.products?.edges || [];
     
     let syncedCount = 0;
     
-    for (const edge of products) {
+    for (const edge of shopifyProducts) {
       const shopifyProduct: ShopifyProduct = edge.node;
       
-      const productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt'> = {
+      const productData: InsertProduct = {
         shopifyProductId: shopifyProduct.id,
         title: shopifyProduct.title,
-        description: shopifyProduct.description || "",
+        description: shopifyProduct.description || null,
         price: shopifyProduct.priceRangeV2.minVariantPrice.amount,
         compareAtPrice: shopifyProduct.compareAtPriceRange?.minVariantPrice?.amount || null,
         images: shopifyProduct.images.edges.map(img => img.node.url),
@@ -49,8 +49,8 @@ export async function syncProductsFromShopify(session: Session): Promise<number>
         reviewCount: 0,
       };
       
-      const existingProducts = await storage.getProducts(session.shop);
-      const existing = existingProducts.find(p => p.shopifyProductId === shopifyProduct.id);
+      // Check if product already exists using shopifyProductId
+      const existing = await storage.getProductByShopifyId(session.shop, shopifyProduct.id);
       
       if (existing) {
         await storage.updateProduct(session.shop, existing.id, productData);

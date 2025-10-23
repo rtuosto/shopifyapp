@@ -45,6 +45,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await sessionStorage.storeSession(session);
       console.log("Session stored for shop:", session.shop);
       
+      // Initialize shop data in background (sync products from Shopify)
+      initializeShopData(session).catch(error => {
+        console.error("Error initializing shop data:", error);
+      });
+      
       res.redirect(`/?shop=${session.shop}`);
     } catch (error) {
       console.error("Auth callback error:", error);
@@ -233,6 +238,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       res.status(500).json({ error: "Failed to fetch dashboard data" });
+    }
+  });
+
+  // Sync products from Shopify (protected)
+  app.post("/api/sync/products", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      
+      // Get session for this shop
+      const session = await sessionStorage.getSessionByShop(shop);
+      if (!session) {
+        return res.status(401).json({ error: "No valid session found. Please reinstall the app." });
+      }
+
+      const syncedCount = await syncProductsFromShopify(session);
+      
+      res.json({ 
+        success: true, 
+        syncedCount,
+        message: `Successfully synced ${syncedCount} products from Shopify` 
+      });
+    } catch (error) {
+      console.error("Error syncing products:", error);
+      res.status(500).json({ error: "Failed to sync products from Shopify" });
     }
   });
 
