@@ -7,12 +7,14 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import ThemeToggle from "@/components/ThemeToggle";
 import Dashboard from "@/pages/Dashboard";
+import Simulator from "@/pages/Simulator";
 import NotFound from "@/pages/NotFound";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/simulator" component={Simulator} />
       <Route component={NotFound} />
     </Switch>
   );

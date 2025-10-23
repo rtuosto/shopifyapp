@@ -636,6 +636,229 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Simulation endpoints for testing A/B test allocation and tracking
+  // POST /api/simulate/traffic - Simulates product impressions
+  app.post("/api/simulate/traffic", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      const { testId, impressions = 100 } = req.body;
+
+      if (!testId) {
+        return res.status(400).json({ error: "testId is required" });
+      }
+
+      const test = await storage.getTest(shop, testId);
+      if (!test) {
+        return res.status(404).json({ error: "Test not found" });
+      }
+
+      if (test.status !== "active") {
+        return res.status(400).json({ error: "Test must be active to simulate traffic" });
+      }
+
+      // Simulate impressions (50/50 split between control and variant)
+      const controlImpressions = Math.floor(impressions / 2);
+      const variantImpressions = impressions - controlImpressions;
+
+      // Update test with new impressions
+      const newImpressions = (test.impressions || 0) + impressions;
+      await storage.updateTest(shop, testId, {
+        impressions: newImpressions,
+      });
+
+      console.log(`[Simulation] Generated ${impressions} impressions for test ${testId} (${controlImpressions} control, ${variantImpressions} variant)`);
+
+      res.json({
+        success: true,
+        testId,
+        impressions: {
+          total: impressions,
+          control: controlImpressions,
+          variant: variantImpressions,
+        },
+        totalImpressions: newImpressions,
+      });
+    } catch (error) {
+      console.error("Error simulating traffic:", error);
+      res.status(500).json({ error: "Failed to simulate traffic" });
+    }
+  });
+
+  // POST /api/simulate/orders - Simulates orders/conversions
+  app.post("/api/simulate/orders", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      const { 
+        testId, 
+        orders = 10, 
+        avgOrderValue,
+        conversionRate 
+      } = req.body;
+
+      if (!testId) {
+        return res.status(400).json({ error: "testId is required" });
+      }
+
+      const test = await storage.getTest(shop, testId);
+      if (!test) {
+        return res.status(404).json({ error: "Test not found" });
+      }
+
+      if (test.status !== "active") {
+        return res.status(400).json({ error: "Test must be active to simulate orders" });
+      }
+
+      // Get the product to use realistic pricing
+      const product = await storage.getProduct(shop, test.productId);
+      if (!product) {
+        return res.status(400).json({ error: "Product not found" });
+      }
+
+      // Use provided avgOrderValue or product price
+      const basePrice = avgOrderValue || parseFloat(product.price);
+
+      // Simulate orders with 50/50 allocation (simulating random assignment)
+      const controlOrders = Math.floor(orders / 2);
+      const variantOrders = orders - controlOrders;
+
+      // Generate realistic order values with some variance (±20%)
+      let totalRevenue = 0;
+      for (let i = 0; i < orders; i++) {
+        const variance = 0.8 + Math.random() * 0.4; // 0.8 to 1.2x
+        const orderValue = basePrice * variance;
+        totalRevenue += orderValue;
+      }
+
+      // Update test metrics
+      const newConversions = (test.conversions || 0) + orders;
+      const newRevenue = parseFloat(test.revenue || "0") + totalRevenue;
+      const arpu = newConversions > 0 ? newRevenue / newConversions : 0;
+
+      await storage.updateTest(shop, testId, {
+        conversions: newConversions,
+        revenue: newRevenue.toString(),
+        arpu: arpu.toString(),
+      });
+
+      console.log(`[Simulation] Generated ${orders} orders for test ${testId}`);
+      console.log(`[Simulation] Control: ${controlOrders}, Variant: ${variantOrders}`);
+      console.log(`[Simulation] Revenue: $${totalRevenue.toFixed(2)}, ARPU: $${arpu.toFixed(2)}`);
+
+      res.json({
+        success: true,
+        testId,
+        orders: {
+          total: orders,
+          control: controlOrders,
+          variant: variantOrders,
+        },
+        revenue: totalRevenue.toFixed(2),
+        totalConversions: newConversions,
+        totalRevenue: newRevenue.toFixed(2),
+        arpu: arpu.toFixed(2),
+      });
+    } catch (error) {
+      console.error("Error simulating orders:", error);
+      res.status(500).json({ error: "Failed to simulate orders" });
+    }
+  });
+
+  // POST /api/simulate/batch - Simulates both traffic and orders in a realistic ratio
+  app.post("/api/simulate/batch", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      const { 
+        testId, 
+        visitors = 1000,
+        conversionRate = 0.03, // 3% default
+        avgOrderValue
+      } = req.body;
+
+      if (!testId) {
+        return res.status(400).json({ error: "testId is required" });
+      }
+
+      const test = await storage.getTest(shop, testId);
+      if (!test) {
+        return res.status(404).json({ error: "Test not found" });
+      }
+
+      if (test.status !== "active") {
+        return res.status(400).json({ error: "Test must be active to simulate batch" });
+      }
+
+      // Simulate traffic (impressions)
+      const controlImpressions = Math.floor(visitors / 2);
+      const variantImpressions = visitors - controlImpressions;
+      const newImpressions = (test.impressions || 0) + visitors;
+
+      // Simulate conversions based on conversion rate
+      const expectedOrders = Math.floor(visitors * conversionRate);
+      const controlOrders = Math.floor(expectedOrders / 2);
+      const variantOrders = expectedOrders - controlOrders;
+
+      // Get the product to use realistic pricing
+      const product = await storage.getProduct(shop, test.productId);
+      if (!product) {
+        return res.status(400).json({ error: "Product not found" });
+      }
+
+      const basePrice = avgOrderValue || parseFloat(product.price);
+
+      // Generate realistic order values
+      let totalRevenue = 0;
+      for (let i = 0; i < expectedOrders; i++) {
+        const variance = 0.8 + Math.random() * 0.4;
+        totalRevenue += basePrice * variance;
+      }
+
+      // Update test metrics
+      const newConversions = (test.conversions || 0) + expectedOrders;
+      const newRevenue = parseFloat(test.revenue || "0") + totalRevenue;
+      const arpu = newConversions > 0 ? newRevenue / newConversions : 0;
+
+      await storage.updateTest(shop, testId, {
+        impressions: newImpressions,
+        conversions: newConversions,
+        revenue: newRevenue.toString(),
+        arpu: arpu.toString(),
+      });
+
+      console.log(`[Simulation Batch] Test ${testId}: ${visitors} visitors, ${expectedOrders} orders (${conversionRate * 100}% CR)`);
+      console.log(`[Simulation Batch] Allocation - Control: ${controlImpressions}/${controlOrders}, Variant: ${variantImpressions}/${variantOrders}`);
+      console.log(`[Simulation Batch] Revenue: $${totalRevenue.toFixed(2)}, ARPU: $${arpu.toFixed(2)}`);
+
+      res.json({
+        success: true,
+        testId,
+        simulation: {
+          visitors,
+          conversionRate: conversionRate * 100,
+          orders: expectedOrders,
+        },
+        allocation: {
+          control: {
+            impressions: controlImpressions,
+            orders: controlOrders,
+          },
+          variant: {
+            impressions: variantImpressions,
+            orders: variantOrders,
+          },
+        },
+        metrics: {
+          totalImpressions: newImpressions,
+          totalConversions: newConversions,
+          totalRevenue: newRevenue.toFixed(2),
+          arpu: arpu.toFixed(2),
+        },
+      });
+    } catch (error) {
+      console.error("Error simulating batch:", error);
+      res.status(500).json({ error: "Failed to simulate batch" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -9,7 +9,7 @@ import {
   SidebarMenuItem,
   SidebarHeader,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, Beaker, TrendingUp, Settings, Sparkles } from "lucide-react";
+import { LayoutDashboard, Beaker, TrendingUp, Settings, Sparkles, FlaskConical } from "lucide-react";
 import { Link, useLocation } from "wouter";
 
 const menuItems = [
@@ -17,6 +17,11 @@ const menuItems = [
     title: "Dashboard",
     url: "/",
     icon: LayoutDashboard,
+  },
+  {
+    title: "Simulator",
+    url: "/simulator",
+    icon: FlaskConical,
   },
   {
     title: "Active Tests",
