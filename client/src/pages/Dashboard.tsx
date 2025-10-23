@@ -112,6 +112,75 @@ export default function Dashboard() {
     },
   });
 
+  // Create test from recommendation mutation
+  const createTestMutation = useMutation({
+    mutationFn: async ({ recommendationId, productId }: { recommendationId: string; productId: string }) => {
+      const recommendation = recommendations.find(r => r.id === recommendationId);
+      const product = products.find(p => p.id === productId);
+      
+      if (!recommendation || !product) {
+        throw new Error("Recommendation or product not found");
+      }
+
+      // Build control data (current product state)
+      const controlData: Record<string, any> = {
+        title: product.title,
+        description: product.description,
+        price: parseFloat(product.price),
+      };
+
+      // Build variant data (proposed changes)
+      const variantData: Record<string, any> = {
+        ...controlData,
+        ...recommendation.proposedChanges,
+      };
+
+      const testData = {
+        productId: product.id,
+        recommendationId: recommendation.id,
+        testType: recommendation.testType,
+        status: "draft",
+        controlData,
+        variantData,
+        performance: "0",
+        impressions: 0,
+        conversions: 0,
+        revenue: "0",
+      };
+
+      const res = await apiRequest<Test>("/api/tests", {
+        method: "POST",
+        body: JSON.stringify(testData),
+      });
+      
+      return res;
+    },
+    onSuccess: async (data, variables) => {
+      // Update recommendation status to "testing"
+      await apiRequest(`/api/recommendations/${variables.recommendationId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "testing" }),
+      });
+      
+      toast({
+        title: "Test Created",
+        description: "Your A/B test has been created successfully",
+      });
+      
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/recommendations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to Create Test",
+        description: error.message || "Could not create test from recommendation",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Fetch dashboard data (poll more frequently if syncing)
   const { data: dashboardData } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
@@ -181,6 +250,16 @@ export default function Dashboard() {
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["/api/products"],
   });
+
+  const handleAccept = async (recommendationId: string) => {
+    const recommendation = recommendations.find(r => r.id === recommendationId);
+    if (!recommendation) return;
+
+    createTestMutation.mutate({
+      recommendationId,
+      productId: recommendation.productId,
+    });
+  };
 
   const handlePreview = async (recommendationId: string) => {
     const recommendation = recommendations.find(r => r.id === recommendationId);
@@ -292,6 +371,7 @@ export default function Dashboard() {
                 confidence={rec.confidence}
                 productName={products.find(p => p.id === rec.productId)?.title || 'Unknown Product'}
                 estimatedImpact={rec.estimatedImpact}
+                onAccept={() => handleAccept(rec.id)}
                 onPreview={() => handlePreview(rec.id)}
               />
             ))}
