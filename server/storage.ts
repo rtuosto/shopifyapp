@@ -53,9 +53,6 @@ export class MemStorage implements IStorage {
     this.recommendations = new Map();
     this.tests = new Map();
     this.metrics = new Map();
-    
-    // Initialize with sample data for default dev shop
-    this.initializeSampleData("cro-autopilot-dev-store.myshopify.com");
   }
   
   // Helper to ensure shop namespace exists
