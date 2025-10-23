@@ -5,6 +5,15 @@ Shoptimizer is an embedded Shopify app designed to enhance sales for store owner
 
 ## Recent Changes (October 23, 2025)
 
+**Traffic & Conversion Simulator - NEW**
+- ✅ Built comprehensive simulation system for validating A/B test tracking before real traffic
+- ✅ Backend endpoints: `/api/simulate/traffic`, `/api/simulate/orders`, `/api/simulate/batch`
+- ✅ Batch simulator: Realistic traffic + conversions with configurable conversion rate
+- ✅ Advanced controls: Separate traffic and order simulation for granular testing
+- ✅ Allocation verification: All simulations use 50/50 control/variant split
+- ✅ Revenue variance: Orders simulated with ±20% price variation for realism
+- ✅ Accessible via Simulator page in navigation sidebar
+
 **Smart Automation System - Production Ready**
 - ✅ Auto-sync on dashboard load: Automatically syncs products when none exist (one-time per session)
 - ✅ Auto-generate on load: Automatically generates 4 AI recommendations when products exist but none pending
@@ -15,6 +24,7 @@ Shoptimizer is an embedded Shopify app designed to enhance sales for store owner
 - ✅ All automation features reviewed and approved by architect for production use
 
 **Implementation Details:**
+- Simulation: Each endpoint validates test is active, simulates 50/50 allocation, updates metrics
 - Ref management: `attemptedRef` prevents retry loops, `hasAutoRef` marks successful completion
 - Error recovery: Failed operations require manual retry via UI buttons
 - Async safety: All handlers use try/finally blocks to guarantee cleanup
@@ -39,6 +49,7 @@ Key features include:
 - **Smart Automation System**: Includes auto-sync on dashboard load, auto-generation of recommendations, and dismissal with replacement for recommendations.
 - **Test Deployment & Conversion Tracking**: Activates A/B tests by deploying variants to Shopify, captures control states for safe rollback, registers Shopify `ORDERS_CREATE` webhooks for automatic conversion attribution, and calculates ARPU.
 - **Safe Rollback**: Deactivates tests and restores original product values even if products were edited post-test creation.
+- **Traffic & Conversion Simulator**: Dedicated simulator page with batch and advanced controls for generating simulated traffic and orders, verifying 50/50 A/B test allocation, and validating performance tracking before deploying to real customers.
 - **UI/UX**: Focuses on intuitive design using Shadcn UI components, providing a seamless embedded Shopify app experience.
 
 ## External Dependencies
