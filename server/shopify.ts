@@ -17,40 +17,63 @@ export const shopify = shopifyApi({
 
 // GraphQL query helpers
 export async function fetchProducts(session: Session) {
-  const client = new shopify.clients.Graphql({ session });
-  
-  const response = await client.request(`
-    query {
-      products(first: 50) {
-        edges {
-          node {
-            id
-            title
-            description
-            priceRangeV2 {
-              minVariantPrice {
-                amount
-                currencyCode
+  try {
+    console.log('[Shopify API] Fetching products with session:', {
+      shop: session.shop,
+      hasAccessToken: !!session.accessToken,
+      scopes: session.scope,
+    });
+    
+    const client = new shopify.clients.Graphql({ session });
+    
+    console.log('[Shopify API] Executing GraphQL query...');
+    const response = await client.request(`
+      query {
+        products(first: 50) {
+          edges {
+            node {
+              id
+              title
+              description
+              priceRangeV2 {
+                minVariantPrice {
+                  amount
+                  currencyCode
+                }
+                maxVariantPrice {
+                  amount
+                  currencyCode
+                }
               }
-              maxVariantPrice {
-                amount
-                currencyCode
-              }
-            }
-            images(first: 5) {
-              edges {
-                node {
-                  url
+              images(first: 5) {
+                edges {
+                  node {
+                    url
+                  }
                 }
               }
             }
           }
         }
       }
-    }
-  `);
+    `);
 
-  return response.data;
+    console.log('[Shopify API] Raw response:', JSON.stringify(response, null, 2));
+    console.log('[Shopify API] Response data:', JSON.stringify(response.data, null, 2));
+    
+    if (response.errors) {
+      console.error('[Shopify API] GraphQL errors:', response.errors);
+    }
+    
+    return response.data;
+  } catch (error) {
+    console.error('[Shopify API] Error fetching products:', error);
+    if (error instanceof Error) {
+      console.error('[Shopify API] Error message:', error.message);
+      console.error('[Shopify API] Error stack:', error.stack);
+    }
+    throw error;
+  }
 }
 
 export async function updateProduct(session: Session, productId: string, updates: {
