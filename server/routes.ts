@@ -769,6 +769,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==========================================
+  // STOREFRONT API (PUBLIC - No Auth Required)
+  // ==========================================
+  
+  // Get active test data for a product (called by storefront JavaScript)
+  app.get("/api/storefront/test/:shopifyProductId", async (req, res) => {
+    try {
+      const shopifyProductId = req.params.shopifyProductId;
+      const shop = req.query.shop as string;
+      
+      if (!shop) {
+        return res.status(400).json({ error: "Missing shop parameter" });
+      }
+      
+      // Find the product
+      const products = await storage.getProducts(shop);
+      const product = products.find(p => p.shopifyProductId === shopifyProductId);
+      
+      if (!product) {
+        return res.json({ activeTest: null });
+      }
+      
+      // Find active test for this product
+      const tests = await storage.getTests(shop);
+      const activeTest = tests.find(t => 
+        t.productId === product.id && 
+        t.status === "active"
+      );
+      
+      if (!activeTest) {
+        return res.json({ activeTest: null });
+      }
+      
+      // Return test data for storefront use
+      res.json({
+        activeTest: {
+          id: activeTest.id,
+          testType: activeTest.testType,
+          controlData: activeTest.controlData,
+          variantData: activeTest.variantData,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching storefront test:", error);
+      res.status(500).json({ error: "Failed to fetch test" });
+    }
+  });
+  
+  // Track impression (product page view)
+  app.post("/api/storefront/impression", async (req, res) => {
+    try {
+      const { testId, variant, shop } = req.body;
+      
+      if (!testId || !variant || !shop) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      
+      if (variant !== "control" && variant !== "variant") {
+        return res.status(400).json({ error: "Invalid variant value" });
+      }
+      
+      // Get the test
+      const test = await storage.getTest(shop, testId);
+      if (!test || test.status !== "active") {
+        return res.status(404).json({ error: "Active test not found" });
+      }
+      
+      // Increment the appropriate impression counter
+      const updates: any = {
+        impressions: (test.impressions || 0) + 1,
+      };
+      
+      if (variant === "control") {
+        updates.controlImpressions = (test.controlImpressions || 0) + 1;
+      } else {
+        updates.variantImpressions = (test.variantImpressions || 0) + 1;
+      }
+      
+      await storage.updateTest(shop, testId, updates);
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error tracking impression:", error);
+      res.status(500).json({ error: "Failed to track impression" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
