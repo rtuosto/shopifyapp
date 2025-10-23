@@ -21,23 +21,30 @@ export default function AIRecommendationCard({
   onReject,
   onPreview,
 }: AIRecommendationCardProps) {
-  const [status, setStatus] = useState<"pending" | "accepted" | "rejected">("pending");
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleAccept = () => {
-    setStatus("accepted");
-    onAccept?.();
-    console.log("Recommendation accepted:", title);
+  const handleAccept = async () => {
+    setIsProcessing(true);
+    try {
+      await onAccept?.();
+    } finally {
+      // Always reset processing state whether success or error
+      setIsProcessing(false);
+    }
   };
 
-  const handleReject = () => {
-    setStatus("rejected");
-    onReject?.();
-    console.log("Recommendation rejected:", title);
+  const handleReject = async () => {
+    setIsProcessing(true);
+    try {
+      await onReject?.();
+    } finally {
+      // Always reset processing state whether success or error
+      setIsProcessing(false);
+    }
   };
 
   const handlePreview = () => {
     onPreview?.();
-    console.log("Opening preview for:", title);
   };
 
   const titleSlug = title ? title.toLowerCase().replace(/\s+/g, '-') : 'unknown';
@@ -69,49 +76,43 @@ export default function AIRecommendationCard({
           </div>
         </div>
 
-        {status === "pending" && (
-          <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2">
+          <Button 
+            variant="outline"
+            onClick={handlePreview}
+            className="w-full gap-2"
+            data-testid="button-preview-test"
+            disabled={isProcessing}
+          >
+            <Eye className="w-4 h-4" />
+            Preview Changes
+          </Button>
+          <div className="flex gap-2">
             <Button 
-              variant="outline"
-              onClick={handlePreview}
-              className="w-full gap-2"
-              data-testid="button-preview-test"
+              onClick={handleAccept} 
+              className="flex-1 gap-2"
+              data-testid="button-accept-recommendation"
+              disabled={isProcessing}
             >
-              <Eye className="w-4 h-4" />
-              Preview Changes
+              <CheckCircle2 className="w-4 h-4" />
+              Accept & Create Test
             </Button>
-            <div className="flex gap-2">
-              <Button 
-                onClick={handleAccept} 
-                className="flex-1 gap-2"
-                data-testid="button-accept-recommendation"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                Accept & Create Test
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={handleReject}
-                data-testid="button-reject-recommendation"
-              >
-                <XCircle className="w-4 h-4" />
-              </Button>
+            <Button 
+              variant="outline" 
+              onClick={handleReject}
+              data-testid="button-reject-recommendation"
+              disabled={isProcessing}
+            >
+              <XCircle className="w-4 h-4" />
+            </Button>
+          </div>
+          {isProcessing && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground justify-center">
+              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></div>
+              Processing...
             </div>
-          </div>
-        )}
-
-        {status === "accepted" && (
-          <div className="text-sm text-chart-4 font-medium flex items-center gap-2" data-testid="text-status-accepted">
-            <CheckCircle2 className="w-4 h-4" />
-            Test created successfully
-          </div>
-        )}
-
-        {status === "rejected" && (
-          <div className="text-sm text-muted-foreground font-medium" data-testid="text-status-rejected">
-            Recommendation dismissed
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </Card>
   );
