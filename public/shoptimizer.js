@@ -143,6 +143,83 @@
   }
 
   // ============================================
+  // Cart Persistence (for conversion attribution)
+  // ============================================
+
+  function persistVariantToCart(testId, variant) {
+    // Store variant assignment for this specific test
+    // This will be attached to line items when product is added to cart
+    const variantData = {
+      testId: testId,
+      variant: variant,
+      timestamp: Date.now(),
+    };
+    
+    // Store in sessionStorage for attachment during add-to-cart
+    const key = `shoptimizer_variant_${testId}`;
+    try {
+      sessionStorage.setItem(key, JSON.stringify(variantData));
+      console.log(`[Shoptimizer] Variant ${variant} stored for test ${testId}`);
+    } catch (e) {
+      console.error('[Shoptimizer] Failed to store variant in sessionStorage:', e);
+    }
+    
+    // Also intercept add-to-cart to attach line item properties
+    interceptAddToCart(testId, variant);
+  }
+  
+  function interceptAddToCart(testId, variant) {
+    // Listen for add-to-cart form submissions
+    document.addEventListener('submit', function(e) {
+      const form = e.target;
+      if (form.matches('[action*="/cart/add"]') || form.querySelector('[name="add"]')) {
+        // This is an add-to-cart form
+        console.log('[Shoptimizer] Intercepting add-to-cart for variant tracking');
+        
+        // Add hidden input with variant info as line item property
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = `properties[_shoptimizer_${testId}]`;
+        input.value = variant;
+        form.appendChild(input);
+      }
+    });
+    
+    // Also intercept AJAX add-to-cart calls (common in modern themes)
+    const originalFetch = window.fetch;
+    window.fetch = function(...args) {
+      const [url, options] = args;
+      if (typeof url === 'string' && url.includes('/cart/add')) {
+        try {
+          if (options && options.body) {
+            const body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
+            if (body.items) {
+              // Multiple items being added
+              body.items = body.items.map((item) => ({
+                ...item,
+                properties: {
+                  ...item.properties,
+                  [`_shoptimizer_${testId}`]: variant,
+                },
+              }));
+            } else {
+              // Single item being added
+              body.properties = {
+                ...body.properties,
+                [`_shoptimizer_${testId}`]: variant,
+              };
+            }
+            options.body = JSON.stringify(body);
+          }
+        } catch (e) {
+          console.error('[Shoptimizer] Failed to attach variant to AJAX cart add:', e);
+        }
+      }
+      return originalFetch.apply(this, args);
+    };
+  }
+
+  // ============================================
   // Main Initialization
   // ============================================
 
@@ -178,7 +255,10 @@
         // Track impression
         trackImpression(testData.id, variant);
 
-        // Store variant on checkout for conversion attribution
+        // Persist variant assignment to Shopify cart for conversion attribution
+        persistVariantToCart(testData.id, variant);
+
+        // Store variant on checkout for conversion attribution (backup)
         window.shoptimizerVariant = variant;
         window.shoptimizerTestId = testData.id;
       })

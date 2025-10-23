@@ -487,9 +487,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (lineItem) {
             const revenue = parseFloat(lineItem.price) * lineItem.quantity;
             
-            // Randomly assign to control or variant (50/50 split)
-            // This is statistically valid over many orders
-            const variant = Math.random() < 0.5 ? 'control' : 'variant';
+            // Get variant from line item properties (set by storefront JavaScript)
+            const lineItemProperties = lineItem.properties || [];
+            let variant = null;
+            
+            // Look for test-specific variant assignment in line item properties
+            const variantProperty = lineItemProperties.find((prop: any) => 
+              prop.name === `_shoptimizer_${activeTest.id}`
+            );
+            
+            if (variantProperty && (variantProperty.value === 'control' || variantProperty.value === 'variant')) {
+              variant = variantProperty.value;
+              console.log(`[Webhook] Using line item property variant: ${variant} for test ${activeTest.id}`);
+            } else {
+              // Fallback: If no variant found in properties, randomly assign (50/50)
+              // This can happen if customer added product without viewing the product page
+              variant = Math.random() < 0.5 ? 'control' : 'variant';
+              console.log(`[Webhook] No line item property found for test ${activeTest.id}, using random assignment: ${variant}`);
+            }
             
             // Update per-variant metrics
             const updates: any = {
@@ -730,23 +745,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const basePrice = avgOrderValue || parseFloat(product.price);
 
-      // Generate realistic order values
-      let totalRevenue = 0;
-      for (let i = 0; i < expectedOrders; i++) {
+      // Generate realistic order values - split between control and variant
+      let controlRevenue = 0;
+      let variantRevenue = 0;
+      
+      for (let i = 0; i < controlOrders; i++) {
         const variance = 0.8 + Math.random() * 0.4;
-        totalRevenue += basePrice * variance;
+        controlRevenue += basePrice * variance;
       }
+      
+      for (let i = 0; i < variantOrders; i++) {
+        const variance = 0.8 + Math.random() * 0.4;
+        variantRevenue += basePrice * variance;
+      }
+      
+      const totalRevenue = controlRevenue + variantRevenue;
 
-      // Update test metrics
+      // Update test metrics - both aggregate and per-variant
+      const newControlImpressions = (test.controlImpressions || 0) + controlImpressions;
+      const newVariantImpressions = (test.variantImpressions || 0) + variantImpressions;
+      const newControlConversions = (test.controlConversions || 0) + controlOrders;
+      const newVariantConversions = (test.variantConversions || 0) + variantOrders;
+      const newControlRevenue = parseFloat(test.controlRevenue || "0") + controlRevenue;
+      const newVariantRevenue = parseFloat(test.variantRevenue || "0") + variantRevenue;
+      
       const newConversions = (test.conversions || 0) + expectedOrders;
       const newRevenue = parseFloat(test.revenue || "0") + totalRevenue;
       const arpu = newConversions > 0 ? newRevenue / newConversions : 0;
 
       await storage.updateTest(shop, testId, {
+        // Aggregate metrics
         impressions: newImpressions,
         conversions: newConversions,
         revenue: newRevenue.toString(),
         arpu: arpu.toString(),
+        // Per-variant metrics
+        controlImpressions: newControlImpressions,
+        variantImpressions: newVariantImpressions,
+        controlConversions: newControlConversions,
+        variantConversions: newVariantConversions,
+        controlRevenue: newControlRevenue.toString(),
+        variantRevenue: newVariantRevenue.toString(),
       });
 
       console.log(`[Simulation Batch] Test ${testId}: ${visitors} visitors, ${expectedOrders} orders (${conversionRate * 100}% CR)`);

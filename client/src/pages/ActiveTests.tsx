@@ -210,69 +210,143 @@ export default function ActiveTests() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                      {/* Impressions */}
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Impressions</p>
-                        <p className="text-2xl font-bold" data-testid={`text-impressions-${index}`}>
-                          {(test.impressions || 0).toLocaleString()}
-                        </p>
-                      </div>
-
-                      {/* Conversions */}
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Conversions</p>
-                        <p className="text-2xl font-bold" data-testid={`text-conversions-${index}`}>
-                          {test.conversions || 0}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {conversionRate.toFixed(2)}% rate
-                        </p>
-                      </div>
-
-                      {/* Revenue */}
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">Revenue</p>
-                        <p className="text-2xl font-bold" data-testid={`text-revenue-${index}`}>
-                          ${(() => {
-                            const rev = test.revenue ? parseFloat(test.revenue) : 0;
-                            return (isNaN(rev) ? 0 : rev).toFixed(2);
-                          })()}
-                        </p>
-                      </div>
-
-                      {/* ARPU */}
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">ARPU</p>
-                        <p className="text-2xl font-bold" data-testid={`text-arpu-${index}`}>
-                          ${(() => {
-                            const arpu = test.arpu ? parseFloat(test.arpu) : 0;
-                            return (isNaN(arpu) ? 0 : arpu).toFixed(2);
-                          })()}
-                        </p>
-                      </div>
-
-                      {/* ARPU Lift */}
-                      <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">ARPU Lift</p>
-                        <div className="flex items-center gap-1">
-                          <p className={`text-2xl font-bold ${arpuLift > 0 ? 'text-chart-4' : arpuLift < 0 ? 'text-destructive' : ''}`} data-testid={`text-arpu-lift-${index}`}>
-                            {isNaN(arpuLift) ? "0.0%" : formatPercentage(arpuLift)}
-                          </p>
-                          {arpuLift > 0 && <ArrowUpRight className="w-5 h-5 text-chart-4" />}
-                          {arpuLift < 0 && <ArrowDownRight className="w-5 h-5 text-destructive" />}
+                    {/* Control vs Variant Comparison */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Control Column */}
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <div className="h-2 w-2 rounded-full bg-blue-500"></div>
+                          <h3 className="font-semibold">Control (Original)</h3>
                         </div>
-                        {!hasSignificantData && (
-                          <p className="text-xs text-yellow-600">Low sample size</p>
-                        )}
+                        
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Impressions</p>
+                            <p className="text-xl font-bold" data-testid={`text-control-impressions-${index}`}>
+                              {(test.controlImpressions || 0).toLocaleString()}
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <p className="text-xs text-muted-foreground">Conversions</p>
+                            <p className="text-xl font-bold" data-testid={`text-control-conversions-${index}`}>
+                              {test.controlConversions || 0}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {(test.controlImpressions || 0) > 0 
+                                ? (((test.controlConversions || 0) / (test.controlImpressions || 1)) * 100).toFixed(2)
+                                : '0.00'}% rate
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <p className="text-xs text-muted-foreground">Revenue</p>
+                            <p className="text-xl font-bold" data-testid={`text-control-revenue-${index}`}>
+                              ${(() => {
+                                const rev = test.controlRevenue ? parseFloat(test.controlRevenue) : 0;
+                                return (isNaN(rev) ? 0 : rev).toFixed(2);
+                              })()}
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <p className="text-xs text-muted-foreground">ARPU</p>
+                            <p className="text-xl font-bold" data-testid={`text-control-arpu-${index}`}>
+                              ${(() => {
+                                const conversions = test.controlConversions || 0;
+                                const revenue = test.controlRevenue ? parseFloat(test.controlRevenue) : 0;
+                                const arpu = conversions > 0 ? revenue / conversions : 0;
+                                return (isNaN(arpu) ? 0 : arpu).toFixed(2);
+                              })()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Variant Column */}
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                          <h3 className="font-semibold">Variant (New)</h3>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Impressions</p>
+                            <p className="text-xl font-bold" data-testid={`text-variant-impressions-${index}`}>
+                              {(test.variantImpressions || 0).toLocaleString()}
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <p className="text-xs text-muted-foreground">Conversions</p>
+                            <p className="text-xl font-bold" data-testid={`text-variant-conversions-${index}`}>
+                              {test.variantConversions || 0}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {(test.variantImpressions || 0) > 0 
+                                ? (((test.variantConversions || 0) / (test.variantImpressions || 1)) * 100).toFixed(2)
+                                : '0.00'}% rate
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <p className="text-xs text-muted-foreground">Revenue</p>
+                            <p className="text-xl font-bold" data-testid={`text-variant-revenue-${index}`}>
+                              ${(() => {
+                                const rev = test.variantRevenue ? parseFloat(test.variantRevenue) : 0;
+                                return (isNaN(rev) ? 0 : rev).toFixed(2);
+                              })()}
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <p className="text-xs text-muted-foreground">ARPU</p>
+                            <p className="text-xl font-bold text-green-600" data-testid={`text-variant-arpu-${index}`}>
+                              ${(() => {
+                                const conversions = test.variantConversions || 0;
+                                const revenue = test.variantRevenue ? parseFloat(test.variantRevenue) : 0;
+                                const arpu = conversions > 0 ? revenue / conversions : 0;
+                                return (isNaN(arpu) ? 0 : arpu).toFixed(2);
+                              })()}
+                            </p>
+                            {(() => {
+                              const controlConversions = test.controlConversions || 0;
+                              const controlRevenue = test.controlRevenue ? parseFloat(test.controlRevenue) : 0;
+                              const controlArpu = controlConversions > 0 ? controlRevenue / controlConversions : 0;
+                              
+                              const variantConversions = test.variantConversions || 0;
+                              const variantRevenue = test.variantRevenue ? parseFloat(test.variantRevenue) : 0;
+                              const variantArpu = variantConversions > 0 ? variantRevenue / variantConversions : 0;
+                              
+                              const lift = controlArpu > 0 ? ((variantArpu - controlArpu) / controlArpu) * 100 : 0;
+                              const hasData = controlConversions >= 3 && variantConversions >= 3;
+                              
+                              return hasData && (
+                                <div className="flex items-center gap-1 mt-1">
+                                  <p className={`text-sm font-semibold ${lift > 0 ? 'text-green-600' : lift < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                                    {lift >= 0 ? '+' : ''}{lift.toFixed(1)}% vs control
+                                  </p>
+                                  {lift > 0 && <ArrowUpRight className="w-4 h-4 text-green-600" />}
+                                  {lift < 0 && <ArrowDownRight className="w-4 h-4 text-red-600" />}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
                       </div>
                     </div>
 
                     {/* Start Date */}
-                    <div className="mt-4 pt-4 border-t flex items-center justify-between">
+                    <div className="mt-6 pt-4 border-t flex items-center justify-between">
                       <div className="text-xs text-muted-foreground">
                         Started: {test.startDate ? new Date(test.startDate).toLocaleString() : 'Unknown'}
                       </div>
+                      {hasSignificantData ? (
+                        <Badge variant="outline" className="text-green-600">Significant data</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-yellow-600">Low sample size</Badge>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -293,11 +367,15 @@ export default function ActiveTests() {
             Metrics update automatically every 2 seconds.
           </p>
           <p>
-            <strong>ARPU Lift:</strong> Measures the percentage increase in Average Revenue Per User compared to the control group. 
+            <strong>Control vs Variant:</strong> Each test shows side-by-side performance metrics. 
+            The Control represents your original product, while the Variant shows the proposed changes.
+          </p>
+          <p>
+            <strong>ARPU Lift:</strong> Measures the percentage increase in Average Revenue Per User for the variant compared to the control. 
             Positive values indicate the variant is performing better.
           </p>
           <p>
-            <strong>Stopping a test:</strong> Deactivates the test and restores the original product values in your store.
+            <strong>Stopping a test:</strong> Deactivates the test and stops showing variants to customers.
             All collected metrics are preserved for analysis.
           </p>
         </CardContent>
