@@ -7,16 +7,50 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Play, Users, ShoppingCart, Zap } from "lucide-react";
+import { Play, Users, ShoppingCart, Zap, CheckCircle2, AlertCircle } from "lucide-react";
 import type { Test, Product } from "@shared/schema";
 
 interface EnrichedTest extends Test {
   productName: string;
 }
 
+interface SimulationResult {
+  type: "batch" | "traffic" | "orders";
+  timestamp: string;
+  testName: string;
+  allocation?: {
+    control: {
+      impressions?: number;
+      orders?: number;
+    };
+    variant: {
+      impressions?: number;
+      orders?: number;
+    };
+  };
+  metrics?: {
+    totalImpressions?: number;
+    totalConversions?: number;
+    totalRevenue?: string;
+    arpu?: string;
+  };
+  impressions?: {
+    total: number;
+    control: number;
+    variant: number;
+  };
+  orders?: {
+    total: number;
+    control: number;
+    variant: number;
+  };
+  revenue?: string;
+}
+
 export default function Simulator() {
   const { toast } = useToast();
   const [selectedTestId, setSelectedTestId] = useState<string>("");
+  const [lastSimulationResult, setLastSimulationResult] = useState<SimulationResult | null>(null);
   
   // Batch simulation parameters
   const [visitors, setVisitors] = useState(1000);
@@ -43,6 +77,8 @@ export default function Simulator() {
     productName: products.find((p) => p.id === test.productId)?.title || "Unknown Product",
   }));
 
+  const selectedTest = enrichedTests.find((t) => t.id === selectedTestId);
+
   // Batch simulation mutation
   const batchSimulation = useMutation({
     mutationFn: async () => {
@@ -54,11 +90,20 @@ export default function Simulator() {
       return res.json();
     },
     onSuccess: (data) => {
+      const result: SimulationResult = {
+        type: "batch",
+        timestamp: new Date().toLocaleTimeString(),
+        testName: selectedTest?.productName || "Unknown",
+        allocation: data.allocation,
+        metrics: data.metrics,
+      };
+      setLastSimulationResult(result);
+      
       toast({
-        title: "Simulation Complete",
-        description: `Generated ${data.simulation.visitors} visitors and ${data.simulation.orders} orders (${data.simulation.conversionRate}% CR)`,
+        title: "Batch Simulation Complete",
+        description: `Generated ${data.simulation.visitors} visitors and ${data.simulation.orders} orders`,
       });
-      // Refresh test data
+      
       queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
     },
@@ -81,10 +126,19 @@ export default function Simulator() {
       return res.json();
     },
     onSuccess: (data) => {
+      const result: SimulationResult = {
+        type: "traffic",
+        timestamp: new Date().toLocaleTimeString(),
+        testName: selectedTest?.productName || "Unknown",
+        impressions: data.impressions,
+      };
+      setLastSimulationResult(result);
+      
       toast({
         title: "Traffic Simulated",
-        description: `Generated ${data.impressions.total} impressions (Control: ${data.impressions.control}, Variant: ${data.impressions.variant})`,
+        description: `Generated ${data.impressions.total} impressions`,
       });
+      
       queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
     },
     onError: (error: Error) => {
@@ -106,10 +160,25 @@ export default function Simulator() {
       return res.json();
     },
     onSuccess: (data) => {
+      const result: SimulationResult = {
+        type: "orders",
+        timestamp: new Date().toLocaleTimeString(),
+        testName: selectedTest?.productName || "Unknown",
+        orders: data.orders,
+        revenue: data.revenue,
+        metrics: {
+          totalConversions: data.totalConversions,
+          totalRevenue: data.totalRevenue,
+          arpu: data.arpu,
+        },
+      };
+      setLastSimulationResult(result);
+      
       toast({
         title: "Orders Simulated",
-        description: `Generated ${data.orders.total} orders with $${data.revenue} revenue (ARPU: $${data.arpu})`,
+        description: `Generated ${data.orders.total} orders with $${data.revenue} revenue`,
       });
+      
       queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
     },
@@ -122,9 +191,18 @@ export default function Simulator() {
     },
   });
 
-  const selectedTest = enrichedTests.find((t) => t.id === selectedTestId);
-
   const isSimulating = batchSimulation.isPending || trafficSimulation.isPending || orderSimulation.isPending;
+  const canSimulate = !!selectedTestId && !isSimulating;
+
+  // Calculate allocation percentages
+  const calculateAllocationPercentage = (control: number, variant: number) => {
+    const total = control + variant;
+    if (total === 0) return { control: 0, variant: 0 };
+    return {
+      control: Math.round((control / total) * 100),
+      variant: Math.round((variant / total) * 100),
+    };
+  };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -195,6 +273,238 @@ export default function Simulator() {
         </CardContent>
       </Card>
 
+      {/* Latest Simulation Results */}
+      {lastSimulationResult && (
+        <Card data-testid="card-simulation-results">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Latest Simulation Results</CardTitle>
+                <CardDescription>
+                  {lastSimulationResult.type.charAt(0).toUpperCase() + lastSimulationResult.type.slice(1)} simulation at {lastSimulationResult.timestamp}
+                </CardDescription>
+              </div>
+              <CheckCircle2 className="w-5 h-5 text-green-500" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Test Info */}
+              <div className="p-3 bg-muted rounded-lg">
+                <div className="text-sm font-medium mb-1">Test Product</div>
+                <div className="text-sm text-muted-foreground" data-testid="text-result-test-name">
+                  {lastSimulationResult.testName}
+                </div>
+              </div>
+
+              {/* Batch Simulation Results */}
+              {lastSimulationResult.type === "batch" && lastSimulationResult.allocation && (
+                <div className="space-y-3">
+                  <div className="font-medium">A/B Test Allocation Verification</div>
+                  
+                  {/* Impressions Allocation */}
+                  <div className="p-4 border rounded-lg space-y-3">
+                    <div className="text-sm font-medium">Traffic Distribution</div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Control</div>
+                        <div className="text-2xl font-bold" data-testid="text-control-impressions">
+                          {lastSimulationResult.allocation.control.impressions}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {calculateAllocationPercentage(
+                            lastSimulationResult.allocation.control.impressions || 0,
+                            lastSimulationResult.allocation.variant.impressions || 0
+                          ).control}% of traffic
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Variant</div>
+                        <div className="text-2xl font-bold" data-testid="text-variant-impressions">
+                          {lastSimulationResult.allocation.variant.impressions}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {calculateAllocationPercentage(
+                            lastSimulationResult.allocation.control.impressions || 0,
+                            lastSimulationResult.allocation.variant.impressions || 0
+                          ).variant}% of traffic
+                        </div>
+                      </div>
+                    </div>
+                    {Math.abs(
+                      (lastSimulationResult.allocation.control.impressions || 0) - 
+                      (lastSimulationResult.allocation.variant.impressions || 0)
+                    ) <= 1 ? (
+                      <div className="flex items-center gap-2 text-xs text-green-600" data-testid="text-allocation-status">
+                        <CheckCircle2 className="w-4 h-4" />
+                        Perfect 50/50 split achieved
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-xs text-yellow-600">
+                        <AlertCircle className="w-4 h-4" />
+                        Minor variance from 50/50 (expected with random allocation)
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Orders Allocation */}
+                  <div className="p-4 border rounded-lg space-y-3">
+                    <div className="text-sm font-medium">Conversion Distribution</div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Control</div>
+                        <div className="text-2xl font-bold" data-testid="text-control-orders">
+                          {lastSimulationResult.allocation.control.orders}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {calculateAllocationPercentage(
+                            lastSimulationResult.allocation.control.orders || 0,
+                            lastSimulationResult.allocation.variant.orders || 0
+                          ).control}% of orders
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Variant</div>
+                        <div className="text-2xl font-bold" data-testid="text-variant-orders">
+                          {lastSimulationResult.allocation.variant.orders}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {calculateAllocationPercentage(
+                            lastSimulationResult.allocation.control.orders || 0,
+                            lastSimulationResult.allocation.variant.orders || 0
+                          ).variant}% of orders
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Updated Metrics */}
+                  {lastSimulationResult.metrics && (
+                    <div className="p-4 border rounded-lg space-y-3">
+                      <div className="text-sm font-medium">Updated Test Metrics</div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="space-y-1">
+                          <div className="text-xs text-muted-foreground">Total Impressions</div>
+                          <div className="text-lg font-bold" data-testid="text-total-impressions">
+                            {lastSimulationResult.metrics.totalImpressions}
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-xs text-muted-foreground">Total Conversions</div>
+                          <div className="text-lg font-bold" data-testid="text-total-conversions">
+                            {lastSimulationResult.metrics.totalConversions}
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-xs text-muted-foreground">Total Revenue</div>
+                          <div className="text-lg font-bold" data-testid="text-total-revenue">
+                            ${lastSimulationResult.metrics.totalRevenue}
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-xs text-muted-foreground">ARPU</div>
+                          <div className="text-lg font-bold" data-testid="text-result-arpu">
+                            ${lastSimulationResult.metrics.arpu}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Revenue includes ±20% variance per order for realistic simulation
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Traffic Simulation Results */}
+              {lastSimulationResult.type === "traffic" && lastSimulationResult.impressions && (
+                <div className="p-4 border rounded-lg space-y-3">
+                  <div className="text-sm font-medium">Traffic Allocation</div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <div className="text-xs text-muted-foreground">Total</div>
+                      <div className="text-2xl font-bold" data-testid="text-traffic-total">
+                        {lastSimulationResult.impressions.total}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-xs text-muted-foreground">Control (50%)</div>
+                      <div className="text-2xl font-bold" data-testid="text-traffic-control">
+                        {lastSimulationResult.impressions.control}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-xs text-muted-foreground">Variant (50%)</div>
+                      <div className="text-2xl font-bold" data-testid="text-traffic-variant">
+                        {lastSimulationResult.impressions.variant}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Order Simulation Results */}
+              {lastSimulationResult.type === "orders" && lastSimulationResult.orders && (
+                <div className="space-y-3">
+                  <div className="p-4 border rounded-lg space-y-3">
+                    <div className="text-sm font-medium">Order Allocation</div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Total</div>
+                        <div className="text-2xl font-bold" data-testid="text-orders-total">
+                          {lastSimulationResult.orders.total}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Control (50%)</div>
+                        <div className="text-2xl font-bold" data-testid="text-orders-control">
+                          {lastSimulationResult.orders.control}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Variant (50%)</div>
+                        <div className="text-2xl font-bold" data-testid="text-orders-variant">
+                          {lastSimulationResult.orders.variant}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {lastSimulationResult.metrics && (
+                    <div className="p-4 border rounded-lg space-y-3">
+                      <div className="text-sm font-medium">Updated Metrics</div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-1">
+                          <div className="text-xs text-muted-foreground">Revenue</div>
+                          <div className="text-lg font-bold" data-testid="text-orders-revenue">
+                            ${lastSimulationResult.revenue}
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-xs text-muted-foreground">Total Conversions</div>
+                          <div className="text-lg font-bold" data-testid="text-orders-total-conversions">
+                            {lastSimulationResult.metrics.totalConversions}
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-xs text-muted-foreground">ARPU</div>
+                          <div className="text-lg font-bold" data-testid="text-orders-arpu">
+                            ${lastSimulationResult.metrics.arpu}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Revenue includes ±20% variance per order for realistic simulation
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Batch Simulation - Easy Mode */}
       <Card data-testid="card-batch-simulation">
         <CardHeader>
@@ -219,6 +529,7 @@ export default function Simulator() {
                   min={10}
                   max={100000}
                   data-testid="input-visitors"
+                  disabled={!canSimulate}
                 />
                 <p className="text-xs text-muted-foreground">
                   Number of product page views (split 50/50 between control and variant)
@@ -236,6 +547,7 @@ export default function Simulator() {
                   max={100}
                   step={0.1}
                   data-testid="input-conversion-rate"
+                  disabled={!canSimulate}
                 />
                 <p className="text-xs text-muted-foreground">
                   Percentage of visitors who make a purchase
@@ -243,9 +555,16 @@ export default function Simulator() {
               </div>
             </div>
 
+            {!selectedTestId && (
+              <div className="flex items-center gap-2 text-sm text-yellow-600 bg-yellow-50 dark:bg-yellow-950 p-3 rounded-lg">
+                <AlertCircle className="w-4 h-4" />
+                Please select an active test above to run simulations
+              </div>
+            )}
+
             <Button
               onClick={() => batchSimulation.mutate()}
-              disabled={!selectedTestId || isSimulating}
+              disabled={!canSimulate}
               className="w-full gap-2"
               data-testid="button-run-batch"
             >
@@ -279,6 +598,7 @@ export default function Simulator() {
                   min={1}
                   max={10000}
                   data-testid="input-impressions"
+                  disabled={!canSimulate}
                 />
                 <p className="text-xs text-muted-foreground">
                   Number of product page views to simulate
@@ -287,7 +607,7 @@ export default function Simulator() {
 
               <Button
                 onClick={() => trafficSimulation.mutate()}
-                disabled={!selectedTestId || isSimulating}
+                disabled={!canSimulate}
                 className="w-full gap-2"
                 variant="outline"
                 data-testid="button-simulate-traffic"
@@ -320,6 +640,7 @@ export default function Simulator() {
                   min={1}
                   max={1000}
                   data-testid="input-orders"
+                  disabled={!canSimulate}
                 />
                 <p className="text-xs text-muted-foreground">
                   Number of purchase orders to simulate
@@ -328,7 +649,7 @@ export default function Simulator() {
 
               <Button
                 onClick={() => orderSimulation.mutate()}
-                disabled={!selectedTestId || isSimulating}
+                disabled={!canSimulate}
                 className="w-full gap-2"
                 variant="outline"
                 data-testid="button-simulate-orders"
@@ -361,7 +682,7 @@ export default function Simulator() {
           </p>
           <p>
             <strong>Allocation Verification:</strong> All simulations use 50/50 allocation between control and variant. 
-            Monitor the dashboard metrics to confirm proper distribution.
+            Results are displayed above with detailed breakdown to confirm proper distribution.
           </p>
         </CardContent>
       </Card>
