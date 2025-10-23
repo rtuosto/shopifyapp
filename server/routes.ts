@@ -5,6 +5,7 @@ import { shopify, fetchProducts, updateProduct, sessionStorage } from "./shopify
 import { generateOptimizationRecommendations, analyzeCompetitors } from "./ai-service";
 import { insertRecommendationSchema, insertTestSchema } from "@shared/schema";
 import { requireShopifySessionOrDev } from "./middleware/shopify-auth";
+import { syncProductsFromShopify, initializeShopData } from "./sync-service";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Health check
