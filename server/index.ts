@@ -1,8 +1,21 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
+
+// Configure session middleware for OAuth
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'shopify-app-session-secret-' + Math.random(),
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    sameSite: 'lax',
+  }
+}));
 
 declare module 'http' {
   interface IncomingMessage {

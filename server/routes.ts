@@ -22,15 +22,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ error: "Missing shop parameter" });
     }
 
-    const authRoute = await shopify.auth.begin({
+    // shopify.auth.begin handles the redirect internally
+    await shopify.auth.begin({
       shop: shopify.utils.sanitizeShop(shop, true)!,
       callbackPath: "/api/auth/callback",
       isOnline: false,
       rawRequest: req,
       rawResponse: res,
     });
-
-    res.redirect(authRoute);
   });
 
   app.get("/api/auth/callback", async (req, res) => {
