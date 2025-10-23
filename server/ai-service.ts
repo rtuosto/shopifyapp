@@ -34,26 +34,35 @@ export async function generateOptimizationRecommendations(
 
 Product Details:
 - Title: ${product.title}
-- Description: ${product.description}
+- Description: ${product.description || 'No description provided'}
 - Price: $${product.price}
 ${product.category ? `- Category: ${product.category}` : ''}
 
 For each recommendation, provide:
-1. What to change (title, price, description, or image)
-2. Specific changes to make
-3. Why it will work (psychology, competitor analysis, SEO, or data-driven reasoning)
-4. Confidence level (0-100)
-5. Estimated impact (e.g., "+15% CTR")
-6. Risk level (low, medium, high)
+1. testType: What to change ("title", "price", "description", or "image")
+2. title: A brief title for the recommendation
+3. description: Why this change will work
+4. proposedChanges: An object containing the ACTUAL new values (e.g., {"title": "new title here"} or {"price": 99.99} or {"description": "new description"})
+5. confidence: Confidence level (0-100)
+6. estimatedImpact: Expected impact (e.g., "+15% CTR")
+7. riskLevel: "low", "medium", or "high"
+8. insights: Array of objects with type, title, and description
+
+CRITICAL: The proposedChanges object MUST contain the actual new value(s), not instructions or descriptions.
+
+Examples:
+- For title change: {"title": "Premium Snowboard - Professional Quality"}
+- For price change: {"price": 899.95}
+- For description change: {"description": "This premium snowboard features..."}
 
 Focus on:
 - Power words and psychological triggers
 - SEO optimization
-- Price psychology
+- Price psychology (e.g., charm pricing, prestige pricing)
 - Clear value propositions
 - Competitive positioning
 
-Return your response as a JSON object with a "recommendations" array containing your suggestions.`;
+Return your response as a JSON object with a "recommendations" array.`;
 
   try {
     const response = await openai.chat.completions.create({
