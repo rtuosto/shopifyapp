@@ -5,7 +5,16 @@ Shoptimizer is an embedded Shopify app designed to enhance sales for store owner
 
 ## Recent Changes (October 23, 2025)
 
-**Traffic & Conversion Simulator - NEW**
+**Active Tests Page & Streamlined Test Deployment - NEW**
+- ✅ Simplified test activation flow: "Accept & Launch Test" immediately creates and activates tests
+- ✅ Eliminated confusing draft state: Tests go live immediately upon acceptance
+- ✅ Dedicated Active Tests page (/active-tests): Real-time monitoring with 2-second auto-refresh
+- ✅ Summary metrics on Active Tests page: Total impressions, conversions, ARPU across all running tests
+- ✅ Individual test cards: Show control vs variant performance with ARPU lift tracking
+- ✅ Dashboard reorganization: "Active Tests" notification card with link, "Completed Tests" table for historical data
+- ✅ Fixed Simulator bug: Corrected query key from `["/api/tests", "active"]` to `["/api/tests"]` for proper test fetching
+
+**Traffic & Conversion Simulator - Production Ready**
 - ✅ Built comprehensive simulation system for validating A/B test tracking before real traffic
 - ✅ Backend endpoints: `/api/simulate/traffic`, `/api/simulate/orders`, `/api/simulate/batch`
 - ✅ Batch simulator: Realistic traffic + conversions with configurable conversion rate
@@ -24,6 +33,8 @@ Shoptimizer is an embedded Shopify app designed to enhance sales for store owner
 - ✅ All automation features reviewed and approved by architect for production use
 
 **Implementation Details:**
+- Test activation: Dashboard "Accept" button now creates test + activates in one flow (no draft state)
+- Active Tests UI: 2-second polling for live updates, pause/resume control, test stop functionality
 - Simulation: Each endpoint validates test is active, simulates 50/50 allocation, updates metrics
 - Ref management: `attemptedRef` prevents retry loops, `hasAutoRef` marks successful completion
 - Error recovery: Failed operations require manual retry via UI buttons
