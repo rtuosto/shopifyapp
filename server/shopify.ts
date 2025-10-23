@@ -114,6 +114,10 @@ export async function updateProduct(session: Session, productId: string, updates
 }) {
   const client = new shopify.clients.Graphql({ session });
 
+  // Separate variant updates from product updates
+  const { variants, ...productUpdates } = updates;
+
+  // Update product fields (title, description)
   const response = await client.request(
     `mutation productUpdate($input: ProductInput!) {
       productUpdate(input: $input) {
@@ -140,7 +144,7 @@ export async function updateProduct(session: Session, productId: string, updates
       variables: {
         input: {
           id: productId,
-          ...updates,
+          ...productUpdates,
         },
       },
     }
@@ -150,7 +154,51 @@ export async function updateProduct(session: Session, productId: string, updates
     console.error('[Shopify API] Product update errors:', response.data.productUpdate.userErrors);
     throw new Error(`Product update failed: ${JSON.stringify(response.data.productUpdate.userErrors)}`);
   }
+
+  // Update variant prices separately if provided
+  if (variants && variants.length > 0) {
+    for (const variant of variants) {
+      if (variant.price) {
+        await updateVariantPrice(session, variant.id, variant.price);
+      }
+    }
+  }
   
+  return response.data;
+}
+
+// Update variant price separately
+async function updateVariantPrice(session: Session, variantId: string, price: string) {
+  const client = new shopify.clients.Graphql({ session });
+  
+  const response = await client.request(
+    `mutation productVariantUpdate($input: ProductVariantInput!) {
+      productVariantUpdate(input: $input) {
+        productVariant {
+          id
+          price
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }`,
+    {
+      variables: {
+        input: {
+          id: variantId,
+          price: price,
+        },
+      },
+    }
+  );
+
+  if (response.data?.productVariantUpdate?.userErrors?.length > 0) {
+    console.error('[Shopify API] Variant update errors:', response.data.productVariantUpdate.userErrors);
+    throw new Error(`Variant update failed: ${JSON.stringify(response.data.productVariantUpdate.userErrors)}`);
+  }
+
   return response.data;
 }
 
