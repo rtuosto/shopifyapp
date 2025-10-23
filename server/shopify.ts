@@ -19,7 +19,7 @@ export const shopify = shopifyApi({
 export async function fetchProducts(session: Session) {
   const client = new shopify.clients.Graphql({ session });
   
-  const query = `
+  const response = await client.request(`
     query {
       products(first: 50) {
         edges {
@@ -48,10 +48,9 @@ export async function fetchProducts(session: Session) {
         }
       }
     }
-  `;
+  `);
 
-  const response = await client.query({ data: query });
-  return response.body;
+  return response.data;
 }
 
 export async function updateProduct(session: Session, productId: string, updates: {
@@ -59,9 +58,9 @@ export async function updateProduct(session: Session, productId: string, updates
   descriptionHtml?: string;
 }) {
   const client = new shopify.clients.Graphql({ session });
-  
-  const mutation = `
-    mutation productUpdate($input: ProductInput!) {
+
+  const response = await client.request(
+    `mutation productUpdate($input: ProductInput!) {
       productUpdate(input: $input) {
         product {
           id
@@ -73,24 +72,18 @@ export async function updateProduct(session: Session, productId: string, updates
           message
         }
       }
+    }`,
+    {
+      variables: {
+        input: {
+          id: productId,
+          ...updates,
+        },
+      },
     }
-  `;
-
-  const variables = {
-    input: {
-      id: productId,
-      ...updates,
-    },
-  };
-
-  const response = await client.query({ 
-    data: { 
-      query: mutation, 
-      variables 
-    } 
-  });
+  );
   
-  return response.body;
+  return response.data;
 }
 
 // Session storage (simple in-memory for demo, should use DB in production)
