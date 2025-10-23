@@ -409,9 +409,7 @@ export default function Dashboard() {
                 key={rec.id}
                 title={rec.title}
                 description={rec.description}
-                confidence={rec.confidence}
                 productName={products.find(p => p.id === rec.productId)?.title || 'Unknown Product'}
-                estimatedImpact={rec.estimatedImpact}
                 onAccept={() => handleAccept(rec.id)}
                 onPreview={() => handlePreview(rec.id)}
               />
@@ -459,9 +457,6 @@ export default function Dashboard() {
           }}
           changes={Object.keys(selectedRecommendation.proposedChanges)}
           insights={selectedRecommendation.insights}
-          confidence={selectedRecommendation.confidence}
-          estimatedLift={selectedRecommendation.estimatedImpact}
-          riskLevel={selectedRecommendation.riskLevel as "low" | "medium" | "high"}
         />
       )}
     </div>

@@ -35,9 +35,6 @@ interface TestPreviewModalProps {
     title: string;
     description: string;
   }>;
-  confidence: number;
-  estimatedLift: string;
-  riskLevel: "low" | "medium" | "high";
   onApprove?: () => void;
 }
 
@@ -49,9 +46,6 @@ export default function TestPreviewModal({
   variant,
   changes,
   insights,
-  confidence,
-  estimatedLift,
-  riskLevel,
   onApprove,
 }: TestPreviewModalProps) {
   const [device, setDevice] = useState<DeviceType>("desktop");
@@ -162,9 +156,6 @@ export default function TestPreviewModal({
 
           <AIInsightsPanel
             insights={insights}
-            confidence={confidence}
-            estimatedLift={estimatedLift}
-            riskLevel={riskLevel}
           />
 
           <div className="flex justify-end gap-2 pt-4 border-t">

@@ -7,9 +7,7 @@ import { useState } from "react";
 interface AIRecommendationCardProps {
   title: string;
   description: string;
-  confidence: number;
   productName: string;
-  estimatedImpact: string;
   onAccept?: () => void;
   onReject?: () => void;
   onPreview?: () => void;
@@ -18,9 +16,7 @@ interface AIRecommendationCardProps {
 export default function AIRecommendationCard({
   title,
   description,
-  confidence,
   productName,
-  estimatedImpact,
   onAccept,
   onReject,
   onPreview,
@@ -56,9 +52,6 @@ export default function AIRecommendationCard({
                 <Sparkles className="w-3 h-3" />
                 AI Recommended
               </Badge>
-              <Badge variant="outline" data-testid="text-confidence">
-                {confidence}% confidence
-              </Badge>
             </div>
             <h3 className="text-base font-semibold" data-testid="text-recommendation-title">
               {title}
@@ -73,12 +66,6 @@ export default function AIRecommendationCard({
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Product</p>
             <p className="text-sm font-medium" data-testid="text-product-name">{productName}</p>
-          </div>
-          <div className="space-y-1 text-right">
-            <p className="text-xs text-muted-foreground">Est. Impact</p>
-            <p className="text-sm font-semibold text-chart-4" data-testid="text-estimated-impact">
-              {estimatedImpact}
-            </p>
           </div>
         </div>
 
