@@ -363,7 +363,7 @@ export class MemStorage implements IStorage {
 
   async createTest(shop: string, insertTest: InsertTest): Promise<Test> {
     const shopTests = this.ensureShopNamespace(this.tests, shop);
-    const id = randomUUID();
+    const id = insertTest.id || randomUUID();
     const test: Test = {
       ...insertTest,
       id,
@@ -390,8 +390,6 @@ export class MemStorage implements IStorage {
     const updated: Test = {
       ...test,
       ...updates,
-      performance: updates.performance?.toString() || test.performance,
-      revenue: updates.revenue?.toString() || test.revenue,
       updatedAt: new Date(),
     };
     shopTests.set(id, updated);
