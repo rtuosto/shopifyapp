@@ -54,15 +54,35 @@ export const insertRecommendationSchema = createInsertSchema(recommendations).om
 export type InsertRecommendation = z.infer<typeof insertRecommendationSchema>;
 export type Recommendation = typeof recommendations.$inferSelect;
 
-// A/B Tests table - Now tracks control vs variant metrics separately
+// A/B Tests table - Extensible for product-level, template-level, and advanced optimization
 export const tests = pgTable("tests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  productId: varchar("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  
+  // Scope & Target (extensible for future template/page tests)
+  scope: text("scope").notNull().default("product"), // "product" | "template" | "page" | "global"
+  productId: varchar("product_id").references(() => products.id, { onDelete: "cascade" }), // Nullable for template tests
   recommendationId: varchar("recommendation_id").references(() => recommendations.id, { onDelete: "set null" }),
-  testType: text("test_type").notNull(),
+  testType: text("test_type").notNull(), // "title" | "price" | "layout" | "navigation" etc.
+  targetSelector: text("target_selector"), // CSS selector for template tests (e.g., ".product-grid")
+  
+  // Test Configuration
   status: text("status").notNull().default("draft"), // "draft", "active", "completed", "cancelled"
   controlData: jsonb("control_data").$type<Record<string, any>>().notNull(),
   variantData: jsonb("variant_data").$type<Record<string, any>>().notNull(),
+  
+  // Optimization Strategy (extensible for Bayesian & Bandits)
+  allocationStrategy: text("allocation_strategy").notNull().default("fixed"), // "fixed" | "bayesian" | "bandit"
+  controlAllocation: decimal("control_allocation", { precision: 5, scale: 2 }).default("50"), // Percentage (0-100)
+  variantAllocation: decimal("variant_allocation", { precision: 5, scale: 2 }).default("50"), // Percentage (0-100)
+  
+  // Statistical Configuration
+  confidenceThreshold: decimal("confidence_threshold", { precision: 3, scale: 2 }).default("0.95"), // 95% confidence
+  minSampleSize: integer("min_sample_size").default(100), // Min samples before optimization
+  bayesianConfig: jsonb("bayesian_config").$type<{
+    priorAlpha?: number; // Beta distribution alpha
+    priorBeta?: number;  // Beta distribution beta
+    updateInterval?: number; // How often to recalculate (minutes)
+  }>(),
   
   // Per-variant metrics for true A/B testing
   controlImpressions: integer("control_impressions").default(0),
@@ -72,13 +92,14 @@ export const tests = pgTable("tests", {
   controlRevenue: decimal("control_revenue", { precision: 10, scale: 2 }).default("0"),
   variantRevenue: decimal("variant_revenue", { precision: 10, scale: 2 }).default("0"),
   
-  // Legacy aggregate fields (kept for backwards compatibility, calculated from per-variant metrics)
+  // Legacy aggregate fields (kept for backwards compatibility)
   arpu: decimal("arpu", { precision: 10, scale: 2 }).default("0"),
   arpuLift: decimal("arpu_lift", { precision: 5, scale: 2 }).default("0"),
   impressions: integer("impressions").default(0),
   conversions: integer("conversions").default(0),
   revenue: decimal("revenue", { precision: 10, scale: 2 }).default("0"),
   
+  // Metadata
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

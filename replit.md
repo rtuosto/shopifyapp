@@ -3,7 +3,24 @@
 ## Overview
 Shoptimizer is an embedded Shopify app designed to enhance sales for store owners by leveraging AI for conversion rate optimization. It automatically analyzes products, recommends optimization tests, and facilitates A/B testing for key product elements like titles, descriptions, and prices. The core objective is to improve Average Revenue Per User (ARPU) through intelligent automation and real-time conversion tracking.
 
-## Recent Changes (October 23, 2025)
+## Recent Changes (October 24, 2025)
+
+**Schema Evolution: Extensible Testing Architecture - NEW**
+- ✅ Extended database schema to support template-level experiments beyond product-level tests
+- ✅ Added optimization strategy fields for future Bayesian and multi-armed bandit algorithms
+- ✅ New fields in tests table:
+  - `scope`: "product" | "template" | "page" | "global" - defines test scope
+  - `productId`: Now nullable to support template tests (e.g., product page layout changes)
+  - `targetSelector`: CSS selector for template tests (e.g., ".product-grid")
+  - `allocationStrategy`: "fixed" | "bayesian" | "bandit" - enables dynamic traffic allocation
+  - `controlAllocation` / `variantAllocation`: Dynamic percentages for advanced optimization
+  - `confidenceThreshold`: Statistical significance threshold (default 95%)
+  - `minSampleSize`: Minimum samples before optimization kicks in (default 100)
+  - `bayesianConfig`: JSONB storing prior distributions for Bayesian optimization
+- ✅ Spillover effects acknowledged: Template changes affect multiple products (industry-standard limitation)
+- ✅ Architecture supports future features: Product page redesigns, listing page tests, navigation changes
+
+**Previous Changes (October 23, 2025)**
 
 **Active Tests Page & Streamlined Test Deployment - NEW**
 - ✅ Simplified test activation flow: "Accept & Launch Test" immediately creates and activates tests
