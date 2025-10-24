@@ -9,6 +9,7 @@ import AIRecommendationCard from "@/components/AIRecommendationCard";
 import TestHistoryTable from "@/components/TestHistoryTable";
 import PerformanceChart from "@/components/PerformanceChart";
 import TestPreviewModal from "@/components/TestPreviewModal";
+import SetupGuide from "@/components/SetupGuide";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Product, Recommendation, Test, Metric } from "@shared/schema";
@@ -593,6 +594,10 @@ export default function Dashboard() {
           subtitle="running now"
         />
       </div>
+
+      {activeTestsCount === 0 && completedTests.length === 0 && (
+        <SetupGuide />
+      )}
 
       {(recommendations.length > 0 || generateRecommendationsMutation.isPending) && (
         <div>

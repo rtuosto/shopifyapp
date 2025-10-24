@@ -1060,6 +1060,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get installation instructions (for Settings page)
+  app.get("/api/installation-script", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const replitDomain = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPLIT_DEV_DOMAIN;
+      const apiUrl = replitDomain ? `https://${replitDomain}` : 'http://localhost:5000';
+      
+      const scriptTag = `{% if template == 'product' %}
+  <script src="${apiUrl}/shoptimizer.js" defer></script>
+{% endif %}`;
+
+      const webhookUrl = `${apiUrl}/api/webhooks/orders/create`;
+      
+      res.json({
+        apiUrl,
+        scriptTag,
+        webhookUrl,
+        isDev: !replitDomain || replitDomain.includes('replit.dev'),
+      });
+    } catch (error) {
+      console.error("Error getting installation script:", error);
+      res.status(500).json({ error: "Failed to get installation script" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

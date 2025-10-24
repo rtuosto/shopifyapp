@@ -9,6 +9,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import Dashboard from "@/pages/Dashboard";
 import ActiveTests from "@/pages/ActiveTests";
 import Simulator from "@/pages/Simulator";
+import Settings from "@/pages/Settings";
 import NotFound from "@/pages/NotFound";
 
 function Router() {
@@ -17,6 +18,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/active-tests" component={ActiveTests} />
       <Route path="/simulator" component={Simulator} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );
