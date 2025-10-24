@@ -134,3 +134,21 @@ export const insertMetricSchema = createInsertSchema(metrics).omit({
 
 export type InsertMetric = z.infer<typeof insertMetricSchema>;
 export type Metric = typeof metrics.$inferSelect;
+
+// Session Assignments table - Tracks persistent variant assignments for A/B testing attribution
+export const sessionAssignments = pgTable("session_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull(), // UUID generated in browser, stored in localStorage
+  testId: varchar("test_id").notNull().references(() => tests.id, { onDelete: "cascade" }),
+  variant: text("variant").notNull(), // "control" | "variant"
+  assignedAt: timestamp("assigned_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(), // Default 90 days from assignment
+});
+
+export const insertSessionAssignmentSchema = createInsertSchema(sessionAssignments).omit({
+  id: true,
+  assignedAt: true,
+});
+
+export type InsertSessionAssignment = z.infer<typeof insertSessionAssignmentSchema>;
+export type SessionAssignment = typeof sessionAssignments.$inferSelect;

@@ -473,7 +473,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[Webhook] Found ${orderedProducts.length} matching products in database`);
       
-      // For each product, check if there's an active test
+      // Extract session ID from cart/order attributes
+      const cartAttributes = orderData.note_attributes || [];
+      const sessionAttribute = cartAttributes.find((attr: any) => 
+        attr.name === '_shoptimizer_session'
+      );
+      
+      const sessionId = sessionAttribute?.value;
+      
+      if (!sessionId) {
+        console.log('[Webhook] No Shoptimizer session ID found in order attributes');
+        // No session ID means customer didn't go through our A/B testing flow
+        // This is expected for orders that didn't visit product pages
+        return res.status(200).json({ received: true });
+      }
+      
+      console.log(`[Webhook] Found session ID: ${sessionId}`);
+      
+      // Fetch all session assignments for this session
+      const sessionAssignments = await storage.getSessionAssignments(shop, sessionId);
+      
+      if (sessionAssignments.length === 0) {
+        console.log('[Webhook] No variant assignments found for this session');
+        return res.status(200).json({ received: true });
+      }
+      
+      console.log(`[Webhook] Found ${sessionAssignments.length} variant assignment(s) for session`);
+      
+      // Create a map of testId -> variant for quick lookup
+      const assignmentMap = new Map(
+        sessionAssignments.map(a => [a.testId, a.variant])
+      );
+      
+      // For each product, check if there's an active test and attribute to correct variant
       for (const product of orderedProducts) {
         const activeTests = await storage.getTestsByProduct(shop, product.id);
         const activeTest = activeTests.find(t => t.status === "active");
@@ -487,24 +519,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (lineItem) {
             const revenue = parseFloat(lineItem.price) * lineItem.quantity;
             
-            // Get variant from line item properties (set by storefront JavaScript)
-            const lineItemProperties = lineItem.properties || [];
-            let variant = null;
+            // Look up which variant this session saw for this test
+            const variant = assignmentMap.get(activeTest.id);
             
-            // Look for test-specific variant assignment in line item properties
-            const variantProperty = lineItemProperties.find((prop: any) => 
-              prop.name === `_shoptimizer_${activeTest.id}`
-            );
-            
-            if (variantProperty && (variantProperty.value === 'control' || variantProperty.value === 'variant')) {
-              variant = variantProperty.value;
-              console.log(`[Webhook] Using line item property variant: ${variant} for test ${activeTest.id}`);
-            } else {
-              // Fallback: If no variant found in properties, randomly assign (50/50)
-              // This can happen if customer added product without viewing the product page
-              variant = Math.random() < 0.5 ? 'control' : 'variant';
-              console.log(`[Webhook] No line item property found for test ${activeTest.id}, using random assignment: ${variant}`);
+            if (!variant) {
+              console.log(`[Webhook] No variant assignment found for test ${activeTest.id}, skipping attribution`);
+              // Session didn't see this test (maybe test was created after they visited)
+              continue;
             }
+            
+            console.log(`[Webhook] Session saw "${variant}" variant for test ${activeTest.id}`);
             
             // Update per-variant metrics
             const updates: any = {
@@ -527,10 +551,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             updates.arpu = arpu.toString();
             
             console.log(`[Webhook] Attributing conversion to ${variant} for test ${activeTest.id}: ${lineItem.quantity}x ${product.title} = $${revenue}`);
+            console.log(`[Webhook] Control metrics - Conversions: ${updates.controlConversions || 0}, Revenue: $${parseFloat(updates.controlRevenue || "0").toFixed(2)}`);
+            console.log(`[Webhook] Variant metrics - Conversions: ${updates.variantConversions || 0}, Revenue: $${parseFloat(updates.variantRevenue || "0").toFixed(2)}`);
             console.log(`[Webhook] Overall metrics - Conversions: ${newConversions}, Revenue: $${newRevenue.toFixed(2)}, ARPU: $${arpu.toFixed(2)}`);
             
             // Update test metrics
             await storage.updateTest(shop, activeTest.id, updates);
+            console.log(`[Webhook] Successfully attributed conversion for test ${activeTest.id}`);
           }
         }
       }
@@ -827,7 +854,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // STOREFRONT API (PUBLIC - No Auth Required)
   // ==========================================
   
-  // Get active test data for a product (called by storefront JavaScript)
+  // Get all active tests for a shop (new unified endpoint)
+  app.get("/api/storefront/tests", async (req, res) => {
+    try {
+      const shop = req.query.shop as string;
+      
+      if (!shop) {
+        return res.status(400).json({ error: "Missing shop parameter" });
+      }
+      
+      // Get all active tests
+      const tests = await storage.getTests(shop);
+      const activeTests = tests.filter(t => t.status === "active");
+      
+      // Get products to map product IDs to Shopify IDs
+      const products = await storage.getProducts(shop);
+      const productMap = new Map(products.map(p => [p.id, p.shopifyProductId]));
+      
+      // Format tests for storefront use
+      const formattedTests = activeTests.map(test => ({
+        id: test.id,
+        shopifyProductId: productMap.get(test.productId || ''),
+        testType: test.testType,
+        controlData: test.controlData,
+        variantData: test.variantData,
+        scope: test.scope || 'product',
+      }));
+      
+      res.json({ tests: formattedTests });
+    } catch (error) {
+      console.error("Error fetching storefront tests:", error);
+      res.status(500).json({ error: "Failed to fetch tests" });
+    }
+  });
+  
+  // Get active test data for a product (legacy endpoint - kept for backwards compatibility)
   app.get("/api/storefront/test/:shopifyProductId", async (req, res) => {
     try {
       const shopifyProductId = req.params.shopifyProductId;
@@ -871,10 +932,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Track impression (product page view)
+  // Record session assignment (persistent variant assignment)
+  app.post("/api/storefront/assign", async (req, res) => {
+    try {
+      const { sessionId, testId, variant, shop } = req.body;
+      
+      if (!sessionId || !testId || !variant || !shop) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      
+      if (variant !== "control" && variant !== "variant") {
+        return res.status(400).json({ error: "Invalid variant value" });
+      }
+      
+      // Check if test exists and is active
+      const test = await storage.getTest(shop, testId);
+      if (!test || test.status !== "active") {
+        return res.status(404).json({ error: "Active test not found" });
+      }
+      
+      // Record the assignment (90-day expiry)
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 90);
+      
+      await storage.createSessionAssignment(shop, {
+        sessionId,
+        testId,
+        variant,
+        expiresAt,
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error recording session assignment:", error);
+      res.status(500).json({ error: "Failed to record assignment" });
+    }
+  });
+  
+  // Get session assignments for a session ID
+  app.get("/api/storefront/assignments/:sessionId", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const shop = req.query.shop as string;
+      
+      if (!shop) {
+        return res.status(400).json({ error: "Missing shop parameter" });
+      }
+      
+      const assignments = await storage.getSessionAssignments(shop, sessionId);
+      
+      // Filter out expired assignments
+      const now = new Date();
+      const validAssignments = assignments.filter((a) => new Date(a.expiresAt) > now);
+      
+      res.json({ assignments: validAssignments });
+    } catch (error) {
+      console.error("Error fetching session assignments:", error);
+      res.status(500).json({ error: "Failed to fetch assignments" });
+    }
+  });
+  
+  // Track impression (product page view) with session tracking
   app.post("/api/storefront/impression", async (req, res) => {
     try {
-      const { testId, variant, shop } = req.body;
+      const { testId, variant, sessionId, shop } = req.body;
       
       if (!testId || !variant || !shop) {
         return res.status(400).json({ error: "Missing required fields" });

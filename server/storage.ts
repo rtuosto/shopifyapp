@@ -7,6 +7,8 @@ import {
   type InsertTest,
   type Metric,
   type InsertMetric,
+  type SessionAssignment,
+  type InsertSessionAssignment,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -39,6 +41,10 @@ export interface IStorage {
   getMetrics(shop: string, limit?: number): Promise<Metric[]>;
   getLatestMetric(shop: string): Promise<Metric | undefined>;
   createMetric(shop: string, metric: InsertMetric): Promise<Metric>;
+
+  // Session Assignments (shop-scoped)
+  getSessionAssignments(shop: string, sessionId: string): Promise<SessionAssignment[]>;
+  createSessionAssignment(shop: string, assignment: InsertSessionAssignment): Promise<SessionAssignment>;
 }
 
 export class MemStorage implements IStorage {
@@ -47,12 +53,14 @@ export class MemStorage implements IStorage {
   private recommendations: Map<string, Map<string, Recommendation>>;
   private tests: Map<string, Map<string, Test>>;
   private metrics: Map<string, Map<string, Metric>>;
+  private sessionAssignments: Map<string, Map<string, SessionAssignment>>;
 
   constructor() {
     this.products = new Map();
     this.recommendations = new Map();
     this.tests = new Map();
     this.metrics = new Map();
+    this.sessionAssignments = new Map();
   }
   
   // Helper to ensure shop namespace exists
@@ -424,6 +432,25 @@ export class MemStorage implements IStorage {
     };
     shopMetrics.set(id, metric);
     return metric;
+  }
+
+  // Session Assignments (shop-scoped)
+  async getSessionAssignments(shop: string, sessionId: string): Promise<SessionAssignment[]> {
+    const shopAssignments = this.ensureShopNamespace(this.sessionAssignments, shop);
+    return Array.from(shopAssignments.values())
+      .filter(assignment => assignment.sessionId === sessionId);
+  }
+
+  async createSessionAssignment(shop: string, insertAssignment: InsertSessionAssignment): Promise<SessionAssignment> {
+    const shopAssignments = this.ensureShopNamespace(this.sessionAssignments, shop);
+    const id = randomUUID();
+    const assignment: SessionAssignment = {
+      ...insertAssignment,
+      id,
+      assignedAt: new Date(),
+    };
+    shopAssignments.set(id, assignment);
+    return assignment;
   }
 }
 
