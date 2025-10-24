@@ -15,7 +15,7 @@
 
   const SHOPTIMIZER_CONFIG = {
     apiUrl: window.ShoptimizerConfig?.apiUrl || 'https://your-app.replit.app',
-    shop: window.Shopify?.shop || '',
+    shop: window.ShoptimizerConfig?.shop || window.Shopify?.shop || '',
     sessionKey: 'shoptimizer_session_id',
     assignmentsKey: 'shoptimizer_assignments',
     sessionExpireDays: 90, // Persistent assignments for 90 days

@@ -7,6 +7,8 @@ import { insertRecommendationSchema, insertTestSchema } from "@shared/schema";
 import { requireShopifySessionOrDev } from "./middleware/shopify-auth";
 import { syncProductsFromShopify, initializeShopData } from "./sync-service";
 import { getSyncStatus, completeSyncSuccess } from "./sync-status";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Health check
@@ -1028,6 +1030,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error tracking impression:", error);
       res.status(500).json({ error: "Failed to track impression" });
+    }
+  });
+
+  // Serve auto-configured storefront SDK with Replit URL pre-filled
+  app.get("/shoptimizer.js", (req, res) => {
+    try {
+      // Get Replit app URL from environment (auto-detects deployed URL)
+      const replitDomain = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPLIT_DEV_DOMAIN;
+      const apiUrl = replitDomain ? `https://${replitDomain}` : 'http://localhost:5000';
+      
+      console.log(`[SDK] Serving auto-configured SDK with API URL: ${apiUrl}`);
+      
+      // Read the SDK file
+      const sdkPath = join(import.meta.dirname, '../public/shoptimizer.js');
+      const sdkContent = readFileSync(sdkPath, 'utf8');
+      
+      // Inject the API URL into the SDK (replaces default placeholder)
+      const configuredSdk = sdkContent.replace(
+        "apiUrl: window.ShoptimizerConfig?.apiUrl || 'https://your-app.replit.app'",
+        `apiUrl: window.ShoptimizerConfig?.apiUrl || '${apiUrl}'`
+      );
+      
+      res.type('application/javascript');
+      res.send(configuredSdk);
+    } catch (error) {
+      console.error('[SDK] Error serving shoptimizer.js:', error);
+      res.status(500).send('// Error loading Shoptimizer SDK');
     }
   });
 
