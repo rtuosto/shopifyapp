@@ -5,6 +5,14 @@ Shoptimizer is an embedded Shopify app designed to enhance sales for store owner
 
 ## Recent Changes (October 24, 2025)
 
+**Auto-Configuration Feature - NEW ✨**
+- ✅ SDK now automatically detects Replit backend URL from `REPLIT_DOMAINS` environment variable
+- ✅ One-line installation: Just add `<script src="https://YOUR-URL/shoptimizer.js">` to theme
+- ✅ No manual configuration needed - apiUrl and shop domain auto-detected
+- ✅ Dynamic SDK serving: GET /shoptimizer.js endpoint injects correct backend URL at runtime
+- ✅ Simplified deployment guides with corrected domain formats (.replit.app for published, REPLIT_DOMAINS for dev)
+- ✅ Backward compatible: Manual configuration override still available via `window.ShoptimizerConfig`
+
 **UUID Session-Based Attribution System - PRODUCTION READY ✅**
 - ✅ Complete rewrite of attribution pipeline for accurate, persistent A/B test tracking
 - ✅ Session tracking: UUID-based session IDs stored in localStorage with 90-day expiry
