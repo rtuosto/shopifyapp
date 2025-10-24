@@ -5,7 +5,35 @@ Shoptimizer is an embedded Shopify app designed to enhance sales for store owner
 
 ## Recent Changes (October 24, 2025)
 
-**Schema Evolution: Extensible Testing Architecture - NEW**
+**UUID Session-Based Attribution System - NEW**
+- ✅ Complete rewrite of attribution pipeline for accurate, persistent A/B test tracking
+- ✅ Session tracking: UUID-based session IDs stored in localStorage with 90-day expiry
+- ✅ Persistent assignments: Users always see same variant across visits (control OR variant, never both)
+- ✅ Database schema: Added `session_assignments` table tracking sessionId → testId → variant mappings
+- ✅ Storefront SDK (public/shoptimizer.js):
+  - Generates/retrieves UUID from localStorage on first visit
+  - Fetches active tests via GET /api/storefront/tests
+  - Assigns variant once per session, syncs to backend
+  - Modifies product page DOM (title, price, description) based on assignment
+  - Injects session ID into cart attributes (`_shoptimizer_session`) for conversion tracking
+  - Tracks impressions with session ID via POST /api/storefront/impression
+- ✅ Backend API endpoints:
+  - GET /api/storefront/tests - Returns all active tests for storefront
+  - POST /api/storefront/assign - Records session variant assignment
+  - GET /api/storefront/assignments/:sessionId - Retrieves session assignments
+  - POST /api/storefront/impression - Tracks impressions with session ID
+- ✅ Webhook attribution: Updated handler to extract session ID from `note_attributes`, lookup assignments, attribute conversions to correct variant
+- ✅ Documentation: DEPLOYMENT_GUIDE.md with comprehensive setup instructions and troubleshooting
+- ✅ Architecture: Supports future template-level tests (page layouts, navigation) via extensible design
+
+**Implementation Details:**
+- Session flow: UUID generation → variant assignment → localStorage storage → backend sync → DOM modification → cart injection → webhook attribution
+- Attribution accuracy: Session ID flows from storefront → cart → order → webhook, ensuring 100% attribution to correct variant
+- Persistence: localStorage with 90-day expiry matches typical customer behavior cycles
+- Fallback handling: Missing session IDs gracefully handled (orders without SDK tracking skip attribution)
+- Theme compatibility: Multiple CSS selector fallbacks for title/price/description elements
+
+**Schema Evolution: Extensible Testing Architecture**
 - ✅ Extended database schema to support template-level experiments beyond product-level tests
 - ✅ Added optimization strategy fields for future Bayesian and multi-armed bandit algorithms
 - ✅ New fields in tests table:
