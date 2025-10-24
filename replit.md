@@ -93,6 +93,15 @@ Shoptimizer is an embedded Shopify app designed to enhance sales for store owner
 - ✅ Fixed async handling: Use mutateAsync and proper finally blocks to prevent double-clicks
 - ✅ All automation features reviewed and approved by architect for production use
 
+**Settings Page & First-Time Setup - NEW**
+- ✅ Dedicated Settings page (/settings) displays installation script with auto-populated Replit URL
+- ✅ Shows webhook configuration and API URL for verification
+- ✅ One-click copy functionality for script tag and webhook URL
+- ✅ SetupGuide component shows on Dashboard when no tests exist (first-time onboarding)
+- ✅ Step-by-step installation instructions with visual checkmarks
+- ✅ Backend endpoint GET /api/installation-script provides all configuration data
+- ✅ Development mode indicator alerts users that URLs will change when published
+
 **Implementation Details:**
 - Test activation: Dashboard "Accept" button now creates test + activates in one flow (no draft state)
 - Active Tests UI: 2-second polling for live updates, pause/resume control, test stop functionality
@@ -101,6 +110,7 @@ Shoptimizer is an embedded Shopify app designed to enhance sales for store owner
 - Error recovery: Failed operations require manual retry via UI buttons
 - Async safety: All handlers use try/finally blocks to guarantee cleanup
 - No state desync: Cards disable buttons during processing, rely on query invalidation for updates
+- Installation flow: GET /api/installation-script auto-detects REPLIT_DOMAINS, Settings page displays with copy buttons, SetupGuide shows on Dashboard when activeTestsCount === 0
 
 ## User Preferences
 - I prefer clear, concise explanations for any proposed changes or architectural decisions.
