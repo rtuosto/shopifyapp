@@ -147,7 +147,24 @@ Body:
 
 ---
 
-## Step 4: Test the Integration
+## Step 4: Push Database Schema
+
+The new session-based attribution requires updating your database schema:
+
+```bash
+npm run db:push
+```
+
+If you see a data-loss warning, use:
+```bash
+npm run db:push --force
+```
+
+This adds the `session_assignments` table required for persistent variant tracking.
+
+---
+
+## Step 5: Test the Integration
 
 ### Test 1: Verify SDK Loading
 
