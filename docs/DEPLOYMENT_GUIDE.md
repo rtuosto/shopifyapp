@@ -1,5 +1,10 @@
 # Shoptimizer Deployment Guide
 
+**✨ NEW: Automatic Configuration**
+The SDK now automatically detects your Replit URL and Shopify store domain. Just add one line to your theme - no manual configuration needed!
+
+---
+
 ## Overview
 This guide explains how to deploy the Shoptimizer A/B testing SDK to a Shopify store for accurate conversion tracking and persistent variant assignments.
 
@@ -8,7 +13,7 @@ This guide explains how to deploy the Shoptimizer A/B testing SDK to a Shopify s
 The Shoptimizer system consists of three components:
 
 1. **Shopify Admin App** - Embedded app in Shopify Admin for creating tests
-2. **Storefront JavaScript SDK** - Client-side script that runs on product pages
+2. **Storefront JavaScript SDK** - Client-side script that runs on product pages (auto-configured)
 3. **Webhook Handler** - Backend endpoint that receives order events for conversion attribution
 
 ## Prerequisites
@@ -16,45 +21,49 @@ The Shoptimizer system consists of three components:
 - Shopify store with API access
 - Shoptimizer app installed via OAuth
 - Access to Shopify theme code (Admin → Online Store → Themes → Actions → Edit code)
+- Your Replit app URL (e.g., `https://your-app-name.replit.dev`)
 
 ---
 
-## Step 1: Configure Shoptimizer API URL
+## Step 1: Inject Shoptimizer SDK into Shopify Theme (One Line!)
 
-The storefront SDK needs to know where your Shoptimizer backend is hosted.
+### Quick Installation (Recommended)
 
-### Option A: Via Theme Settings (Recommended)
+Add **one line** to your theme's `theme.liquid` file before the closing `</head>` tag:
 
-Add this to your theme's `<head>` section (in `theme.liquid` or equivalent):
+```liquid
+{% if template == 'product' %}
+  <script src="https://YOUR-REPLIT-APP-URL/shoptimizer.js" defer></script>
+{% endif %}
+```
+
+**Replace `YOUR-REPLIT-APP-URL`** with your actual Replit app URL:
+- Published apps: `https://your-app-name.replit.app`
+- Dev mode: Check your Replit environment variable `REPLIT_DOMAINS` for the exact URL
+
+**That's it!** The SDK automatically:
+- ✅ Detects your Replit backend URL from environment
+- ✅ Detects your Shopify store domain from Shopify context
+- ✅ Generates persistent UUID session IDs (90-day expiry)
+- ✅ Fetches active tests and modifies product pages
+- ✅ Tracks impressions and injects session IDs into cart
+
+### (Optional) Manual Configuration Override
+
+If you need custom configuration (rare), add this **before** the SDK script:
 
 ```liquid
 <script>
   window.ShoptimizerConfig = {
-    apiUrl: 'https://your-replit-app.replit.app', // Replace with your actual URL
-    shop: '{{ shop.domain }}'
+    apiUrl: 'https://custom-backend.com',  // Override backend URL
+    shop: 'custom-shop.myshopify.com'      // Override shop domain
   };
 </script>
 ```
 
-### Option B: Direct Configuration
+### Alternative: Script Tag API
 
-Edit `public/shoptimizer.js` and update line 15:
-
-```javascript
-apiUrl: 'https://your-replit-app.replit.app', // Replace with your backend URL
-```
-
----
-
-## Step 2: Inject Shoptimizer SDK into Shopify Theme
-
-The SDK must run on every product page to detect tests and modify content.
-
-### Method 1: Via Shopify's Script Tag API (Recommended)
-
-This approach auto-injects the script without manual theme edits.
-
-**Create a script tag via Shopify Admin API:**
+Auto-inject without manual theme edits:
 
 ```bash
 POST https://{shop}.myshopify.com/admin/api/2024-01/script_tags.json
@@ -67,41 +76,29 @@ Body:
 {
   "script_tag": {
     "event": "onload",
-    "src": "https://your-replit-app.replit.app/shoptimizer.js",
+    "src": "https://YOUR-REPLIT-APP-URL/shoptimizer.js",
     "display_scope": "online_store"
   }
 }
 ```
 
-**Verification:**
-Visit any product page and check browser console. You should see:
+Replace `YOUR-REPLIT-APP-URL` with your actual Replit app URL.
+
+### Verification
+
+Visit any product page and check browser console (F12). You should see:
+
 ```
+[SDK] Serving auto-configured SDK with API URL: https://your-app.replit.app
 [Shoptimizer] Session ID: abc-123-def-456
 [Shoptimizer] Checking for active tests on product: gid://shopify/Product/123456
 ```
 
-### Method 2: Manual Theme Integration
-
-If you prefer manual control, add the script to your theme:
-
-**Location:** `theme.liquid` (or `product-template.liquid` for product pages only)
-
-```liquid
-{% if template == 'product' %}
-  <!-- Shoptimizer A/B Testing SDK -->
-  <script>
-    window.ShoptimizerConfig = {
-      apiUrl: 'https://your-replit-app.replit.app',
-      shop: '{{ shop.domain }}'
-    };
-  </script>
-  <script src="https://your-replit-app.replit.app/shoptimizer.js" defer></script>
-{% endif %}
-```
+The `[SDK]` log confirms the backend auto-configured the SDK with the correct URL.
 
 ---
 
-## Step 3: Register Order Webhook
+## Step 2: Register Order Webhook
 
 Shoptimizer needs to receive order events to attribute conversions correctly.
 

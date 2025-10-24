@@ -15,27 +15,44 @@ This guide provides step-by-step instructions to test the complete Shoptimizer a
 
 ## Phase 1: Install Storefront SDK
 
-### Step 1.1: Configure API URL
+### ✨ One-Line Installation (Automatic Configuration)
 
-Add the following to your theme's `theme.liquid` file **before the closing `</head>` tag**:
+Add this single line to your theme's `theme.liquid` file **before the closing `</head>` tag**:
+
+```liquid
+{% if template == 'product' %}
+  <script src="https://YOUR-REPLIT-APP-URL/shoptimizer.js" defer></script>
+{% endif %}
+```
+
+**Replace `YOUR-REPLIT-APP-URL`** with your actual Replit app URL:
+- **Published apps**: `https://your-app-name.replit.app`
+- **Dev mode**: Find your URL in Replit's address bar or check the `REPLIT_DOMAINS` environment variable
+
+**Example:**
+```liquid
+{% if template == 'product' %}
+  <script src="https://shoptimizer.replit.app/shoptimizer.js" defer></script>
+{% endif %}
+```
+
+**That's it!** The SDK automatically:
+- ✅ Detects your Replit backend URL (no manual config needed)
+- ✅ Detects your Shopify store domain (from Shopify's context)
+- ✅ Generates and persists session IDs
+- ✅ Fetches active tests and modifies product pages
+
+### (Optional) Manual Configuration Override
+
+If you need to override the automatic detection (rare), you can add this **before** the SDK script:
 
 ```liquid
 <script>
   window.ShoptimizerConfig = {
-    apiUrl: 'https://your-replit-app.replit.app', // Replace with your actual backend URL
-    shop: '{{ shop.domain }}'
+    apiUrl: 'https://custom-backend-url.com',  // Optional: Override backend URL
+    shop: '{{ shop.domain }}'                   // Optional: Override shop domain
   };
 </script>
-```
-
-### Step 1.2: Inject Shoptimizer SDK
-
-Add this script tag **after** the config script (still before `</head>`):
-
-```liquid
-{% if template == 'product' %}
-  <script src="https://your-replit-app.replit.app/shoptimizer.js" defer></script>
-{% endif %}
 ```
 
 ### Step 1.3: Verify SDK Loading
