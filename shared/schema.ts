@@ -91,9 +91,27 @@ export const tests = pgTable("tests", {
   confidenceThreshold: decimal("confidence_threshold", { precision: 3, scale: 2 }).default("0.95"), // 95% confidence
   minSampleSize: integer("min_sample_size").default(100), // Min samples before optimization
   bayesianConfig: jsonb("bayesian_config").$type<{
-    priorAlpha?: number; // Beta distribution alpha
-    priorBeta?: number;  // Beta distribution beta
-    updateInterval?: number; // How often to recalculate (minutes)
+    // Control arm Bayesian posteriors
+    control?: {
+      incidence: { alpha: number; beta: number };
+      value: { mu: number; kappa: number; alphaV: number; betaV: number };
+      orderValues?: number[]; // Stored for incremental updates
+    };
+    // Variant arm Bayesian posteriors  
+    variant?: {
+      incidence: { alpha: number; beta: number };
+      value: { mu: number; kappa: number; alphaV: number; betaV: number };
+      orderValues?: number[]; // Stored for incremental updates
+    };
+    // Safety and risk parameters
+    safetyBudgetRemaining?: number; // Dollars remaining in safety budget
+    safetyBudgetTotal?: number; // Total safety budget (default $50)
+    riskMode?: 'cautious' | 'balanced' | 'aggressive'; // Default cautious
+    controlFloor?: number; // Minimum control allocation (default 0.75)
+    variantStart?: number; // Starting variant allocation (default 0.05)
+    // Promotion tracking
+    lastAllocationUpdate?: string; // ISO timestamp of last allocation update
+    promotionCheckCount?: number; // How many times we've checked promotion criteria
   }>(),
   
   // Per-variant metrics for true A/B testing
