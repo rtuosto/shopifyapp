@@ -146,14 +146,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Product not found" });
       }
 
+      // Get active tests to filter out conflicting test types
+      const activeTests = await storage.getActiveTestsByProduct(shop, product.id);
+      const activeTestTypes = new Set(activeTests.map(t => t.testType));
+      
+      console.log(`[AI] Product: ${product.title} (${product.id})`);
+      console.log(`[AI] Active tests for this product:`, activeTests.map(t => ({ id: t.id, type: t.testType, status: t.status })));
+      console.log(`[AI] Active test types:`, Array.from(activeTestTypes));
+
       const aiRecommendations = await generateOptimizationRecommendations({
         title: product.title,
         description: product.description || "",
         price: parseFloat(product.price),
       });
 
+      console.log(`[AI] Generated ${aiRecommendations.length} recommendations:`, aiRecommendations.map(r => r.testType));
+
+      // Filter out recommendations for test types that already have active tests
+      const availableRecommendations = aiRecommendations.filter(rec => {
+        const hasConflict = activeTestTypes.has(rec.testType);
+        if (hasConflict) {
+          console.log(`[AI] FILTERING OUT ${rec.testType} recommendation - active test exists`);
+          return false;
+        }
+        console.log(`[AI] KEEPING ${rec.testType} recommendation - no conflict`);
+        return true;
+      });
+
       const created = await Promise.all(
-        aiRecommendations.map(rec =>
+        availableRecommendations.map(rec =>
           storage.createRecommendation(shop, {
             productId: product.id,
             ...rec,
@@ -193,14 +214,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
           }
           
+          // Get active tests to filter out conflicting test types
+          const activeTests = await storage.getActiveTestsByProduct(shop, product.id);
+          const activeTestTypes = new Set(activeTests.map(t => t.testType));
+          
+          console.log(`[AI] Product: ${product.title} (${product.id})`);
+          console.log(`[AI] Active tests for this product:`, activeTests.map(t => ({ id: t.id, type: t.testType, status: t.status })));
+          console.log(`[AI] Active test types:`, Array.from(activeTestTypes));
+          
           const aiRecommendations = await generateOptimizationRecommendations({
             title: product.title,
             description: product.description || "",
             price: parseFloat(product.price),
           });
 
+          console.log(`[AI] Generated ${aiRecommendations.length} recommendations:`, aiRecommendations.map(r => r.testType));
+
+          // Filter out recommendations for test types that already have active tests
+          const availableRecommendations = aiRecommendations.filter(rec => {
+            const hasConflict = activeTestTypes.has(rec.testType);
+            if (hasConflict) {
+              console.log(`[AI] FILTERING OUT ${rec.testType} recommendation for ${product.title} - active test exists`);
+              return false;
+            }
+            console.log(`[AI] KEEPING ${rec.testType} recommendation for ${product.title} - no conflict`);
+            return true;
+          });
+
           await Promise.all(
-            aiRecommendations.map(rec =>
+            availableRecommendations.map(rec =>
               storage.createRecommendation(shop, {
                 productId: product.id,
                 ...rec,
@@ -209,7 +251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
           
           successCount++;
-          console.log(`[AI] Generated ${aiRecommendations.length} recommendations for: ${product.title}`);
+          console.log(`[AI] Generated ${availableRecommendations.length} recommendations for: ${product.title}`);
         } catch (error) {
           errorCount++;
           console.error(`[AI] Failed to generate recommendations for ${product.title}:`, error);
@@ -365,6 +407,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (test.status !== "draft") {
         return res.status(400).json({ error: "Only draft tests can be activated" });
+      }
+      
+      // Check for conflicting active tests (same product + test type)
+      const conflictingTests = await storage.getActiveTestsByProduct(shop, test.productId, test.testType);
+      if (conflictingTests.length > 0) {
+        const testTypeLabel = test.testType === 'price' ? 'price' : 
+                             test.testType === 'title' ? 'title' : 
+                             test.testType === 'description' ? 'description' : test.testType;
+        return res.status(409).json({ 
+          error: `Cannot activate test: This product already has an active ${testTypeLabel} test. Please stop the existing test first.`,
+          conflictingTestId: conflictingTests[0].id
+        });
       }
       
       // Get the product

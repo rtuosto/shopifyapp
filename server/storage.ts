@@ -37,6 +37,7 @@ export interface IStorage {
   getTest(shop: string, id: string): Promise<Test | undefined>;
   getTests(shop: string, status?: string): Promise<Test[]>;
   getTestsByProduct(shop: string, productId: string): Promise<Test[]>;
+  getActiveTestsByProduct(shop: string, productId: string, testType?: string): Promise<Test[]>;
   createTest(shop: string, test: InsertTest): Promise<Test>;
   updateTest(shop: string, id: string, test: Partial<InsertTest>): Promise<Test | undefined>;
   deleteTest(shop: string, id: string): Promise<boolean>;
@@ -371,6 +372,15 @@ export class MemStorage implements IStorage {
   async getTestsByProduct(shop: string, productId: string): Promise<Test[]> {
     const shopTests = this.ensureShopNamespace(this.tests, shop);
     return Array.from(shopTests.values()).filter(t => t.productId === productId);
+  }
+
+  async getActiveTestsByProduct(shop: string, productId: string, testType?: string): Promise<Test[]> {
+    const shopTests = this.ensureShopNamespace(this.tests, shop);
+    return Array.from(shopTests.values()).filter(t => 
+      t.productId === productId && 
+      t.status === 'active' &&
+      (!testType || t.testType === testType)
+    );
   }
 
   async createTest(shop: string, insertTest: InsertTest): Promise<Test> {

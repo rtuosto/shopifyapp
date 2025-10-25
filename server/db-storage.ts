@@ -144,6 +144,22 @@ export class DbStorage implements IStorage {
       .orderBy(desc(tests.createdAt));
   }
 
+  async getActiveTestsByProduct(shop: string, productId: string, testType?: string): Promise<Test[]> {
+    const conditions = [
+      eq(tests.shop, shop),
+      eq(tests.productId, productId),
+      eq(tests.status, 'active')
+    ];
+    
+    if (testType) {
+      conditions.push(eq(tests.testType, testType));
+    }
+    
+    return await db.select().from(tests)
+      .where(and(...conditions))
+      .orderBy(desc(tests.createdAt));
+  }
+
   async createTest(shop: string, test: InsertTest): Promise<Test> {
     const [result] = await db.insert(tests).values({ ...test, shop }).returning();
     return result;
