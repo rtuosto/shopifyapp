@@ -452,4 +452,7 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Switch to database storage to persist data through restarts
+// This prevents unnecessary LLM calls by caching AI recommendations in PostgreSQL
+import { dbStorage } from "./db-storage";
+export const storage = dbStorage;

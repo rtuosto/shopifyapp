@@ -1,0 +1,184 @@
+import { eq, and, desc } from "drizzle-orm";
+import { db } from "./db";
+import { 
+  products, 
+  recommendations, 
+  tests, 
+  metrics, 
+  sessionAssignments,
+  type Product,
+  type InsertProduct,
+  type Recommendation,
+  type InsertRecommendation,
+  type Test,
+  type InsertTest,
+  type Metric,
+  type InsertMetric,
+  type SessionAssignment,
+  type InsertSessionAssignment,
+} from "@shared/schema";
+import type { IStorage } from "./storage";
+
+/**
+ * PostgreSQL-backed storage implementation using Drizzle ORM
+ * Persists data across server restarts, avoiding unnecessary LLM calls
+ */
+export class DbStorage implements IStorage {
+  // Products (shop-scoped)
+  async getProduct(shop: string, id: string): Promise<Product | undefined> {
+    const result = await db.select().from(products).where(eq(products.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getProducts(shop: string): Promise<Product[]> {
+    return await db.select().from(products);
+  }
+
+  async getProductByShopifyId(shop: string, shopifyProductId: string): Promise<Product | undefined> {
+    const result = await db.select().from(products)
+      .where(eq(products.shopifyProductId, shopifyProductId))
+      .limit(1);
+    return result[0];
+  }
+
+  async createProduct(shop: string, product: InsertProduct): Promise<Product> {
+    const [result] = await db.insert(products).values(product).returning();
+    return result;
+  }
+
+  async updateProduct(shop: string, id: string, updates: Partial<InsertProduct>): Promise<Product | undefined> {
+    const [result] = await db.update(products)
+      .set({ ...(updates as any), updatedAt: new Date() })
+      .where(eq(products.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteProduct(shop: string, id: string): Promise<boolean> {
+    const result = await db.delete(products).where(eq(products.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Recommendations (shop-scoped) - KEY FOR AVOIDING LLM COSTS
+  async getRecommendation(shop: string, id: string): Promise<Recommendation | undefined> {
+    const result = await db.select().from(recommendations)
+      .where(eq(recommendations.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getRecommendations(shop: string, status?: string): Promise<Recommendation[]> {
+    if (status) {
+      return await db.select().from(recommendations)
+        .where(eq(recommendations.status, status))
+        .orderBy(desc(recommendations.createdAt));
+    }
+    return await db.select().from(recommendations)
+      .orderBy(desc(recommendations.createdAt));
+  }
+
+  async getRecommendationsByProduct(shop: string, productId: string): Promise<Recommendation[]> {
+    return await db.select().from(recommendations)
+      .where(eq(recommendations.productId, productId))
+      .orderBy(desc(recommendations.createdAt));
+  }
+
+  async createRecommendation(shop: string, recommendation: InsertRecommendation): Promise<Recommendation> {
+    const [result] = await db.insert(recommendations).values(recommendation).returning();
+    return result;
+  }
+
+  async updateRecommendation(shop: string, id: string, updates: Partial<InsertRecommendation>): Promise<Recommendation | undefined> {
+    const [result] = await db.update(recommendations)
+      .set(updates as any)
+      .where(eq(recommendations.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteRecommendation(shop: string, id: string): Promise<boolean> {
+    const result = await db.delete(recommendations)
+      .where(eq(recommendations.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Tests (shop-scoped)
+  async getTest(shop: string, id: string): Promise<Test | undefined> {
+    const result = await db.select().from(tests)
+      .where(eq(tests.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getTests(shop: string, status?: string): Promise<Test[]> {
+    if (status) {
+      return await db.select().from(tests)
+        .where(eq(tests.status, status))
+        .orderBy(desc(tests.createdAt));
+    }
+    return await db.select().from(tests)
+      .orderBy(desc(tests.createdAt));
+  }
+
+  async getTestsByProduct(shop: string, productId: string): Promise<Test[]> {
+    return await db.select().from(tests)
+      .where(eq(tests.productId, productId))
+      .orderBy(desc(tests.createdAt));
+  }
+
+  async createTest(shop: string, test: InsertTest): Promise<Test> {
+    const [result] = await db.insert(tests).values(test).returning();
+    return result;
+  }
+
+  async updateTest(shop: string, id: string, updates: Partial<InsertTest>): Promise<Test | undefined> {
+    const [result] = await db.update(tests)
+      .set({ ...(updates as any), updatedAt: new Date() })
+      .where(eq(tests.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteTest(shop: string, id: string): Promise<boolean> {
+    const result = await db.delete(tests)
+      .where(eq(tests.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Metrics (shop-scoped)
+  async getMetrics(shop: string, limit?: number): Promise<Metric[]> {
+    const query = db.select().from(metrics).orderBy(desc(metrics.date));
+    if (limit) {
+      return await query.limit(limit);
+    }
+    return await query;
+  }
+
+  async getLatestMetric(shop: string): Promise<Metric | undefined> {
+    const result = await db.select().from(metrics)
+      .orderBy(desc(metrics.date))
+      .limit(1);
+    return result[0];
+  }
+
+  async createMetric(shop: string, metric: InsertMetric): Promise<Metric> {
+    const [result] = await db.insert(metrics).values(metric).returning();
+    return result;
+  }
+
+  // Session Assignments (shop-scoped)
+  async getSessionAssignments(shop: string, sessionId: string): Promise<SessionAssignment[]> {
+    return await db.select().from(sessionAssignments)
+      .where(eq(sessionAssignments.sessionId, sessionId));
+  }
+
+  async createSessionAssignment(shop: string, assignment: InsertSessionAssignment): Promise<SessionAssignment> {
+    const [result] = await db.insert(sessionAssignments).values(assignment).returning();
+    return result;
+  }
+}
+
+// Export singleton instance
+export const dbStorage = new DbStorage();
