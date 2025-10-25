@@ -22,14 +22,15 @@ Shoptimizer utilizes a full-stack architecture with a React, Shadcn UI, Wouter, 
 
 **Key Architectural Decisions & Features:**
 - **AI Recommendations**: GPT-4 analyzes product data to provide actionable optimization suggestions with psychological insights and SEO explanations. Recommendations are cached in PostgreSQL to avoid unnecessary API calls on server restarts.
+- **Multi-Variant Price Testing**: Complete support for products with multiple variants (sizes, colors, etc.). Price tests store all variant IDs and prices, calculate proportional price changes, deploy updated prices to ALL variants via Shopify's productVariantsBulkUpdate API, and safely restore original prices on rollback. This prevents cart/checkout price mismatches by updating actual Shopify variant prices rather than just UI display.
 - **UUID Session-Based Attribution**: A robust system using UUIDs stored in localStorage ensures persistent variant assignments across user sessions, accurately attributing conversions for A/B tests. This includes backend API endpoints for managing assignments and impressions, and webhook integration for conversion tracking.
 - **Extensible Testing Architecture**: The database schema supports diverse test scopes (product, template, page, global) and advanced allocation strategies (fixed, Bayesian, bandit) for future optimization features.
 - **Test Preview System**: Offers side-by-side control vs. variant comparison with multi-device views and visual diff highlighting.
 - **Dashboard & Active Tests Page**: Provides real-time metrics, performance charts, AI recommendation cards, and a dedicated page for monitoring live tests with ARPU lift tracking.
-- **Product Sync System**: Automated and manual synchronization of Shopify products with real-time status and error notifications.
+- **Product Sync System**: Automated and manual synchronization of Shopify products with complete variant data (IDs, prices, titles) stored in PostgreSQL for accurate price testing.
 - **Smart Automation System**: Includes auto-sync, auto-generation of AI recommendations, and dismissal with replacement for recommendations.
-- **Test Deployment & Conversion Tracking**: Activates A/B tests by deploying variants, captures control states for safe rollback, and registers `ORDERS_CREATE` webhooks for automatic conversion attribution and ARPU calculation.
-- **Safe Rollback**: Deactivates tests and restores original product values.
+- **Test Deployment & Conversion Tracking**: Activates A/B tests by deploying variants to Shopify (for price tests), captures control states for safe rollback, and registers `ORDERS_CREATE` webhooks for automatic conversion attribution and ARPU calculation.
+- **Safe Rollback**: Deactivates tests and restores original product values in Shopify. For price tests, restores ALL original variant prices from stored control data.
 - **Traffic & Conversion Simulator**: A comprehensive system for validating A/B test tracking and performance before live deployment, including batch and advanced controls for traffic and order simulation.
 - **Collection Page Variant Support**: Ensures consistent variant display on collection pages, homepages, and search results to prevent test contamination. Uses DOM manipulation and MutationObserver for dynamic content with intelligent infinite loop prevention (isProcessing guard + needsRecheck pattern) to avoid redundant processing while catching lazy-loaded cards.
 - **Auto-Configuration**: The SDK automatically detects the backend URL from `REPLIT_DOMAINS` for simplified one-line installation and deployment.
