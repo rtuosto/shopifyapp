@@ -293,8 +293,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Activate test - enable A/B testing WITHOUT modifying Shopify product
-  // The storefront JavaScript will handle showing control vs variant to users
+  // Activate test - enable A/B testing
+  // For price tests: Deploy variant prices to Shopify
+  // For other tests: Storefront JavaScript handles display
   app.post("/api/tests/:id/activate", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
@@ -317,17 +318,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       console.log(`[Test Activation] Activating A/B test ${testId} for product ${product.title}`);
+      console.log(`[Test Activation] Test type: ${test.testType}`);
       console.log(`[Test Activation] Control:`, test.controlData);
       console.log(`[Test Activation] Variant:`, test.variantData);
       
-      // Simply activate the test in our database - NO Shopify modifications
-      // The storefront JavaScript will dynamically show control/variant to users
+      // For price tests, deploy variant prices to Shopify
+      if (test.testType === "price" && test.variantData.variantPrices) {
+        try {
+          const session = await sessionStorage.getSessionByShop(shop);
+          if (!session) {
+            throw new Error("No Shopify session found");
+          }
+          
+          console.log(`[Test Activation] Deploying variant prices to Shopify...`);
+          await updateProduct(session, product.shopifyProductId, {
+            variants: test.variantData.variantPrices,
+          });
+          console.log(`[Test Activation] Variant prices deployed successfully`);
+        } catch (error) {
+          console.error("[Test Activation] Failed to deploy prices to Shopify:", error);
+          throw new Error("Failed to deploy price changes to Shopify");
+        }
+      }
+      
+      // Activate the test in our database
       const activatedTest = await storage.updateTest(shop, testId, {
         status: "active",
         startDate: new Date(),
       });
       
-      console.log(`[Test Activation] Test activated - storefront will handle A/B display`);
+      console.log(`[Test Activation] Test activated successfully`);
       
       res.json({
         success: true,
@@ -341,7 +361,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Deactivate test - stop A/B testing (no Shopify changes needed)
+  // Deactivate test - stop A/B testing and rollback changes
+  // For price tests: Restore original variant prices
+  // For other tests: No Shopify changes needed
   app.post("/api/tests/:id/deactivate", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
@@ -357,16 +379,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Only active tests can be deactivated" });
       }
       
-      console.log(`[Test Deactivation] Stopping A/B test ${testId}`);
+      // Get the product
+      const product = await storage.getProduct(shop, test.productId);
+      if (!product) {
+        return res.status(404).json({ error: "Product not found" });
+      }
       
-      // Simply mark test as completed - NO Shopify modifications needed
-      // Product was never changed, so nothing to revert
+      console.log(`[Test Deactivation] Stopping A/B test ${testId}`);
+      console.log(`[Test Deactivation] Test type: ${test.testType}`);
+      
+      // For price tests, restore original variant prices
+      if (test.testType === "price" && test.controlData.variantPrices) {
+        try {
+          const session = await sessionStorage.getSessionByShop(shop);
+          if (!session) {
+            throw new Error("No Shopify session found");
+          }
+          
+          console.log(`[Test Deactivation] Restoring original variant prices...`);
+          await updateProduct(session, product.shopifyProductId, {
+            variants: test.controlData.variantPrices,
+          });
+          console.log(`[Test Deactivation] Original prices restored successfully`);
+        } catch (error) {
+          console.error("[Test Deactivation] Failed to restore prices:", error);
+          throw new Error("Failed to restore original prices in Shopify");
+        }
+      }
+      
+      // Mark test as completed
       const deactivatedTest = await storage.updateTest(shop, testId, {
         status: "completed",
         endDate: new Date(),
       });
       
-      console.log(`[Test Deactivation] Test stopped - storefront will no longer show variants`);
+      console.log(`[Test Deactivation] Test stopped successfully`);
       
       res.json({
         success: true,

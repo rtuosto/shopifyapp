@@ -159,11 +159,28 @@ export default function Dashboard() {
         price: parseFloat(product.price),
       };
 
+      // For price tests, store all variant prices in control and variant data
+      if (recommendation.testType === "price" && product.variants && product.variants.length > 0) {
+        controlData.variantPrices = product.variants.map((v: any) => ({
+          id: v.id,
+          price: v.price,
+        }));
+      }
+
       // Build variant data (proposed changes)
       const variantData: Record<string, any> = {
         ...controlData,
         ...recommendation.proposedChanges,
       };
+
+      // For price tests, calculate proportional price changes for all variants
+      if (recommendation.testType === "price" && controlData.variantPrices) {
+        const priceMultiplier = variantData.price / controlData.price;
+        variantData.variantPrices = controlData.variantPrices.map((v: any) => ({
+          id: v.id,
+          price: (parseFloat(v.price) * priceMultiplier).toFixed(2),
+        }));
+      }
 
       const testData = {
         productId: product.id,
