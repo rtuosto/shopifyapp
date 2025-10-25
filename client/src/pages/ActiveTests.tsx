@@ -337,6 +337,104 @@ export default function ActiveTests() {
                       </div>
                     </div>
 
+                    {/* Bayesian Metrics (for Bayesian tests only) */}
+                    {test.allocationStrategy === "bayesian" && (
+                      <div className="mt-6 pt-6 border-t space-y-4">
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="w-5 h-5 text-primary" />
+                          <h3 className="font-semibold">Dynamic Traffic Allocation</h3>
+                          <Badge variant="secondary" className="text-xs">Bayesian</Badge>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {/* Current Traffic Split */}
+                          <div className="space-y-2">
+                            <p className="text-xs text-muted-foreground">Current Traffic Split</p>
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm">Control:</span>
+                                <span className="text-sm font-bold">{test.controlAllocation || '50'}%</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm">Variant:</span>
+                                <span className="text-sm font-bold text-green-600">{test.variantAllocation || '50'}%</span>
+                              </div>
+                            </div>
+                            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                              <div 
+                                className="bg-blue-500 h-full transition-all duration-500"
+                                style={{ width: `${test.controlAllocation || '50'}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Bayesian Metrics */}
+                          {test.bayesianConfig && typeof test.bayesianConfig === 'object' && (
+                            <>
+                              <div className="space-y-2">
+                                <p className="text-xs text-muted-foreground">Variant Win Probability</p>
+                                <p className="text-2xl font-bold text-primary">
+                                  {(() => {
+                                    const config = test.bayesianConfig as any;
+                                    const prob = config.probVariantBetter || 0.5;
+                                    return (prob * 100).toFixed(1);
+                                  })()}%
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {(() => {
+                                    const config = test.bayesianConfig as any;
+                                    const prob = config.probVariantBetter || 0.5;
+                                    if (prob > 0.95) return "Very high confidence";
+                                    if (prob > 0.80) return "High confidence";
+                                    if (prob > 0.60) return "Moderate confidence";
+                                    if (prob > 0.40) return "Uncertain";
+                                    return "Variant underperforming";
+                                  })()}
+                                </p>
+                              </div>
+
+                              <div className="space-y-2">
+                                <p className="text-xs text-muted-foreground">Expected Loss (per 1K)</p>
+                                <p className="text-2xl font-bold">
+                                  ${(() => {
+                                    const config = test.bayesianConfig as any;
+                                    const eoc = config.expectedOpportunityCost || 0;
+                                    return eoc.toFixed(2);
+                                  })()}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {(() => {
+                                    const config = test.bayesianConfig as any;
+                                    const budget = config.safetyBudget || 50;
+                                    const eoc = config.expectedOpportunityCost || 0;
+                                    const remaining = Math.max(0, budget - eoc);
+                                    return `${remaining.toFixed(0)} of ${budget} budget left`;
+                                  })()}
+                                </p>
+                              </div>
+                            </>
+                          )}
+                        </div>
+
+                        {/* Promotion Status */}
+                        {test.bayesianConfig && typeof test.bayesianConfig === 'object' && (() => {
+                          const config = test.bayesianConfig as any;
+                          const prob = config.probVariantBetter || 0.5;
+                          const totalSessions = (test.controlImpressions || 0) + (test.variantImpressions || 0);
+                          const shouldPromote = prob > 0.95 && totalSessions >= 2000;
+                          
+                          return shouldPromote && (
+                            <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+                              <TrendingUp className="w-5 h-5 text-green-600" />
+                              <p className="text-sm text-green-700 dark:text-green-300 font-semibold">
+                                Ready for promotion - Variant significantly outperforms control
+                              </p>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+
                     {/* Start Date */}
                     <div className="mt-6 pt-4 border-t flex items-center justify-between">
                       <div className="text-xs text-muted-foreground">
