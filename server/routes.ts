@@ -1004,27 +1004,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use provided avgOrderValue or product price
       const basePrice = avgOrderValue || parseFloat(product.price);
 
-      // Simulate orders with 50/50 allocation (simulating random assignment)
-      const controlOrders = Math.floor(orders / 2);
+      // Use current allocation percentages for realistic simulation
+      const controlAllocation = parseFloat(test.controlAllocation || "50") / 100;
+      const variantAllocation = parseFloat(test.variantAllocation || "50") / 100;
+      const totalAllocation = controlAllocation + variantAllocation;
+      
+      const controlOrders = Math.floor(orders * (controlAllocation / totalAllocation));
       const variantOrders = orders - controlOrders;
 
-      // Generate realistic order values with some variance (±20%)
+      // Create individual conversion records with revenue tracking
+      const { randomUUID } = await import("crypto");
       let totalRevenue = 0;
-      for (let i = 0; i < orders; i++) {
+      let controlRevenue = 0;
+      let variantRevenue = 0;
+
+      for (let i = 0; i < controlOrders; i++) {
         const variance = 0.8 + Math.random() * 0.4; // 0.8 to 1.2x
         const orderValue = basePrice * variance;
         totalRevenue += orderValue;
+        controlRevenue += orderValue;
+        
+        await storage.createTestConversion({
+          testId,
+          sessionId: randomUUID(),
+          variant: "control",
+          revenue: orderValue.toFixed(2),
+        });
       }
 
-      // Update test metrics
+      for (let i = 0; i < variantOrders; i++) {
+        const variance = 0.8 + Math.random() * 0.4; // 0.8 to 1.2x
+        const orderValue = basePrice * variance;
+        totalRevenue += orderValue;
+        variantRevenue += orderValue;
+        
+        await storage.createTestConversion({
+          testId,
+          sessionId: randomUUID(),
+          variant: "variant",
+          revenue: orderValue.toFixed(2),
+        });
+      }
+
+      // Update test metrics with aggregate counters
+      const newControlConversions = (test.controlConversions || 0) + controlOrders;
+      const newVariantConversions = (test.variantConversions || 0) + variantOrders;
       const newConversions = (test.conversions || 0) + orders;
+      const newControlRevenue = parseFloat(test.controlRevenue || "0") + controlRevenue;
+      const newVariantRevenue = parseFloat(test.variantRevenue || "0") + variantRevenue;
       const newRevenue = parseFloat(test.revenue || "0") + totalRevenue;
+      
+      // Calculate ARPU for each variant
+      const controlArpu = newControlConversions > 0 ? newControlRevenue / newControlConversions : 0;
+      const variantArpu = newVariantConversions > 0 ? newVariantRevenue / newVariantConversions : 0;
       const arpu = newConversions > 0 ? newRevenue / newConversions : 0;
 
       await storage.updateTest(shop, testId, {
         conversions: newConversions,
+        controlConversions: newControlConversions,
+        variantConversions: newVariantConversions,
         revenue: newRevenue.toString(),
+        controlRevenue: newControlRevenue.toString(),
+        variantRevenue: newVariantRevenue.toString(),
         arpu: arpu.toString(),
+        controlArpu: controlArpu.toString(),
+        variantArpu: variantArpu.toString(),
       });
 
       console.log(`[Simulation] Generated ${orders} orders for test ${testId}`);
@@ -1081,7 +1125,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const controlImpressions = Math.floor(visitors * (controlAllocation / totalAllocation));
       const variantImpressions = visitors - controlImpressions;
-      const newImpressions = (test.impressions || 0) + visitors;
 
       // Simulate conversions based on conversion rate and allocation
       const expectedOrders = Math.floor(visitors * conversionRate);
@@ -1096,18 +1139,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const basePrice = avgOrderValue || parseFloat(product.price);
 
-      // Generate realistic order values - split between control and variant
+      // Create individual impression records with unique session IDs
+      const { randomUUID } = await import("crypto");
+      for (let i = 0; i < controlImpressions; i++) {
+        await storage.createTestImpression({
+          testId,
+          sessionId: randomUUID(),
+          variant: "control",
+        });
+      }
+      for (let i = 0; i < variantImpressions; i++) {
+        await storage.createTestImpression({
+          testId,
+          sessionId: randomUUID(),
+          variant: "variant",
+        });
+      }
+
+      // Create individual conversion records with revenue tracking
       let controlRevenue = 0;
       let variantRevenue = 0;
       
       for (let i = 0; i < controlOrders; i++) {
         const variance = 0.8 + Math.random() * 0.4;
-        controlRevenue += basePrice * variance;
+        const orderValue = basePrice * variance;
+        controlRevenue += orderValue;
+        
+        await storage.createTestConversion({
+          testId,
+          sessionId: randomUUID(),
+          variant: "control",
+          revenue: orderValue.toFixed(2),
+        });
       }
       
       for (let i = 0; i < variantOrders; i++) {
         const variance = 0.8 + Math.random() * 0.4;
-        variantRevenue += basePrice * variance;
+        const orderValue = basePrice * variance;
+        variantRevenue += orderValue;
+        
+        await storage.createTestConversion({
+          testId,
+          sessionId: randomUUID(),
+          variant: "variant",
+          revenue: orderValue.toFixed(2),
+        });
       }
       
       const totalRevenue = controlRevenue + variantRevenue;
