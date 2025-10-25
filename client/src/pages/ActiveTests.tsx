@@ -178,14 +178,37 @@ export default function ActiveTests() {
               const conversionRate = impressions > 0 ? (conversions / impressions) * 100 : 0;
               const arpuLift = parseFloat(test.arpuLift || "0");
               
-              // Determine if test has significant data
-              // Both Bayesian and Fixed tests need minimum data per variant for confident decisions
-              const hasSignificantData = test.allocationStrategy === "bayesian"
+              // 2-State Badge System: "Still Learning" vs "Ready to Decide"
+              // Check if we have sufficient data per variant
+              const hasSufficientData = test.allocationStrategy === "bayesian"
                 ? impressions >= 2000 && // Matches Bayesian promotion criteria
                   (test.controlConversions || 0) >= 30 && // Control has meaningful data
                   (test.variantConversions || 0) >= 30    // Variant has meaningful data
                 : (test.controlConversions || 0) >= 3 &&  // Fixed: Both variants need minimum data
                   (test.variantConversions || 0) >= 3;    // Lower threshold since traffic is balanced
+              
+              // Check if we have a clear winner (probability >80% or <20%)
+              const CONFIDENCE_THRESHOLD = 0.80;
+              let hasClearWinner = false;
+              if (test.allocationStrategy === "bayesian" && test.bayesianConfig && typeof test.bayesianConfig === 'object') {
+                const config = test.bayesianConfig as any;
+                const prob = config.probVariantBetter || 0.5;
+                hasClearWinner = prob > CONFIDENCE_THRESHOLD || prob < (1 - CONFIDENCE_THRESHOLD);
+              } else if (test.allocationStrategy === "fixed") {
+                // For fixed tests, use simple statistical significance based on conversion rate difference
+                const controlRate = (test.controlImpressions || 0) > 0 
+                  ? (test.controlConversions || 0) / (test.controlImpressions || 1) 
+                  : 0;
+                const variantRate = (test.variantImpressions || 0) > 0 
+                  ? (test.variantConversions || 0) / (test.variantImpressions || 1) 
+                  : 0;
+                const rateDiff = Math.abs(variantRate - controlRate);
+                // Clear winner if conversion rate difference is >20% (e.g., 3% vs 3.6% = 20% lift)
+                hasClearWinner = controlRate > 0 && (rateDiff / controlRate) > 0.20;
+              }
+              
+              // Badge: "Ready to Decide" only if BOTH sufficient data AND clear winner
+              const isReadyToDecide = hasSufficientData && hasClearWinner;
               
               return (
                 <Card key={test.id} data-testid={`card-test-${index}`}>
@@ -388,17 +411,6 @@ export default function ActiveTests() {
                                     return (prob * 100).toFixed(1);
                                   })()}%
                                 </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {(() => {
-                                    const config = test.bayesianConfig as any;
-                                    const prob = config.probVariantBetter || 0.5;
-                                    if (prob > 0.95) return "Very high confidence";
-                                    if (prob > 0.80) return "High confidence";
-                                    if (prob > 0.60) return "Moderate confidence";
-                                    if (prob > 0.40) return "Uncertain";
-                                    return "Variant underperforming";
-                                  })()}
-                                </p>
                               </div>
 
                               <div className="space-y-2">
@@ -443,15 +455,19 @@ export default function ActiveTests() {
                       </div>
                     )}
 
-                    {/* Start Date */}
+                    {/* Start Date and Status Badge */}
                     <div className="mt-6 pt-4 border-t flex items-center justify-between">
                       <div className="text-xs text-muted-foreground">
                         Started: {test.startDate ? new Date(test.startDate).toLocaleString() : 'Unknown'}
                       </div>
-                      {hasSignificantData ? (
-                        <Badge variant="outline" className="text-green-600">Significant data</Badge>
+                      {isReadyToDecide ? (
+                        <Badge variant="outline" className="text-green-600 border-green-600">
+                          ✓ Ready to Decide
+                        </Badge>
                       ) : (
-                        <Badge variant="outline" className="text-yellow-600">Low sample size</Badge>
+                        <Badge variant="outline" className="text-yellow-600 border-yellow-600">
+                          ⏱ Still Learning
+                        </Badge>
                       )}
                     </div>
                   </CardContent>
