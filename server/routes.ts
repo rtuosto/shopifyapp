@@ -547,7 +547,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedTest = await storage.updateTest(shop, testId, {
         controlAllocation: (result.allocation.control * 100).toFixed(2),
         variantAllocation: (result.allocation.variant * 100).toFixed(2),
-        bayesianConfig: result.bayesianState,
+        bayesianConfig: {
+          ...result.bayesianState,
+          probVariantBetter: result.metrics.probabilityVariantWins,
+        },
       });
       
       console.log(`[Bayesian Update] Test ${testId}: Control ${(result.allocation.control * 100).toFixed(1)}% / Variant ${(result.allocation.variant * 100).toFixed(1)}%`);
@@ -610,6 +613,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           endDate: new Date(),
           bayesianConfig: {
             ...result.bayesianState,
+            probVariantBetter: result.metrics.probabilityVariantWins,
             promotionCheckCount: (result.bayesianState.promotionCheckCount || 0) + 1,
           },
         });
@@ -631,7 +635,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const updatedTest = await storage.updateTest(shop, testId, {
           status: "cancelled",
           endDate: new Date(),
-          bayesianConfig: result.bayesianState,
+          bayesianConfig: {
+            ...result.bayesianState,
+            probVariantBetter: result.metrics.probabilityVariantWins,
+          },
         });
         
         console.log(`[Auto-Stop] Test ${testId} stopped: safety budget exhausted`);
@@ -1277,7 +1284,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updateTest(shop, testId, {
             controlAllocation: (result.allocation.control * 100).toFixed(2),
             variantAllocation: (result.allocation.variant * 100).toFixed(2),
-            bayesianConfig: result.bayesianState,
+            bayesianConfig: {
+              ...result.bayesianState,
+              probVariantBetter: result.metrics.probabilityVariantWins,
+            },
           });
           
           allocationAfter = {
