@@ -18,6 +18,29 @@ interface SimulationResult {
   type: "batch" | "traffic" | "orders";
   timestamp: string;
   testName: string;
+  allocationBefore?: { control: number; variant: number };
+  allocationAfter?: { control: number; variant: number };
+  variantPerformance?: {
+    control: {
+      impressions: number;
+      conversions: number;
+      revenue: string;
+      conversionRate: string;
+      arpu: string;
+    };
+    variant: {
+      impressions: number;
+      conversions: number;
+      revenue: string;
+      conversionRate: string;
+      arpu: string;
+    };
+  };
+  bayesianUpdate?: {
+    newAllocation: { control: number; variant: number };
+    metrics: any;
+    reasoning: string;
+  };
   allocation?: {
     control: {
       impressions?: number;
@@ -54,7 +77,8 @@ export default function Simulator() {
   
   // Batch simulation parameters
   const [visitors, setVisitors] = useState(1000);
-  const [conversionRate, setConversionRate] = useState(3);
+  const [controlConversionRate, setControlConversionRate] = useState(3.0);
+  const [variantConversionRate, setVariantConversionRate] = useState(3.5);
   
   // Individual simulation parameters
   const [impressions, setImpressions] = useState(100);
@@ -85,7 +109,8 @@ export default function Simulator() {
       const res = await apiRequest("POST", "/api/simulate/batch", {
         testId: selectedTestId,
         visitors,
-        conversionRate: conversionRate / 100,
+        controlConversionRate: controlConversionRate / 100,
+        variantConversionRate: variantConversionRate / 100,
       });
       return res.json();
     },
@@ -94,14 +119,21 @@ export default function Simulator() {
         type: "batch",
         timestamp: new Date().toLocaleTimeString(),
         testName: selectedTest?.productName || "Unknown",
-        allocation: data.allocation,
-        metrics: data.metrics,
+        allocationBefore: data.allocationBefore,
+        allocationAfter: data.allocationAfter,
+        variantPerformance: data.variantPerformance,
+        bayesianUpdate: data.bayesianUpdate,
       };
       setLastSimulationResult(result);
       
+      const allocationShifted = data.allocationBefore && data.allocationAfter && 
+        (Math.abs(data.allocationBefore.control - data.allocationAfter.control) > 0.1);
+      
       toast({
         title: "Batch Simulation Complete",
-        description: `Generated ${data.simulation.visitors} visitors and ${data.simulation.orders} orders`,
+        description: allocationShifted 
+          ? `Generated ${data.impressions} visitors. Allocation shifted: ${data.allocationBefore.control.toFixed(1)}% → ${data.allocationAfter.control.toFixed(1)}% control`
+          : `Generated ${data.impressions} visitors and ${data.conversions} conversions`,
       });
       
       queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
@@ -297,8 +329,154 @@ export default function Simulator() {
                 </div>
               </div>
 
-              {/* Batch Simulation Results */}
-              {lastSimulationResult.type === "batch" && lastSimulationResult.allocation && (
+              {/* NEW: Batch Simulation Results with Allocation Evolution */}
+              {lastSimulationResult.type === "batch" && lastSimulationResult.variantPerformance && (
+                <div className="space-y-4">
+                  {/* Allocation Evolution */}
+                  {lastSimulationResult.allocationBefore && lastSimulationResult.allocationAfter && (
+                    <div className="p-4 border rounded-lg space-y-3">
+                      <div className="text-sm font-medium">Traffic Allocation Evolution</div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <div className="text-xs text-muted-foreground">Before Simulation</div>
+                          <div className="flex gap-2">
+                            <div className="flex-1 text-center">
+                              <div className="text-lg font-bold" data-testid="text-allocation-before-control">
+                                {lastSimulationResult.allocationBefore.control.toFixed(1)}%
+                              </div>
+                              <div className="text-xs text-muted-foreground">Control</div>
+                            </div>
+                            <div className="flex-1 text-center">
+                              <div className="text-lg font-bold" data-testid="text-allocation-before-variant">
+                                {lastSimulationResult.allocationBefore.variant.toFixed(1)}%
+                              </div>
+                              <div className="text-xs text-muted-foreground">Variant</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="text-xs text-muted-foreground">After Simulation</div>
+                          <div className="flex gap-2">
+                            <div className="flex-1 text-center">
+                              <div className="text-lg font-bold" data-testid="text-allocation-after-control">
+                                {lastSimulationResult.allocationAfter.control.toFixed(1)}%
+                              </div>
+                              <div className="text-xs text-muted-foreground">Control</div>
+                            </div>
+                            <div className="flex-1 text-center">
+                              <div className="text-lg font-bold" data-testid="text-allocation-after-variant">
+                                {lastSimulationResult.allocationAfter.variant.toFixed(1)}%
+                              </div>
+                              <div className="text-xs text-muted-foreground">Variant</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      {Math.abs(lastSimulationResult.allocationAfter.control - lastSimulationResult.allocationBefore.control) > 0.1 ? (
+                        <div className="flex items-center gap-2 text-xs text-blue-600">
+                          <CheckCircle2 className="w-4 h-4" />
+                          Bayesian engine shifted traffic based on performance
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <AlertCircle className="w-4 h-4" />
+                          No allocation shift (need more data or similar performance)
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Variant Performance Comparison */}
+                  <div className="p-4 border rounded-lg space-y-3">
+                    <div className="text-sm font-medium">Variant Performance</div>
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <div className="text-xs font-medium text-muted-foreground">Control</div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-xs text-muted-foreground">Impressions:</span>
+                            <span className="text-sm font-medium" data-testid="text-control-impressions-new">
+                              {lastSimulationResult.variantPerformance.control.impressions}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-xs text-muted-foreground">Conversions:</span>
+                            <span className="text-sm font-medium" data-testid="text-control-conversions">
+                              {lastSimulationResult.variantPerformance.control.conversions}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-xs text-muted-foreground">Conv. Rate:</span>
+                            <span className="text-sm font-medium" data-testid="text-control-cr">
+                              {lastSimulationResult.variantPerformance.control.conversionRate}%
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-xs text-muted-foreground">Revenue:</span>
+                            <span className="text-sm font-medium" data-testid="text-control-revenue">
+                              ${lastSimulationResult.variantPerformance.control.revenue}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-xs text-muted-foreground">ARPU:</span>
+                            <span className="text-sm font-medium" data-testid="text-control-arpu">
+                              ${lastSimulationResult.variantPerformance.control.arpu}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="text-xs font-medium text-muted-foreground">Variant</div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-xs text-muted-foreground">Impressions:</span>
+                            <span className="text-sm font-medium" data-testid="text-variant-impressions-new">
+                              {lastSimulationResult.variantPerformance.variant.impressions}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-xs text-muted-foreground">Conversions:</span>
+                            <span className="text-sm font-medium" data-testid="text-variant-conversions">
+                              {lastSimulationResult.variantPerformance.variant.conversions}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-xs text-muted-foreground">Conv. Rate:</span>
+                            <span className="text-sm font-medium" data-testid="text-variant-cr">
+                              {lastSimulationResult.variantPerformance.variant.conversionRate}%
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-xs text-muted-foreground">Revenue:</span>
+                            <span className="text-sm font-medium" data-testid="text-variant-revenue">
+                              ${lastSimulationResult.variantPerformance.variant.revenue}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-xs text-muted-foreground">ARPU:</span>
+                            <span className="text-sm font-medium" data-testid="text-variant-arpu">
+                              ${lastSimulationResult.variantPerformance.variant.arpu}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bayesian Update Info */}
+                  {lastSimulationResult.bayesianUpdate && (
+                    <div className="p-4 border rounded-lg space-y-2 bg-blue-50 dark:bg-blue-950">
+                      <div className="text-sm font-medium text-blue-900 dark:text-blue-100">Bayesian Engine Update</div>
+                      <p className="text-xs text-blue-700 dark:text-blue-300" data-testid="text-bayesian-reasoning">
+                        {lastSimulationResult.bayesianUpdate.reasoning}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* OLD: Batch Simulation Results (fallback for old API response) */}
+              {lastSimulationResult.type === "batch" && lastSimulationResult.allocation && !lastSimulationResult.variantPerformance && (
                 <div className="space-y-3">
                   <div className="font-medium">A/B Test Allocation Verification</div>
                   
@@ -537,20 +715,54 @@ export default function Simulator() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="conversion-rate">Conversion Rate (%)</Label>
+                <Label htmlFor="control-conversion-rate">Control Conversion Rate (%)</Label>
                 <Input
-                  id="conversion-rate"
+                  id="control-conversion-rate"
                   type="number"
-                  value={conversionRate}
-                  onChange={(e) => setConversionRate(Number(e.target.value))}
+                  value={controlConversionRate}
+                  onChange={(e) => setControlConversionRate(Number(e.target.value))}
                   min={0}
                   max={100}
                   step={0.1}
-                  data-testid="input-conversion-rate"
+                  data-testid="input-control-conversion-rate"
                   disabled={!canSimulate}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Percentage of visitors who make a purchase
+                  Control conversion rate (baseline performance)
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="variant-conversion-rate">Variant Conversion Rate (%)</Label>
+                <Input
+                  id="variant-conversion-rate"
+                  type="number"
+                  value={variantConversionRate}
+                  onChange={(e) => setVariantConversionRate(Number(e.target.value))}
+                  min={0}
+                  max={100}
+                  step={0.1}
+                  data-testid="input-variant-conversion-rate"
+                  disabled={!canSimulate}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Variant conversion rate (set higher to simulate lift)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">Expected Lift</Label>
+                <div className="h-10 flex items-center px-3 border rounded-md bg-muted">
+                  <span className="text-sm font-medium" data-testid="text-expected-lift">
+                    {controlConversionRate > 0 
+                      ? `${(((variantConversionRate - controlConversionRate) / controlConversionRate) * 100).toFixed(1)}%`
+                      : '0%'}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Relative improvement from control to variant
                 </p>
               </div>
             </div>

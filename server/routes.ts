@@ -1100,14 +1100,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/simulate/batch - Simulates both traffic and orders in a realistic ratio
+  // POST /api/simulate/batch - Realistic simulator that uses actual assignment flow
   app.post("/api/simulate/batch", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
       const { 
         testId, 
         visitors = 1000,
-        conversionRate = 0.03, // 3% default
+        controlConversionRate = 0.03, // 3% default for control
+        variantConversionRate = 0.03, // 3% default for variant (can be different to test lift)
         avgOrderValue
       } = req.body;
 
@@ -1124,20 +1125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Test must be active to simulate batch" });
       }
 
-      // Simulate traffic (impressions) using current allocation percentages
-      const controlAllocation = parseFloat(test.controlAllocation || "50") / 100;
-      const variantAllocation = parseFloat(test.variantAllocation || "50") / 100;
-      const totalAllocation = controlAllocation + variantAllocation;
-      
-      const controlImpressions = Math.floor(visitors * (controlAllocation / totalAllocation));
-      const variantImpressions = visitors - controlImpressions;
-
-      // Simulate conversions based on conversion rate and allocation
-      const expectedOrders = Math.floor(visitors * conversionRate);
-      const controlOrders = Math.floor(expectedOrders * (controlAllocation / totalAllocation));
-      const variantOrders = expectedOrders - controlOrders;
-
-      // Get the product to use realistic pricing
+      // Get product for pricing
       const product = await storage.getProduct(shop, test.productId);
       if (!product) {
         return res.status(400).json({ error: "Product not found" });
@@ -1145,79 +1133,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const basePrice = avgOrderValue || parseFloat(product.price);
       const { randomUUID } = await import("crypto");
+      const { assignVisitor } = await import('./assignment-service');
 
-      // Create impression records using bulk insert for performance
+      // Capture allocation BEFORE simulation
+      const allocationBefore = {
+        control: parseFloat(test.controlAllocation || "50"),
+        variant: parseFloat(test.variantAllocation || "50"),
+      };
+
+      // Track assignments for each visitor
+      const assignments: Array<{ sessionId: string; variant: 'control' | 'variant' }> = [];
       const impressionRecords = [];
-      for (let i = 0; i < controlImpressions; i++) {
-        impressionRecords.push({
-          testId,
-          sessionId: randomUUID(),
-          variant: "control" as const,
-        });
-      }
-      for (let i = 0; i < variantImpressions; i++) {
-        impressionRecords.push({
-          testId,
-          sessionId: randomUUID(),
-          variant: "variant" as const,
-        });
-      }
-      await storage.createTestImpressionsBulk(impressionRecords);
-
-      // Create conversion records using bulk insert for performance
-      let controlRevenue = 0;
-      let variantRevenue = 0;
       const conversionRecords = [];
       
-      for (let i = 0; i < controlOrders; i++) {
-        const variance = 0.8 + Math.random() * 0.4;
-        const orderValue = basePrice * variance;
-        controlRevenue += orderValue;
-        
-        conversionRecords.push({
-          testId,
-          sessionId: randomUUID(),
-          variant: "control" as const,
-          revenue: orderValue.toFixed(2),
-        });
-      }
-      
-      for (let i = 0; i < variantOrders; i++) {
-        const variance = 0.8 + Math.random() * 0.4;
-        const orderValue = basePrice * variance;
-        variantRevenue += orderValue;
-        
-        conversionRecords.push({
-          testId,
-          sessionId: randomUUID(),
-          variant: "variant" as const,
-          revenue: orderValue.toFixed(2),
-        });
-      }
-      await storage.createTestConversionsBulk(conversionRecords);
-      
-      const totalRevenue = controlRevenue + variantRevenue;
+      let controlImpressions = 0;
+      let variantImpressions = 0;
+      let controlConversions = 0;
+      let variantConversions = 0;
+      let controlRevenue = 0;
+      let variantRevenue = 0;
 
-      // Update test metrics - both aggregate and per-variant
+      console.log(`[Simulator] Starting batch simulation for ${visitors} visitors`);
+      console.log(`[Simulator] Current allocation - Control: ${allocationBefore.control}%, Variant: ${allocationBefore.variant}%`);
+      console.log(`[Simulator] Conversion rates - Control: ${controlConversionRate * 100}%, Variant: ${variantConversionRate * 100}%`);
+
+      // REALISTIC FLOW: Simulate each visitor going through the actual assignment logic
+      for (let i = 0; i < visitors; i++) {
+        const sessionId = randomUUID();
+        
+        // Step 1: Assign visitor using CURRENT allocation (respects Bayesian updates)
+        const assignment = await assignVisitor(storage, {
+          shop,
+          testId,
+          sessionId,
+          test, // Pass test to avoid redundant lookup
+        });
+        
+        assignments.push({ sessionId, variant: assignment.variant });
+        
+        // Step 2: Track impression
+        impressionRecords.push({
+          testId,
+          sessionId,
+          variant: assignment.variant,
+        });
+        
+        if (assignment.variant === 'control') {
+          controlImpressions++;
+        } else {
+          variantImpressions++;
+        }
+        
+        // Step 3: Probabilistically convert based on variant-specific conversion rate
+        const conversionRate = assignment.variant === 'control' 
+          ? controlConversionRate 
+          : variantConversionRate;
+        
+        const converts = Math.random() < conversionRate;
+        
+        if (converts) {
+          // Step 4: Generate order value with variance
+          const variance = 0.8 + Math.random() * 0.4; // ±20% variance
+          const orderValue = basePrice * variance;
+          
+          conversionRecords.push({
+            testId,
+            sessionId,
+            variant: assignment.variant,
+            revenue: orderValue.toFixed(2),
+          });
+          
+          if (assignment.variant === 'control') {
+            controlConversions++;
+            controlRevenue += orderValue;
+          } else {
+            variantConversions++;
+            variantRevenue += orderValue;
+          }
+        }
+      }
+
+      console.log(`[Simulator] Assignments - Control: ${controlImpressions}, Variant: ${variantImpressions}`);
+      console.log(`[Simulator] Conversions - Control: ${controlConversions}, Variant: ${variantConversions}`);
+      console.log(`[Simulator] Revenue - Control: $${controlRevenue.toFixed(2)}, Variant: $${variantRevenue.toFixed(2)}`);
+
+      // Bulk insert for performance (avoid 1000+ individual database operations)
+      await storage.createTestImpressionsBulk(impressionRecords);
+      if (conversionRecords.length > 0) {
+        await storage.createTestConversionsBulk(conversionRecords);
+      }
+
+      const totalRevenue = controlRevenue + variantRevenue;
+      const totalConversions = controlConversions + variantConversions;
+
+      // Update test metrics
       const newControlImpressions = (test.controlImpressions || 0) + controlImpressions;
       const newVariantImpressions = (test.variantImpressions || 0) + variantImpressions;
-      const newControlConversions = (test.controlConversions || 0) + controlOrders;
-      const newVariantConversions = (test.variantConversions || 0) + variantOrders;
+      const newControlConversions = (test.controlConversions || 0) + controlConversions;
+      const newVariantConversions = (test.variantConversions || 0) + variantConversions;
       const newControlRevenue = parseFloat(test.controlRevenue || "0") + controlRevenue;
       const newVariantRevenue = parseFloat(test.variantRevenue || "0") + variantRevenue;
       
       const newImpressions = (test.impressions || 0) + visitors;
-      const newConversions = (test.conversions || 0) + expectedOrders;
+      const newConversions = (test.conversions || 0) + totalConversions;
       const newRevenue = parseFloat(test.revenue || "0") + totalRevenue;
       const arpu = newConversions > 0 ? newRevenue / newConversions : 0;
 
       const updatedTest = await storage.updateTest(shop, testId, {
-        // Aggregate metrics
         impressions: newImpressions,
         conversions: newConversions,
         revenue: newRevenue.toString(),
         arpu: arpu.toString(),
-        // Per-variant metrics
         controlImpressions: newControlImpressions,
         variantImpressions: newVariantImpressions,
         controlConversions: newControlConversions,
@@ -1226,12 +1252,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         variantRevenue: newVariantRevenue.toString(),
       });
 
-      console.log(`[Simulation Batch] Test ${testId}: ${visitors} visitors, ${expectedOrders} orders (${conversionRate * 100}% CR)`);
-      console.log(`[Simulation Batch] Allocation - Control: ${controlImpressions}/${controlOrders}, Variant: ${variantImpressions}/${variantOrders}`);
-      console.log(`[Simulation Batch] Revenue: $${totalRevenue.toFixed(2)}, ARPU: $${arpu.toFixed(2)}`);
-
       // Update Bayesian allocation if using Bayesian strategy
       let bayesianUpdate = null;
+      let allocationAfter = allocationBefore;
+      
       if (updatedTest && updatedTest.allocationStrategy === "bayesian") {
         try {
           const { computeAllocationUpdate, updateBayesianState, BayesianState } = await import('./statistics/allocation-service');
@@ -1256,16 +1280,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             bayesianConfig: result.bayesianState,
           });
           
+          allocationAfter = {
+            control: parseFloat((result.allocation.control * 100).toFixed(1)),
+            variant: parseFloat((result.allocation.variant * 100).toFixed(1)),
+          };
+          
           bayesianUpdate = {
-            newAllocation: {
-              control: (result.allocation.control * 100).toFixed(1),
-              variant: (result.allocation.variant * 100).toFixed(1),
-            },
+            newAllocation: allocationAfter,
             metrics: result.metrics,
             reasoning: result.reasoning,
           };
           
-          console.log(`[Bayesian Update] New allocation: Control ${bayesianUpdate.newAllocation.control}% / Variant ${bayesianUpdate.newAllocation.variant}%`);
+          console.log(`[Bayesian Update] Allocation shifted - Control: ${allocationBefore.control}% → ${allocationAfter.control}%, Variant: ${allocationBefore.variant}% → ${allocationAfter.variant}%`);
           console.log(`[Bayesian Update] ${result.reasoning}`);
         } catch (error) {
           console.error("[Bayesian Update] Failed to update allocation:", error);
@@ -1275,26 +1301,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         success: true,
         testId,
-        simulation: {
-          visitors,
-          conversionRate: conversionRate * 100,
-          orders: expectedOrders,
-        },
-        allocation: {
+        impressions: visitors,
+        conversions: totalConversions,
+        revenue: totalRevenue.toFixed(2),
+        arpu: arpu.toFixed(2),
+        allocationBefore,
+        allocationAfter,
+        variantPerformance: {
           control: {
             impressions: controlImpressions,
-            orders: controlOrders,
+            conversions: controlConversions,
+            revenue: controlRevenue.toFixed(2),
+            conversionRate: controlImpressions > 0 ? (controlConversions / controlImpressions * 100).toFixed(2) : '0',
+            arpu: controlConversions > 0 ? (controlRevenue / controlConversions).toFixed(2) : '0',
           },
           variant: {
             impressions: variantImpressions,
-            orders: variantOrders,
+            conversions: variantConversions,
+            revenue: variantRevenue.toFixed(2),
+            conversionRate: variantImpressions > 0 ? (variantConversions / variantImpressions * 100).toFixed(2) : '0',
+            arpu: variantConversions > 0 ? (variantRevenue / variantConversions).toFixed(2) : '0',
           },
-        },
-        metrics: {
-          totalImpressions: newImpressions,
-          totalConversions: newConversions,
-          totalRevenue: newRevenue.toFixed(2),
-          arpu: arpu.toFixed(2),
         },
         bayesianUpdate,
       });
@@ -1387,6 +1414,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Record session assignment (persistent variant assignment)
+  // NOTE: SDK sends variant pre-selected by client-side logic.
+  // For simulator and future server-side assignment, use assignVisitor from assignment-service.ts
   app.post("/api/storefront/assign", async (req, res) => {
     try {
       const { sessionId, testId, variant, shop } = req.body;
