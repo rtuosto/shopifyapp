@@ -307,27 +307,40 @@
   // ============================================
 
   async function initShoptimizer() {
-    // Get or create persistent session ID
-    const sessionId = getSessionId();
-    console.log('[Shoptimizer] Session ID:', sessionId);
-    
-    // Inject session ID into cart for conversion attribution
-    injectSessionIntoCart(sessionId);
-    
-    // Get Shopify product ID from the page
-    const shopifyProductId = getShopifyProductId();
-    if (!shopifyProductId) {
-      console.log('[Shoptimizer] No product ID found, skipping A/B test check');
-      return;
-    }
-
-    console.log('[Shoptimizer] Checking for active tests on product:', shopifyProductId);
-
     try {
+      // Get or create persistent session ID
+      const sessionId = getSessionId();
+      console.log('[Shoptimizer] Session ID:', sessionId);
+      
+      // Inject session ID into cart for conversion attribution
+      injectSessionIntoCart(sessionId);
+      
+      // Get Shopify product ID from the page
+      const shopifyProductId = getShopifyProductId();
+      if (!shopifyProductId) {
+        console.log('[Shoptimizer] Not a product page - session tracking active, A/B testing skipped');
+        console.log('[Shoptimizer] Initialized successfully (session tracking only)');
+        return;
+      }
+
+      console.log('[Shoptimizer] Product page detected:', shopifyProductId);
+
+      // Validate configuration
+      if (!SHOPTIMIZER_CONFIG.apiUrl || SHOPTIMIZER_CONFIG.apiUrl.includes('your-app.replit.app')) {
+        console.error('[Shoptimizer] Invalid API URL. Please check your installation.');
+        return;
+      }
+
       // Fetch all active tests from backend
-      const response = await fetch(
-        `${SHOPTIMIZER_CONFIG.apiUrl}/api/storefront/tests?shop=${SHOPTIMIZER_CONFIG.shop}`
-      );
+      const testUrl = `${SHOPTIMIZER_CONFIG.apiUrl}/api/storefront/tests?shop=${SHOPTIMIZER_CONFIG.shop}`;
+      console.log('[Shoptimizer] Fetching active tests from:', testUrl);
+      
+      const response = await fetch(testUrl);
+      
+      if (!response.ok) {
+        console.error('[Shoptimizer] Failed to fetch tests:', response.status, response.statusText);
+        return;
+      }
       
       const data = await response.json();
       
@@ -363,8 +376,12 @@
       window.shoptimizerVariant = variant;
       window.shoptimizerTestId = productTest.id;
       
+      console.log('[Shoptimizer] Initialized successfully (A/B testing active)');
+      
     } catch (err) {
-      console.error('[Shoptimizer] Failed to initialize:', err);
+      console.error('[Shoptimizer] Initialization error:', err.message || err);
+      // Still track session even if A/B testing fails
+      console.log('[Shoptimizer] Session tracking active despite error');
     }
   }
 
