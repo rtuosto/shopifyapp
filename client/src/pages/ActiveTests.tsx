@@ -141,7 +141,7 @@ export default function ActiveTests() {
               <CardTitle className="text-3xl">${averageRpv.toFixed(2)}</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-xs text-muted-foreground">Revenue per user</p>
+              <p className="text-xs text-muted-foreground">Revenue per visitor</p>
             </CardContent>
           </Card>
         </div>
