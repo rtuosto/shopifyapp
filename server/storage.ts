@@ -52,9 +52,11 @@ export interface IStorage {
   
   // Test Impressions (tracking individual impression events)
   createTestImpression(impression: InsertTestImpression): Promise<TestImpression>;
+  createTestImpressionsBulk(impressions: InsertTestImpression[]): Promise<void>;
   
   // Test Conversions (tracking individual conversion events)
   createTestConversion(conversion: InsertTestConversion): Promise<TestConversion>;
+  createTestConversionsBulk(conversions: InsertTestConversion[]): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -471,6 +473,10 @@ export class MemStorage implements IStorage {
     };
   }
 
+  async createTestImpressionsBulk(impressions: InsertTestImpression[]): Promise<void> {
+    console.warn(`[MemStorage] ${impressions.length} test impressions not persisted in memory - upgrade to DbStorage`);
+  }
+
   // Test Conversions (not persisted in MemStorage - for dev only)
   async createTestConversion(conversion: InsertTestConversion): Promise<TestConversion> {
     console.warn("[MemStorage] Test conversions not persisted in memory - upgrade to DbStorage");
@@ -479,6 +485,10 @@ export class MemStorage implements IStorage {
       id: randomUUID(),
       createdAt: new Date(),
     };
+  }
+
+  async createTestConversionsBulk(conversions: InsertTestConversion[]): Promise<void> {
+    console.warn(`[MemStorage] ${conversions.length} test conversions not persisted in memory - upgrade to DbStorage`);
   }
 }
 

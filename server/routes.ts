@@ -281,11 +281,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const product = await storage.getProduct(shop, test.productId);
       
       // Calculate derived metrics
-      const controlARPU = test.controlImpressions > 0 
-        ? parseFloat(test.controlRevenue) / test.controlImpressions 
+      const controlARPU = test.controlConversions > 0 
+        ? parseFloat(test.controlRevenue) / test.controlConversions 
         : 0;
-      const variantARPU = test.variantImpressions > 0 
-        ? parseFloat(test.variantRevenue) / test.variantImpressions 
+      const variantARPU = test.variantConversions > 0 
+        ? parseFloat(test.variantRevenue) / test.variantConversions 
         : 0;
       const arpuLift = controlARPU > 0 
         ? ((variantARPU - controlARPU) / controlARPU) * 100 
@@ -1075,8 +1075,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         controlRevenue: newControlRevenue.toString(),
         variantRevenue: newVariantRevenue.toString(),
         arpu: arpu.toString(),
-        controlArpu: controlArpu.toString(),
-        variantArpu: variantArpu.toString(),
       });
 
       console.log(`[Simulation] Generated ${orders} orders for test ${testId}`);
@@ -1146,37 +1144,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const basePrice = avgOrderValue || parseFloat(product.price);
-
-      // Create individual impression records with unique session IDs
       const { randomUUID } = await import("crypto");
+
+      // Create impression records using bulk insert for performance
+      const impressionRecords = [];
       for (let i = 0; i < controlImpressions; i++) {
-        await storage.createTestImpression({
+        impressionRecords.push({
           testId,
           sessionId: randomUUID(),
-          variant: "control",
+          variant: "control" as const,
         });
       }
       for (let i = 0; i < variantImpressions; i++) {
-        await storage.createTestImpression({
+        impressionRecords.push({
           testId,
           sessionId: randomUUID(),
-          variant: "variant",
+          variant: "variant" as const,
         });
       }
+      await storage.createTestImpressionsBulk(impressionRecords);
 
-      // Create individual conversion records with revenue tracking
+      // Create conversion records using bulk insert for performance
       let controlRevenue = 0;
       let variantRevenue = 0;
+      const conversionRecords = [];
       
       for (let i = 0; i < controlOrders; i++) {
         const variance = 0.8 + Math.random() * 0.4;
         const orderValue = basePrice * variance;
         controlRevenue += orderValue;
         
-        await storage.createTestConversion({
+        conversionRecords.push({
           testId,
           sessionId: randomUUID(),
-          variant: "control",
+          variant: "control" as const,
           revenue: orderValue.toFixed(2),
         });
       }
@@ -1186,13 +1187,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const orderValue = basePrice * variance;
         variantRevenue += orderValue;
         
-        await storage.createTestConversion({
+        conversionRecords.push({
           testId,
           sessionId: randomUUID(),
-          variant: "variant",
+          variant: "variant" as const,
           revenue: orderValue.toFixed(2),
         });
       }
+      await storage.createTestConversionsBulk(conversionRecords);
       
       const totalRevenue = controlRevenue + variantRevenue;
 
@@ -1204,6 +1206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newControlRevenue = parseFloat(test.controlRevenue || "0") + controlRevenue;
       const newVariantRevenue = parseFloat(test.variantRevenue || "0") + variantRevenue;
       
+      const newImpressions = (test.impressions || 0) + visitors;
       const newConversions = (test.conversions || 0) + expectedOrders;
       const newRevenue = parseFloat(test.revenue || "0") + totalRevenue;
       const arpu = newConversions > 0 ? newRevenue / newConversions : 0;

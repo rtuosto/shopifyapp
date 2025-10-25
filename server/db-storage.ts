@@ -207,10 +207,20 @@ export class DbStorage implements IStorage {
     return result;
   }
 
+  async createTestImpressionsBulk(impressions: InsertTestImpression[]): Promise<void> {
+    if (impressions.length === 0) return;
+    await db.insert(testImpressions).values(impressions);
+  }
+
   // Test Conversions (NOT shop-scoped - global tracking)
   async createTestConversion(conversion: InsertTestConversion): Promise<TestConversion> {
     const [result] = await db.insert(testConversions).values(conversion).returning();
     return result;
+  }
+
+  async createTestConversionsBulk(conversions: InsertTestConversion[]): Promise<void> {
+    if (conversions.length === 0) return;
+    await db.insert(testConversions).values(conversions);
   }
 }
 
