@@ -274,12 +274,29 @@ export function computeAllocationUpdate(
   
   // Sanity check: if safety budget is unreasonably negative (< -1000), reset it
   // This handles tests that were broken by the previous bug
-  if (currentSafetyBudget < -1000) {
+  if (currentSafetyBudget < -1000 || !isFinite(currentSafetyBudget)) {
     console.log(`[Safety Budget] Resetting unreasonably negative budget (${currentSafetyBudget.toFixed(2)}) to initial value`);
     currentSafetyBudget = bayesianState.safetyBudgetTotal || 50;
   }
   
-  const safetyBudgetRemaining = currentSafetyBudget - (costOfWaitingPerSession * newImpressions);
+  // Safeguard: Handle pathological cost values (NaN, Infinity, negative)
+  // For pathological values, deduct entire safety budget to force test to stop (fail-safe)
+  let budgetDeduction = 0;
+  if (!isFinite(costOfWaitingPerSession) || costOfWaitingPerSession < 0) {
+    console.log(`[Safety Budget] Cost of waiting is pathological (${costOfWaitingPerSession}), exhausting budget to stop test`);
+    // Deduct entire budget plus some margin to ensure stop condition triggers
+    budgetDeduction = currentSafetyBudget + Math.abs(currentSafetyBudget) + 100;
+  } else {
+    // Normal case: legitimate cost calculation
+    budgetDeduction = costOfWaitingPerSession * newImpressions;
+  }
+  
+  // Safeguard: prevent budget from becoming unreasonably negative due to overflow
+  let safetyBudgetRemaining = currentSafetyBudget - budgetDeduction;
+  if (safetyBudgetRemaining < -1000 || !isFinite(safetyBudgetRemaining)) {
+    console.log(`[Safety Budget] Budget calculation produced unreasonable value (${safetyBudgetRemaining}), capping at -50`);
+    safetyBudgetRemaining = -50; // Allow some negative but cap it
+  }
 
   // Check promotion criteria
   const promotionCheck = checkPromotionCriteria(

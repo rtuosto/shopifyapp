@@ -222,9 +222,11 @@ export default function Simulator() {
             for (const line of lines) {
               if (line.startsWith("event:")) {
                 currentEvent = line.substring(6).trim();
+                console.log(`[SSE Client] Received event type: ${currentEvent}`);
               } else if (line.startsWith("data:") && currentEvent) {
                 try {
                   const data = JSON.parse(line.substring(5).trim());
+                  console.log(`[SSE Client] Parsed ${currentEvent} data:`, currentEvent === 'progress' ? `${data.impressions} impressions` : data);
 
                   if (currentEvent === "progress") {
                     setStreamProgress(parseFloat(data.percentage));
@@ -577,7 +579,10 @@ export default function Simulator() {
                           )}
                         </div>
                         <ResponsiveContainer width="100%" height={300}>
-                          <LineChart data={isStreaming ? streamingEvolutionData : (lastSimulationResult.evolutionData || [])}>
+                          <LineChart 
+                            key={`rpv-${isStreaming ? streamingEvolutionData.length : 'static'}`}
+                            data={isStreaming ? streamingEvolutionData : (lastSimulationResult.evolutionData || [])}
+                          >
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis 
                               dataKey="impressions" 
@@ -630,7 +635,10 @@ export default function Simulator() {
                           )}
                         </div>
                         <ResponsiveContainer width="100%" height={300}>
-                          <LineChart data={isStreaming ? streamingEvolutionData : (lastSimulationResult.evolutionData || [])}>
+                          <LineChart 
+                            key={`allocation-${isStreaming ? streamingEvolutionData.length : 'static'}`}
+                            data={isStreaming ? streamingEvolutionData : (lastSimulationResult.evolutionData || [])}
+                          >
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis 
                               dataKey="impressions" 

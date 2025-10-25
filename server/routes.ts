@@ -1545,11 +1545,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
       res.flushHeaders();
 
       const sendEvent = (event: string, data: any) => {
-        res.write(`event: ${event}\n`);
-        res.write(`data: ${JSON.stringify(data)}\n\n`);
+        const eventData = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+        console.log(`[SSE] Sending ${event} event:`, event === 'progress' ? `impressions=${data.impressions}` : 'full data');
+        res.write(eventData);
+        
+        // Force flush to send data immediately
+        if (typeof (res as any).flush === 'function') {
+          (res as any).flush();
+        }
       };
 
       const basePrice = avgOrderValue || parseFloat(product.price);
@@ -1650,6 +1657,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             variantAllocation: parseFloat(currentVariantAlloc.toFixed(1)),
             percentage: ((i + 1) / visitors * 100).toFixed(1),
           });
+          
+          // Yield to event loop to allow buffer to flush
+          await new Promise(resolve => setImmediate(resolve));
         }
       }
 
