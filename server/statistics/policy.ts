@@ -95,6 +95,7 @@ export function computeTTTSAllocation(
 
 /**
  * Apply allocation constraints (floors, normalization)
+ * Enforces minimum allocations while maintaining valid probability distribution
  * @param rawAllocation Unconstrained allocation
  * @param controlFloor Minimum control allocation (e.g., 0.75)
  * @param variantFloor Minimum variant allocation (e.g., 0.05)
@@ -104,13 +105,32 @@ export function applyAllocationConstraints(
   controlFloor: number,
   variantFloor: number
 ): AllocationResult {
-  let control = Math.max(rawAllocation.control, controlFloor);
-  let variant = Math.max(rawAllocation.variant, variantFloor);
+  let control = rawAllocation.control;
+  let variant = rawAllocation.variant;
 
-  // Normalize to sum to 1
+  // Check if floors are compatible (sum <= 1)
+  if (controlFloor + variantFloor > 1) {
+    // Floors are incompatible - prioritize control floor (cautious approach)
+    return { control: controlFloor, variant: 1 - controlFloor };
+  }
+
+  // Enforce control floor first (more important for safety)
+  if (control < controlFloor) {
+    control = controlFloor;
+    variant = 1 - controlFloor;
+  }
+  // Then enforce variant floor if needed
+  else if (variant < variantFloor) {
+    variant = variantFloor;
+    control = 1 - variantFloor;
+  }
+
+  // Ensure they sum to exactly 1 (handle floating point precision)
   const total = control + variant;
-  control /= total;
-  variant /= total;
+  if (Math.abs(total - 1) > 1e-10) {
+    control /= total;
+    variant /= total;
+  }
 
   return { control, variant };
 }
