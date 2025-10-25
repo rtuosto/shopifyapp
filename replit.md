@@ -46,7 +46,13 @@ Shoptimizer utilizes a full-stack architecture with a React, Shadcn UI, Wouter, 
 - **Safe Rollback**: Deactivates tests and restores original product values in Shopify. For price tests, restores ALL original variant prices from stored control data.
 - **Traffic & Conversion Simulator**: A comprehensive system for validating A/B test tracking and performance before live deployment, including batch simulation and live streaming mode:
   - **Batch Mode**: Instant simulation results with evolution data captured at 100-impression intervals
-  - **Live Streaming Mode** (NEW - October 2025): Real-time simulation using Server-Sent Events (SSE) that streams progress updates every 100 visitors, allowing merchants to watch the Bayesian engine adapt traffic allocation in real-time. Features progressive chart updates, live progress indicators, and visual "Live" badges on evolution charts for an immersive educational experience.
+  - **Live Streaming Mode** (October 2025 - Production Ready): Real-time simulation using Server-Sent Events (SSE) with native EventSource API that streams progress updates every 100 visitors, allowing merchants to watch the Bayesian engine adapt traffic allocation in real-time. Features:
+    - **EventSource Architecture**: GET endpoint `/api/simulate/batch-stream` with query parameters (testId, visitors, controlConversionRate, variantConversionRate)
+    - **Server Validation**: Validates numeric inputs (visitors > 0, conversion rates 0-1) before setting SSE headers to return proper 400 errors for invalid parameters
+    - **Client Management**: useRef stores EventSource instance with useEffect cleanup on component unmount, prevents multiple connections
+    - **Error Handling**: Distinguishes between reconnectable (CONNECTING) and terminal (CLOSED) EventSource states for proper error messaging
+    - **Progressive Updates**: Streams `start`, `progress` (every 100 impressions), and `complete` events with live chart updates
+    - **Visual Experience**: Live progress indicators, streaming evolution charts with "Live" badges for immersive educational experience
 - **Collection Page Variant Support**: Ensures consistent variant display on collection pages, homepages, and search results to prevent test contamination. Uses DOM manipulation and MutationObserver for dynamic content with intelligent infinite loop prevention (isProcessing guard + needsRecheck pattern) to avoid redundant processing while catching lazy-loaded cards.
 - **Auto-Configuration**: The SDK automatically detects the backend URL from `REPLIT_DOMAINS` for simplified one-line installation and deployment.
 - **CORS Configuration**: Public SDK endpoints are configured with CORS headers (`Access-Control-Allow-Origin: *`) to enable seamless cross-origin requests from Shopify stores.
