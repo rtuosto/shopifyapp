@@ -50,6 +50,7 @@ export interface BayesianState {
   variantStart?: number;
   lastAllocationUpdate?: string;
   promotionCheckCount?: number;
+  lastTotalImpressions?: number; // Track impressions from last update to calculate delta
 }
 
 export interface AllocationUpdateResult {
@@ -99,6 +100,7 @@ export function initializeBayesianState(params?: {
     variantStart: 0.05,
     lastAllocationUpdate: new Date().toISOString(),
     promotionCheckCount: 0,
+    lastTotalImpressions: 0,
   };
 }
 
@@ -257,9 +259,12 @@ export function computeAllocationUpdate(
     seed
   );
 
-  // Update safety budget
+  // Update safety budget - only subtract cost for NEW impressions since last update
+  const currentTotalImpressions = metrics.controlImpressions + metrics.variantImpressions;
+  const lastTotalImpressions = bayesianState.lastTotalImpressions || 0;
+  const newImpressions = Math.max(0, currentTotalImpressions - lastTotalImpressions);
   const safetyBudgetRemaining = (bayesianState.safetyBudgetRemaining || 50) - 
-    (costOfWaitingPerSession * (metrics.controlImpressions + metrics.variantImpressions));
+    (costOfWaitingPerSession * newImpressions);
 
   // Check promotion criteria
   const promotionCheck = checkPromotionCriteria(
@@ -293,6 +298,7 @@ export function computeAllocationUpdate(
       ...bayesianState,
       safetyBudgetRemaining,
       promotionCheckCount: (bayesianState.promotionCheckCount || 0) + 1,
+      lastTotalImpressions: currentTotalImpressions,
     },
     metrics: {
       probabilityVariantWins,
