@@ -187,3 +187,38 @@ export const insertSessionAssignmentSchema = createInsertSchema(sessionAssignmen
 
 export type InsertSessionAssignment = z.infer<typeof insertSessionAssignmentSchema>;
 export type SessionAssignment = typeof sessionAssignments.$inferSelect;
+
+// Test Impressions table - Tracks individual impression events (multi-tenant)
+export const testImpressions = pgTable("test_impressions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  testId: varchar("test_id").notNull().references(() => tests.id, { onDelete: "cascade" }),
+  sessionId: varchar("session_id").notNull(),
+  variant: text("variant").notNull(), // "control" | "variant"
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTestImpressionSchema = createInsertSchema(testImpressions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertTestImpression = z.infer<typeof insertTestImpressionSchema>;
+export type TestImpression = typeof testImpressions.$inferSelect;
+
+// Test Conversions table - Tracks individual conversion events (multi-tenant)
+export const testConversions = pgTable("test_conversions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  testId: varchar("test_id").notNull().references(() => tests.id, { onDelete: "cascade" }),
+  sessionId: varchar("session_id").notNull(),
+  variant: text("variant").notNull(), // "control" | "variant"
+  revenue: decimal("revenue", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTestConversionSchema = createInsertSchema(testConversions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertTestConversion = z.infer<typeof insertTestConversionSchema>;
+export type TestConversion = typeof testConversions.$inferSelect;

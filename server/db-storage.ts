@@ -6,6 +6,8 @@ import {
   tests, 
   metrics, 
   sessionAssignments,
+  testImpressions,
+  testConversions,
   type Product,
   type InsertProduct,
   type Recommendation,
@@ -16,6 +18,10 @@ import {
   type InsertMetric,
   type SessionAssignment,
   type InsertSessionAssignment,
+  type TestImpression,
+  type InsertTestImpression,
+  type TestConversion,
+  type InsertTestConversion,
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -192,6 +198,18 @@ export class DbStorage implements IStorage {
 
   async createSessionAssignment(shop: string, assignment: InsertSessionAssignment): Promise<SessionAssignment> {
     const [result] = await db.insert(sessionAssignments).values({ ...assignment, shop }).returning();
+    return result;
+  }
+
+  // Test Impressions (NOT shop-scoped - global tracking)
+  async createTestImpression(impression: InsertTestImpression): Promise<TestImpression> {
+    const [result] = await db.insert(testImpressions).values(impression).returning();
+    return result;
+  }
+
+  // Test Conversions (NOT shop-scoped - global tracking)
+  async createTestConversion(conversion: InsertTestConversion): Promise<TestConversion> {
+    const [result] = await db.insert(testConversions).values(conversion).returning();
     return result;
   }
 }

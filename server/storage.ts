@@ -9,6 +9,10 @@ import {
   type InsertMetric,
   type SessionAssignment,
   type InsertSessionAssignment,
+  type TestImpression,
+  type InsertTestImpression,
+  type TestConversion,
+  type InsertTestConversion,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -45,6 +49,12 @@ export interface IStorage {
   // Session Assignments (shop-scoped)
   getSessionAssignments(shop: string, sessionId: string): Promise<SessionAssignment[]>;
   createSessionAssignment(shop: string, assignment: InsertSessionAssignment): Promise<SessionAssignment>;
+  
+  // Test Impressions (tracking individual impression events)
+  createTestImpression(impression: InsertTestImpression): Promise<TestImpression>;
+  
+  // Test Conversions (tracking individual conversion events)
+  createTestConversion(conversion: InsertTestConversion): Promise<TestConversion>;
 }
 
 export class MemStorage implements IStorage {
@@ -449,6 +459,26 @@ export class MemStorage implements IStorage {
     };
     shopAssignments.set(id, assignment);
     return assignment;
+  }
+
+  // Test Impressions (not persisted in MemStorage - for dev only)
+  async createTestImpression(impression: InsertTestImpression): Promise<TestImpression> {
+    console.warn("[MemStorage] Test impressions not persisted in memory - upgrade to DbStorage");
+    return {
+      ...impression,
+      id: randomUUID(),
+      createdAt: new Date(),
+    };
+  }
+
+  // Test Conversions (not persisted in MemStorage - for dev only)
+  async createTestConversion(conversion: InsertTestConversion): Promise<TestConversion> {
+    console.warn("[MemStorage] Test conversions not persisted in memory - upgrade to DbStorage");
+    return {
+      ...conversion,
+      id: randomUUID(),
+      createdAt: new Date(),
+    };
   }
 }
 
