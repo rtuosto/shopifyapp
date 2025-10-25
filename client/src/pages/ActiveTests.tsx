@@ -66,7 +66,7 @@ export default function ActiveTests() {
     const revenue = t.revenue ? parseFloat(t.revenue) : 0;
     return sum + (isNaN(revenue) ? 0 : revenue);
   }, 0);
-  const averageArpu = totalConversions > 0 ? totalRevenue / totalConversions : 0;
+  const averageRpv = totalImpressions > 0 ? totalRevenue / totalImpressions : 0;
   const averageConversionRate = totalImpressions > 0 ? (totalConversions / totalImpressions) * 100 : 0;
 
   const formatPercentage = (value: number) => {
@@ -135,10 +135,10 @@ export default function ActiveTests() {
             </CardContent>
           </Card>
 
-          <Card data-testid="card-metric-arpu">
+          <Card data-testid="card-metric-rpv">
             <CardHeader className="pb-3">
-              <CardDescription>Average ARPU</CardDescription>
-              <CardTitle className="text-3xl">${averageArpu.toFixed(2)}</CardTitle>
+              <CardDescription>Average RPV</CardDescription>
+              <CardTitle className="text-3xl">${averageRpv.toFixed(2)}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-xs text-muted-foreground">Revenue per user</p>
@@ -267,13 +267,21 @@ export default function ActiveTests() {
                           </div>
                           
                           <div>
-                            <p className="text-xs text-muted-foreground">ARPU</p>
-                            <p className="text-xl font-bold" data-testid={`text-control-arpu-${index}`}>
+                            <p className="text-xs text-muted-foreground">RPV (Revenue Per Visitor)</p>
+                            <p className="text-xl font-bold" data-testid={`text-control-rpv-${index}`}>
                               ${(() => {
+                                const impressions = test.controlImpressions || 0;
+                                const revenue = test.controlRevenue ? parseFloat(test.controlRevenue) : 0;
+                                const rpv = impressions > 0 ? revenue / impressions : 0;
+                                return (isNaN(rpv) ? 0 : rpv).toFixed(2);
+                              })()}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              AOV: ${(() => {
                                 const conversions = test.controlConversions || 0;
                                 const revenue = test.controlRevenue ? parseFloat(test.controlRevenue) : 0;
-                                const arpu = conversions > 0 ? revenue / conversions : 0;
-                                return (isNaN(arpu) ? 0 : arpu).toFixed(2);
+                                const aov = conversions > 0 ? revenue / conversions : 0;
+                                return (isNaN(aov) ? 0 : aov).toFixed(2);
                               })()}
                             </p>
                           </div>
@@ -318,26 +326,27 @@ export default function ActiveTests() {
                           </div>
                           
                           <div>
-                            <p className="text-xs text-muted-foreground">ARPU</p>
-                            <p className="text-xl font-bold text-green-600" data-testid={`text-variant-arpu-${index}`}>
+                            <p className="text-xs text-muted-foreground">RPV (Revenue Per Visitor)</p>
+                            <p className="text-xl font-bold text-green-600" data-testid={`text-variant-rpv-${index}`}>
                               ${(() => {
-                                const conversions = test.variantConversions || 0;
+                                const impressions = test.variantImpressions || 0;
                                 const revenue = test.variantRevenue ? parseFloat(test.variantRevenue) : 0;
-                                const arpu = conversions > 0 ? revenue / conversions : 0;
-                                return (isNaN(arpu) ? 0 : arpu).toFixed(2);
+                                const rpv = impressions > 0 ? revenue / impressions : 0;
+                                return (isNaN(rpv) ? 0 : rpv).toFixed(2);
                               })()}
                             </p>
                             {(() => {
-                              const controlConversions = test.controlConversions || 0;
+                              // Calculate RPV lift (what Bayesian optimizes)
+                              const controlImpressions = test.controlImpressions || 0;
                               const controlRevenue = test.controlRevenue ? parseFloat(test.controlRevenue) : 0;
-                              const controlArpu = controlConversions > 0 ? controlRevenue / controlConversions : 0;
+                              const controlRpv = controlImpressions > 0 ? controlRevenue / controlImpressions : 0;
                               
-                              const variantConversions = test.variantConversions || 0;
+                              const variantImpressions = test.variantImpressions || 0;
                               const variantRevenue = test.variantRevenue ? parseFloat(test.variantRevenue) : 0;
-                              const variantArpu = variantConversions > 0 ? variantRevenue / variantConversions : 0;
+                              const variantRpv = variantImpressions > 0 ? variantRevenue / variantImpressions : 0;
                               
-                              const lift = controlArpu > 0 ? ((variantArpu - controlArpu) / controlArpu) * 100 : 0;
-                              const hasData = controlConversions >= 3 && variantConversions >= 3;
+                              const lift = controlRpv > 0 ? ((variantRpv - controlRpv) / controlRpv) * 100 : 0;
+                              const hasData = (test.controlConversions || 0) >= 3 && (test.variantConversions || 0) >= 3;
                               
                               return hasData && (
                                 <div className="flex items-center gap-1 mt-1">
@@ -349,6 +358,14 @@ export default function ActiveTests() {
                                 </div>
                               );
                             })()}
+                            <p className="text-xs text-muted-foreground">
+                              AOV: ${(() => {
+                                const conversions = test.variantConversions || 0;
+                                const revenue = test.variantRevenue ? parseFloat(test.variantRevenue) : 0;
+                                const aov = conversions > 0 ? revenue / conversions : 0;
+                                return (isNaN(aov) ? 0 : aov).toFixed(2);
+                              })()}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -491,8 +508,9 @@ export default function ActiveTests() {
             The Control represents your original product, while the Variant shows the proposed changes.
           </p>
           <p>
-            <strong>ARPU Lift:</strong> Measures the percentage increase in Average Revenue Per User for the variant compared to the control. 
-            Positive values indicate the variant is performing better.
+            <strong>RPV (Revenue Per Visitor):</strong> The primary metric optimized by our Bayesian engine. 
+            RPV = Total Revenue ÷ Total Impressions. A variant can win with higher RPV even if it has lower AOV, 
+            by converting visitors at a higher rate. AOV (Average Order Value) is shown as a secondary metric.
           </p>
           <p>
             <strong>Stopping a test:</strong> Deactivates the test and stops showing variants to customers.
