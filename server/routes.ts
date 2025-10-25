@@ -992,14 +992,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Test must be active to simulate batch" });
       }
 
-      // Simulate traffic (impressions)
-      const controlImpressions = Math.floor(visitors / 2);
+      // Simulate traffic (impressions) using current allocation percentages
+      const controlAllocation = parseFloat(test.controlAllocation || "50") / 100;
+      const variantAllocation = parseFloat(test.variantAllocation || "50") / 100;
+      const totalAllocation = controlAllocation + variantAllocation;
+      
+      const controlImpressions = Math.floor(visitors * (controlAllocation / totalAllocation));
       const variantImpressions = visitors - controlImpressions;
       const newImpressions = (test.impressions || 0) + visitors;
 
-      // Simulate conversions based on conversion rate
+      // Simulate conversions based on conversion rate and allocation
       const expectedOrders = Math.floor(visitors * conversionRate);
-      const controlOrders = Math.floor(expectedOrders / 2);
+      const controlOrders = Math.floor(expectedOrders * (controlAllocation / totalAllocation));
       const variantOrders = expectedOrders - controlOrders;
 
       // Get the product to use realistic pricing
@@ -1038,7 +1042,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newRevenue = parseFloat(test.revenue || "0") + totalRevenue;
       const arpu = newConversions > 0 ? newRevenue / newConversions : 0;
 
-      await storage.updateTest(shop, testId, {
+      const updatedTest = await storage.updateTest(shop, testId, {
         // Aggregate metrics
         impressions: newImpressions,
         conversions: newConversions,
@@ -1056,6 +1060,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[Simulation Batch] Test ${testId}: ${visitors} visitors, ${expectedOrders} orders (${conversionRate * 100}% CR)`);
       console.log(`[Simulation Batch] Allocation - Control: ${controlImpressions}/${controlOrders}, Variant: ${variantImpressions}/${variantOrders}`);
       console.log(`[Simulation Batch] Revenue: $${totalRevenue.toFixed(2)}, ARPU: $${arpu.toFixed(2)}`);
+
+      // Update Bayesian allocation if using Bayesian strategy
+      let bayesianUpdate = null;
+      if (updatedTest && updatedTest.allocationStrategy === "bayesian") {
+        try {
+          const { computeAllocationUpdate, updateBayesianState, BayesianState } = await import('./statistics/allocation-service');
+          
+          const bayesianConfig = updatedTest.bayesianConfig as BayesianState || {};
+          const metrics = {
+            controlImpressions: newControlImpressions,
+            variantImpressions: newVariantImpressions,
+            controlConversions: newControlConversions,
+            variantConversions: newVariantConversions,
+            controlRevenue: newControlRevenue,
+            variantRevenue: newVariantRevenue,
+          };
+          
+          const updatedState = updateBayesianState(bayesianConfig, metrics);
+          const result = computeAllocationUpdate(updatedState, metrics);
+          
+          // Update allocation in database
+          await storage.updateTest(shop, testId, {
+            controlAllocation: (result.allocation.control * 100).toFixed(2),
+            variantAllocation: (result.allocation.variant * 100).toFixed(2),
+            bayesianConfig: result.bayesianState,
+          });
+          
+          bayesianUpdate = {
+            newAllocation: {
+              control: (result.allocation.control * 100).toFixed(1),
+              variant: (result.allocation.variant * 100).toFixed(1),
+            },
+            metrics: result.metrics,
+            reasoning: result.reasoning,
+          };
+          
+          console.log(`[Bayesian Update] New allocation: Control ${bayesianUpdate.newAllocation.control}% / Variant ${bayesianUpdate.newAllocation.variant}%`);
+          console.log(`[Bayesian Update] ${result.reasoning}`);
+        } catch (error) {
+          console.error("[Bayesian Update] Failed to update allocation:", error);
+        }
+      }
 
       res.json({
         success: true,
@@ -1081,6 +1127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalRevenue: newRevenue.toFixed(2),
           arpu: arpu.toFixed(2),
         },
+        bayesianUpdate,
       });
     } catch (error) {
       console.error("Error simulating batch:", error);
