@@ -179,32 +179,18 @@ export default function ActiveTests() {
               const arpuLift = parseFloat(test.arpuLift || "0");
               
               // 2-State Badge System: "Still Learning" vs "Ready to Decide"
-              // Check if we have sufficient data per variant
-              const hasSufficientData = test.allocationStrategy === "bayesian"
-                ? impressions >= 2000 && // Matches Bayesian promotion criteria
-                  (test.controlConversions || 0) >= 30 && // Control has meaningful data
-                  (test.variantConversions || 0) >= 30    // Variant has meaningful data
-                : (test.controlConversions || 0) >= 3 &&  // Fixed: Both variants need minimum data
-                  (test.variantConversions || 0) >= 3;    // Lower threshold since traffic is balanced
+              // All tests now use Bayesian allocation - check if we have sufficient data per variant
+              const hasSufficientData = impressions >= 2000 && // Matches Bayesian promotion criteria
+                (test.controlConversions || 0) >= 30 && // Control has meaningful data
+                (test.variantConversions || 0) >= 30;   // Variant has meaningful data
               
               // Check if we have a clear winner (probability >80% or <20%)
               const CONFIDENCE_THRESHOLD = 0.80;
               let hasClearWinner = false;
-              if (test.allocationStrategy === "bayesian" && test.bayesianConfig && typeof test.bayesianConfig === 'object') {
+              if (test.bayesianConfig && typeof test.bayesianConfig === 'object') {
                 const config = test.bayesianConfig as any;
                 const prob = config.probVariantBetter || 0.5;
                 hasClearWinner = prob > CONFIDENCE_THRESHOLD || prob < (1 - CONFIDENCE_THRESHOLD);
-              } else if (test.allocationStrategy === "fixed") {
-                // For fixed tests, use simple statistical significance based on conversion rate difference
-                const controlRate = (test.controlImpressions || 0) > 0 
-                  ? (test.controlConversions || 0) / (test.controlImpressions || 1) 
-                  : 0;
-                const variantRate = (test.variantImpressions || 0) > 0 
-                  ? (test.variantConversions || 0) / (test.variantImpressions || 1) 
-                  : 0;
-                const rateDiff = Math.abs(variantRate - controlRate);
-                // Clear winner if conversion rate difference is >20% (e.g., 3% vs 3.6% = 20% lift)
-                hasClearWinner = controlRate > 0 && (rateDiff / controlRate) > 0.20;
               }
               
               // Badge: "Ready to Decide" only if BOTH sufficient data AND clear winner
@@ -368,14 +354,13 @@ export default function ActiveTests() {
                       </div>
                     </div>
 
-                    {/* Bayesian Metrics (for Bayesian tests only) */}
-                    {test.allocationStrategy === "bayesian" && (
-                      <div className="mt-6 pt-6 border-t space-y-4">
-                        <div className="flex items-center gap-2">
-                          <TrendingUp className="w-5 h-5 text-primary" />
-                          <h3 className="font-semibold">Dynamic Traffic Allocation</h3>
-                          <Badge variant="secondary" className="text-xs">Bayesian</Badge>
-                        </div>
+                    {/* Bayesian Metrics (all tests use Bayesian allocation) */}
+                    <div className="mt-6 pt-6 border-t space-y-4">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-primary" />
+                        <h3 className="font-semibold">Dynamic Traffic Allocation</h3>
+                        <Badge variant="secondary" className="text-xs">Bayesian</Badge>
+                      </div>
                         
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           {/* Current Traffic Split */}
@@ -453,7 +438,6 @@ export default function ActiveTests() {
                           );
                         })()}
                       </div>
-                    )}
 
                     {/* Start Date and Status Badge */}
                     <div className="mt-6 pt-4 border-t flex items-center justify-between">
