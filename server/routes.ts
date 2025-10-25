@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import cors from "cors";
 import { storage } from "./storage";
 import { shopify, fetchProducts, updateProduct, getProductVariants, sessionStorage } from "./shopify";
 import { generateOptimizationRecommendations } from "./ai-service";
@@ -11,6 +12,18 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // CORS configuration for public storefront API endpoints
+  // These endpoints are called by the SDK from customer Shopify stores
+  const storefrontCors = cors({
+    origin: '*', // Allow all origins for public SDK
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type'],
+    credentials: false
+  });
+
+  // Apply CORS to all storefront endpoints
+  app.use('/api/storefront', storefrontCors);
+  app.options('/api/storefront/*', storefrontCors); // Handle preflight requests
   // Health check
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
