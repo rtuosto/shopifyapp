@@ -1085,8 +1085,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let variantRevenue = 0;
 
       for (let i = 0; i < controlOrders; i++) {
-        const variance = 0.8 + Math.random() * 0.4; // 0.8 to 1.2x
-        const orderValue = basePrice * variance;
+        const orderValue = basePrice;
         totalRevenue += orderValue;
         controlRevenue += orderValue;
         
@@ -1099,8 +1098,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       for (let i = 0; i < variantOrders; i++) {
-        const variance = 0.8 + Math.random() * 0.4; // 0.8 to 1.2x
-        const orderValue = basePrice * variance;
+        const orderValue = basePrice;
         totalRevenue += orderValue;
         variantRevenue += orderValue;
         

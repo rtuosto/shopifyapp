@@ -889,8 +889,8 @@ export default function Simulator() {
             Uses the test's dynamic allocation percentages determined by the Bayesian engine.
           </p>
           <p>
-            <strong>Order Simulation:</strong> Creates purchase conversions with realistic revenue variance (±20%). 
-            Updates test metrics including conversions, revenue, and ARPU.
+            <strong>Order Simulation:</strong> Creates purchase conversions with exact product pricing. 
+            Updates test metrics including conversions, revenue, and RPV.
           </p>
           <p>
             <strong>Allocation Verification:</strong> All simulations use the test's current allocation percentages. 
