@@ -1,140 +1,7 @@
 # Shoptimizer - AI-Powered Shopify Conversion Optimization
 
 ## Overview
-Shoptimizer is an embedded Shopify app designed to enhance sales for store owners by leveraging AI for conversion rate optimization. It automatically analyzes products, recommends optimization tests, and facilitates A/B testing for key product elements like titles, descriptions, and prices. The core objective is to improve Average Revenue Per User (ARPU) through intelligent automation and real-time conversion tracking.
-
-## Recent Changes (October 25, 2025)
-
-**Collection Page Variant Support - PRODUCTION READY ✅**
-- ✅ **Critical UX enhancement:** Variants now display consistently on collection pages AND product detail pages
-- ✅ **Test validity:** Prevents contamination where users see $10.00 on collection page but $9.99 on PDP
-- ✅ Product card detection: Uses data attributes ([data-product-id], data-product-handle, href patterns)
-- ✅ Scoped DOM updates: Modifies price/title within each card element to avoid PDP conflicts
-- ✅ MutationObserver: Handles lazy-loaded products with 300ms debounce for infinite scroll themes
-- ✅ Performance optimized:
-  - Fetch tests once per page load, cache in memory
-  - Skip already-processed cards (dataset.shoptimizerProcessed flag)
-  - Debounced observer callbacks prevent excessive processing
-- ✅ Collection impressions: Track with context: 'collection' to distinguish from 'product' impressions
-- ✅ Session consistency: Same user sees same variant across homepage, collections, search, and PDPs
-- ✅ Theme compatibility: Multiple selector fallbacks cover most Shopify themes
-- ✅ Reuses existing architecture: No schema changes, extends scope="product" tests to multi-page display
-- ✅ Architect approved: No security issues, performance concerns addressed
-
-**Implementation Details:**
-- Initialization flow: Runs both PDP logic AND collection page processing on all pages
-- Card selectors: .product-card, .product-item, .grid-product, [data-product-id], li.grid__item
-- Processed cards tracked in Set to prevent duplicate impressions on observer re-fires
-- Works on: Collection pages, homepage featured products, search results, any page with product grids
-
-**Previous Changes (October 24, 2025)**
-
-**Auto-Configuration Feature - NEW ✨**
-- ✅ SDK now automatically detects Replit backend URL from `REPLIT_DOMAINS` environment variable
-- ✅ One-line installation: Just add `<script src="https://YOUR-URL/shoptimizer.js">` to theme
-- ✅ No manual configuration needed - apiUrl and shop domain auto-detected
-- ✅ Dynamic SDK serving: GET /shoptimizer.js endpoint injects correct backend URL at runtime
-- ✅ Simplified deployment guides with corrected domain formats (.replit.app for published, REPLIT_DOMAINS for dev)
-- ✅ Backward compatible: Manual configuration override still available via `window.ShoptimizerConfig`
-
-**UUID Session-Based Attribution System - PRODUCTION READY ✅**
-- ✅ Complete rewrite of attribution pipeline for accurate, persistent A/B test tracking
-- ✅ Session tracking: UUID-based session IDs stored in localStorage with 90-day expiry
-- ✅ Persistent assignments: Users always see same variant across visits (control OR variant, never both)
-- ✅ Database schema: Added `session_assignments` table tracking sessionId → testId → variant mappings
-- ✅ Storefront SDK (public/shoptimizer.js):
-  - Generates/retrieves UUID from localStorage on first visit
-  - Fetches active tests via GET /api/storefront/tests
-  - Assigns variant once per session, syncs to backend
-  - Modifies product page DOM (title, price, description) based on assignment
-  - Injects session ID into cart attributes (`_shoptimizer_session`) for conversion tracking
-  - Tracks impressions with session ID via POST /api/storefront/impression
-- ✅ Backend API endpoints:
-  - GET /api/storefront/tests - Returns all active tests for storefront
-  - POST /api/storefront/assign - Records session variant assignment
-  - GET /api/storefront/assignments/:sessionId - Retrieves session assignments
-  - POST /api/storefront/impression - Tracks impressions with session ID
-- ✅ Webhook attribution: Updated handler to extract session ID from `note_attributes`, lookup assignments, attribute conversions to correct variant
-- ✅ Automated test suite: 12/12 tests passing (8 storefront API + 4 webhook simulation)
-  - tests/test-storefront-api.ts: Validates all storefront endpoints and webhook attribution
-  - tests/test-webhook-simulator.ts: Simulates Shopify orders with session IDs for conversion tracking
-  - Run with: `npx tsx tests/run-tests.ts`
-- ✅ Documentation:
-  - docs/DEPLOYMENT_GUIDE.md - Complete setup instructions and webhook registration
-  - docs/SHOPIFY_DEV_STORE_TESTING.md - 8-phase manual testing guide for dev store validation
-  - docs/TEST_RESULTS.md - Automated test results and production readiness checklist
-- ✅ Architecture: Supports future template-level tests (page layouts, navigation) via extensible design
-- ✅ Architect review: Approved for production deployment - no security issues, all edge cases handled
-
-**Implementation Details:**
-- Session flow: UUID generation → variant assignment → localStorage storage → backend sync → DOM modification → cart injection → webhook attribution
-- Attribution accuracy: Session ID flows from storefront → cart → order → webhook, ensuring 100% attribution to correct variant
-- Persistence: localStorage with 90-day expiry matches typical customer behavior cycles
-- Fallback handling: Missing session IDs gracefully handled (orders without SDK tracking skip attribution)
-- Theme compatibility: Multiple CSS selector fallbacks for title/price/description elements
-
-**Schema Evolution: Extensible Testing Architecture**
-- ✅ Extended database schema to support template-level experiments beyond product-level tests
-- ✅ Added optimization strategy fields for future Bayesian and multi-armed bandit algorithms
-- ✅ New fields in tests table:
-  - `scope`: "product" | "template" | "page" | "global" - defines test scope
-  - `productId`: Now nullable to support template tests (e.g., product page layout changes)
-  - `targetSelector`: CSS selector for template tests (e.g., ".product-grid")
-  - `allocationStrategy`: "fixed" | "bayesian" | "bandit" - enables dynamic traffic allocation
-  - `controlAllocation` / `variantAllocation`: Dynamic percentages for advanced optimization
-  - `confidenceThreshold`: Statistical significance threshold (default 95%)
-  - `minSampleSize`: Minimum samples before optimization kicks in (default 100)
-  - `bayesianConfig`: JSONB storing prior distributions for Bayesian optimization
-- ✅ Spillover effects acknowledged: Template changes affect multiple products (industry-standard limitation)
-- ✅ Architecture supports future features: Product page redesigns, listing page tests, navigation changes
-
-**Previous Changes (October 23, 2025)**
-
-**Active Tests Page & Streamlined Test Deployment - NEW**
-- ✅ Simplified test activation flow: "Accept & Launch Test" immediately creates and activates tests
-- ✅ Eliminated confusing draft state: Tests go live immediately upon acceptance
-- ✅ Dedicated Active Tests page (/active-tests): Real-time monitoring with 2-second auto-refresh
-- ✅ Summary metrics on Active Tests page: Total impressions, conversions, ARPU across all running tests
-- ✅ Individual test cards: Show control vs variant performance with ARPU lift tracking
-- ✅ Dashboard reorganization: "Active Tests" notification card with link, "Completed Tests" table for historical data
-- ✅ Fixed Simulator bug: Corrected query key from `["/api/tests", "active"]` to `["/api/tests"]` for proper test fetching
-
-**Traffic & Conversion Simulator - Production Ready**
-- ✅ Built comprehensive simulation system for validating A/B test tracking before real traffic
-- ✅ Backend endpoints: `/api/simulate/traffic`, `/api/simulate/orders`, `/api/simulate/batch`
-- ✅ Batch simulator: Realistic traffic + conversions with configurable conversion rate
-- ✅ Advanced controls: Separate traffic and order simulation for granular testing
-- ✅ Allocation verification: All simulations use 50/50 control/variant split
-- ✅ Revenue variance: Orders simulated with ±20% price variation for realism
-- ✅ Accessible via Simulator page in navigation sidebar
-
-**Smart Automation System - Production Ready**
-- ✅ Auto-sync on dashboard load: Automatically syncs products when none exist (one-time per session)
-- ✅ Auto-generate on load: Automatically generates 4 AI recommendations when products exist but none pending
-- ✅ Dismiss with replacement: Dismissing a recommendation triggers generation of new one for same product
-- ✅ Fixed infinite retry loops: Added `attemptedRef` flags to prevent continuous mutation calls on failure
-- ✅ Fixed AIRecommendationCard state desync: Removed optimistic local state, relies on server state only
-- ✅ Fixed async handling: Use mutateAsync and proper finally blocks to prevent double-clicks
-- ✅ All automation features reviewed and approved by architect for production use
-
-**Settings Page & First-Time Setup - NEW**
-- ✅ Dedicated Settings page (/settings) displays installation script with auto-populated Replit URL
-- ✅ Shows webhook configuration and API URL for verification
-- ✅ One-click copy functionality for script tag and webhook URL
-- ✅ SetupGuide component shows on Dashboard when no tests exist (first-time onboarding)
-- ✅ Step-by-step installation instructions with visual checkmarks
-- ✅ Backend endpoint GET /api/installation-script provides all configuration data
-- ✅ Development mode indicator alerts users that URLs will change when published
-
-**Implementation Details:**
-- Test activation: Dashboard "Accept" button now creates test + activates in one flow (no draft state)
-- Active Tests UI: 2-second polling for live updates, pause/resume control, test stop functionality
-- Simulation: Each endpoint validates test is active, simulates 50/50 allocation, updates metrics
-- Ref management: `attemptedRef` prevents retry loops, `hasAutoRef` marks successful completion
-- Error recovery: Failed operations require manual retry via UI buttons
-- Async safety: All handlers use try/finally blocks to guarantee cleanup
-- No state desync: Cards disable buttons during processing, rely on query invalidation for updates
-- Installation flow: GET /api/installation-script auto-detects REPLIT_DOMAINS, Settings page displays with copy buttons, SetupGuide shows on Dashboard when activeTestsCount === 0
+Shoptimizer is an embedded Shopify app designed to enhance sales for store owners by leveraging AI for conversion rate optimization. It automatically analyzes products, recommends optimization tests, and facilitates A/B testing for key product elements like titles, descriptions, and prices. The core objective is to improve Average Revenue Per User (ARPU) through intelligent automation and real-time conversion tracking. Shoptimizer aims to provide a seamless and powerful tool for Shopify merchants to boost their sales and improve their store's performance.
 
 ## User Preferences
 - I prefer clear, concise explanations for any proposed changes or architectural decisions.
@@ -145,25 +12,30 @@ Shoptimizer is an embedded Shopify app designed to enhance sales for store owner
 - Focus on delivering functional, well-tested features that directly impact conversion optimization.
 
 ## System Architecture
-Shoptimizer utilizes a full-stack architecture. The frontend is built with React, Shadcn UI (Tailwind CSS), Wouter for routing, and TanStack Query for data fetching, integrated within the Shopify admin via App Bridge. Recharts is used for data visualization. The backend runs on Express.js with PostgreSQL for session and OAuth token storage, and an in-memory store for application data. It integrates with the Shopify Admin GraphQL API v12 for product management and webhooks for conversion tracking. OpenAI's GPT-4 powers AI-driven recommendations.
+Shoptimizer utilizes a full-stack architecture with a React, Shadcn UI, Wouter, and TanStack Query frontend, integrated via Shopify App Bridge. The backend runs on Express.js with PostgreSQL for persistent storage and an in-memory store for application data. It integrates with the Shopify Admin GraphQL API v12 for product management and uses webhooks for conversion tracking. OpenAI's GPT-4 powers AI-driven recommendations.
 
-Key features include:
-- **AI Recommendations**: GPT-4 analyzes product data to provide actionable optimization suggestions, including psychological insights and SEO explanations.
-- **Test Preview System**: Offers a side-by-side comparison of control vs. variant, with multi-device views and visual diff highlighting.
-- **Dashboard**: Displays real-time metrics (ARPU, total revenue, conversions, active tests), performance charts, and AI recommendation cards.
-- **Product Sync System**: Automated and manual product synchronization from Shopify, with real-time status tracking and error notifications.
-- **Smart Automation System**: Includes auto-sync on dashboard load, auto-generation of recommendations, and dismissal with replacement for recommendations.
-- **Test Deployment & Conversion Tracking**: Activates A/B tests by deploying variants to Shopify, captures control states for safe rollback, registers Shopify `ORDERS_CREATE` webhooks for automatic conversion attribution, and calculates ARPU.
-- **Safe Rollback**: Deactivates tests and restores original product values even if products were edited post-test creation.
-- **Traffic & Conversion Simulator**: Dedicated simulator page with batch and advanced controls for generating simulated traffic and orders, verifying 50/50 A/B test allocation, and validating performance tracking before deploying to real customers.
-- **UI/UX**: Focuses on intuitive design using Shadcn UI components, providing a seamless embedded Shopify app experience.
+**Key Architectural Decisions & Features:**
+- **AI Recommendations**: GPT-4 analyzes product data to provide actionable optimization suggestions with psychological insights and SEO explanations.
+- **UUID Session-Based Attribution**: A robust system using UUIDs stored in localStorage ensures persistent variant assignments across user sessions, accurately attributing conversions for A/B tests. This includes backend API endpoints for managing assignments and impressions, and webhook integration for conversion tracking.
+- **Extensible Testing Architecture**: The database schema supports diverse test scopes (product, template, page, global) and advanced allocation strategies (fixed, Bayesian, bandit) for future optimization features.
+- **Test Preview System**: Offers side-by-side control vs. variant comparison with multi-device views and visual diff highlighting.
+- **Dashboard & Active Tests Page**: Provides real-time metrics, performance charts, AI recommendation cards, and a dedicated page for monitoring live tests with ARPU lift tracking.
+- **Product Sync System**: Automated and manual synchronization of Shopify products with real-time status and error notifications.
+- **Smart Automation System**: Includes auto-sync, auto-generation of AI recommendations, and dismissal with replacement for recommendations.
+- **Test Deployment & Conversion Tracking**: Activates A/B tests by deploying variants, captures control states for safe rollback, and registers `ORDERS_CREATE` webhooks for automatic conversion attribution and ARPU calculation.
+- **Safe Rollback**: Deactivates tests and restores original product values.
+- **Traffic & Conversion Simulator**: A comprehensive system for validating A/B test tracking and performance before live deployment, including batch and advanced controls for traffic and order simulation.
+- **Collection Page Variant Support**: Ensures consistent variant display on collection pages, homepages, and search results to prevent test contamination. Uses DOM manipulation and MutationObserver for dynamic content.
+- **Auto-Configuration**: The SDK automatically detects the backend URL from `REPLIT_DOMAINS` for simplified one-line installation and deployment.
+- **CORS Configuration**: Public SDK endpoints are configured with CORS headers (`Access-Control-Allow-Origin: *`) to enable seamless cross-origin requests from Shopify stores.
+- **UI/UX**: Leverages Shadcn UI components and Tailwind CSS for an intuitive and embedded Shopify app experience.
 
 ## External Dependencies
-- **Shopify Admin GraphQL API v12**: For interacting with Shopify store data (products, orders).
+- **Shopify Admin GraphQL API v12**: For store data interaction (products, orders).
 - **OpenAI GPT-4**: Powers the AI recommendation engine.
-- **PostgreSQL**: Used for persistent session storage and OAuth tokens.
-- **Shopify App Bridge**: Enables the embedded app experience within the Shopify admin.
+- **PostgreSQL**: Used for persistent session and OAuth token storage.
+- **Shopify App Bridge**: Enables the embedded app experience.
 - **Wouter**: Client-side routing.
-- **Shadcn UI & Tailwind CSS**: UI component library and styling framework.
+- **Shadcn UI & Tailwind CSS**: UI component library and styling.
 - **TanStack Query**: Data fetching and caching.
 - **Recharts**: Data visualization.
