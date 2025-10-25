@@ -232,10 +232,224 @@
   }
 
   // ============================================
+  // Collection/Listing Page Support
+  // ============================================
+
+  // Track which product cards we've already processed to avoid duplicates
+  const processedProductCards = new Set();
+
+  /**
+   * Apply variant to a product card on collection/listing pages
+   * Scoped to the card element to avoid affecting PDP elements
+   */
+  function applyVariantToCard(cardElement, test, variant) {
+    const data = variant === 'control' ? test.controlData : test.variantData;
+    const productId = getProductIdFromCard(cardElement);
+
+    console.log(`[Shoptimizer] Applying ${variant} to product card:`, productId);
+
+    // Apply title change (scoped to card)
+    if (data.title) {
+      const titleSelectors = [
+        '.card__heading',
+        '.card-title',
+        '.product-card__title',
+        '.product-item__title',
+        '[data-product-title]',
+        'a.product-title',
+        'h3',
+        'h2'
+      ];
+      
+      for (const selector of titleSelectors) {
+        const titleElement = cardElement.querySelector(selector);
+        if (titleElement) {
+          // Store original for potential rollback
+          if (!titleElement.dataset.originalTitle) {
+            titleElement.dataset.originalTitle = titleElement.textContent;
+          }
+          titleElement.textContent = data.title;
+          console.log(`[Shoptimizer] Updated card title via ${selector}`);
+          break;
+        }
+      }
+    }
+
+    // Apply price change (scoped to card)
+    if (data.price) {
+      const priceSelectors = [
+        '.price__regular .price-item--regular',
+        '.price-item--regular',
+        '.product-card__price',
+        '.product-item__price',
+        '[data-product-price]',
+        '.price',
+        '.money'
+      ];
+      
+      const priceElements = cardElement.querySelectorAll(priceSelectors.join(', '));
+      const formattedPrice = formatPrice(data.price);
+      
+      priceElements.forEach(el => {
+        // Store original for potential rollback
+        if (!el.dataset.originalPrice) {
+          el.dataset.originalPrice = el.textContent;
+        }
+        el.textContent = formattedPrice;
+        console.log(`[Shoptimizer] Updated card price to ${formattedPrice}`);
+      });
+    }
+
+    // Mark card as processed
+    cardElement.dataset.shoptimizerProcessed = 'true';
+    cardElement.dataset.shoptimizerVariant = variant;
+  }
+
+  /**
+   * Extract product ID from a product card element
+   */
+  function getProductIdFromCard(cardElement) {
+    // Method 1: data-product-id attribute
+    if (cardElement.dataset.productId) {
+      const id = cardElement.dataset.productId;
+      return id.includes('gid://') ? id : `gid://shopify/Product/${id}`;
+    }
+
+    // Method 2: data-product-handle (need to match with test data)
+    if (cardElement.dataset.productHandle) {
+      return cardElement.dataset.productHandle;
+    }
+
+    // Method 3: Extract from product URL in card
+    const productLink = cardElement.querySelector('a[href*="/products/"]');
+    if (productLink) {
+      const match = productLink.href.match(/\/products\/([^?/#]+)/);
+      if (match) {
+        return match[1]; // Return handle, will match against test data
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Find product test by ID or handle
+   */
+  function findTestForProduct(tests, productIdentifier) {
+    if (!productIdentifier) return null;
+
+    return tests.find(test => {
+      // Direct GID match
+      if (test.shopifyProductId === productIdentifier) {
+        return true;
+      }
+
+      // Handle match (extract from GID)
+      if (test.shopifyProductId && test.shopifyProductId.includes('Product/')) {
+        const testId = test.shopifyProductId.split('Product/')[1];
+        if (testId === productIdentifier || testId === productIdentifier.replace('gid://shopify/Product/', '')) {
+          return true;
+        }
+      }
+
+      // Handle-based match (if test stores handle)
+      if (test.productHandle === productIdentifier) {
+        return true;
+      }
+
+      return false;
+    });
+  }
+
+  /**
+   * Process all product cards on collection/listing pages
+   */
+  async function processCollectionPageProducts(sessionId, tests) {
+    if (!tests || tests.length === 0) return;
+
+    // Common product card selectors across Shopify themes
+    const cardSelectors = [
+      '.product-card',
+      '.product-item',
+      '.grid-product',
+      '.card-wrapper',
+      '[data-product-id]',
+      '.product-grid-item',
+      'li.grid__item'
+    ];
+
+    const productCards = document.querySelectorAll(cardSelectors.join(', '));
+    
+    if (productCards.length === 0) {
+      console.log('[Shoptimizer] No product cards found on this page');
+      return;
+    }
+
+    console.log(`[Shoptimizer] Found ${productCards.length} product card(s) on collection page`);
+
+    for (const card of productCards) {
+      // Skip if already processed
+      if (card.dataset.shoptimizerProcessed === 'true') {
+        continue;
+      }
+
+      const productId = getProductIdFromCard(card);
+      if (!productId) {
+        console.log('[Shoptimizer] Could not extract product ID from card, skipping');
+        continue;
+      }
+
+      // Find active test for this product
+      const productTest = findTestForProduct(tests, productId);
+      if (!productTest) {
+        continue; // No test for this product, skip
+      }
+
+      console.log(`[Shoptimizer] Found active test for product ${productId}:`, productTest.id);
+
+      // Assign variant (reuse existing logic)
+      const variant = await assignUserToVariant(sessionId, productTest.id);
+      
+      // Apply variant to this card
+      applyVariantToCard(card, productTest, variant);
+
+      // Track collection page impression (once per card)
+      const cardKey = `${productTest.id}-${productId}`;
+      if (!processedProductCards.has(cardKey)) {
+        trackImpression(sessionId, productTest.id, variant, 'collection');
+        processedProductCards.add(cardKey);
+      }
+    }
+  }
+
+  /**
+   * Watch for lazy-loaded product cards (infinite scroll, AJAX)
+   */
+  function watchForLazyLoadedProducts(sessionId, tests) {
+    if (!tests || tests.length === 0) return;
+
+    let debounceTimer;
+    const observer = new MutationObserver((mutations) => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        console.log('[Shoptimizer] DOM changed, checking for new product cards...');
+        processCollectionPageProducts(sessionId, tests);
+      }, 300); // Debounce 300ms to avoid excessive processing
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    console.log('[Shoptimizer] MutationObserver active for lazy-loaded products');
+  }
+
+  // ============================================
   // Impression Tracking
   // ============================================
 
-  function trackImpression(sessionId, testId, variant) {
+  function trackImpression(sessionId, testId, variant, context = 'product') {
     fetch(`${SHOPTIMIZER_CONFIG.apiUrl}/api/storefront/impression`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -244,6 +458,7 @@
         variant,
         sessionId,
         shop: SHOPTIMIZER_CONFIG.shop,
+        context, // 'product' for PDP, 'collection' for listing pages
       }),
     }).catch(err => {
       console.error('[Shoptimizer] Failed to track impression:', err);
@@ -314,16 +529,6 @@
       
       // Inject session ID into cart for conversion attribution
       injectSessionIntoCart(sessionId);
-      
-      // Get Shopify product ID from the page
-      const shopifyProductId = getShopifyProductId();
-      if (!shopifyProductId) {
-        console.log('[Shoptimizer] Not a product page - session tracking active, A/B testing skipped');
-        console.log('[Shoptimizer] Initialized successfully (session tracking only)');
-        return;
-      }
-
-      console.log('[Shoptimizer] Product page detected:', shopifyProductId);
 
       // Validate configuration
       if (!SHOPTIMIZER_CONFIG.apiUrl || SHOPTIMIZER_CONFIG.apiUrl.includes('your-app.replit.app')) {
@@ -331,7 +536,7 @@
         return;
       }
 
-      // Fetch all active tests from backend
+      // Fetch all active tests from backend (once for all page types)
       const testUrl = `${SHOPTIMIZER_CONFIG.apiUrl}/api/storefront/tests?shop=${SHOPTIMIZER_CONFIG.shop}`;
       console.log('[Shoptimizer] Fetching active tests from:', testUrl);
       
@@ -346,37 +551,54 @@
       
       if (!data.tests || data.tests.length === 0) {
         console.log('[Shoptimizer] No active tests found');
+        console.log('[Shoptimizer] Initialized successfully (session tracking only)');
         return;
       }
       
       console.log(`[Shoptimizer] Found ${data.tests.length} active test(s)`);
       
-      // Find test for current product
-      const productTest = data.tests.find(t => t.shopifyProductId === shopifyProductId);
+      // Check if this is a product detail page
+      const shopifyProductId = getShopifyProductId();
       
-      if (!productTest) {
-        console.log('[Shoptimizer] No test for this specific product');
-        return;
+      if (shopifyProductId) {
+        // PRODUCT DETAIL PAGE LOGIC
+        console.log('[Shoptimizer] Product page detected:', shopifyProductId);
+        
+        const productTest = data.tests.find(t => t.shopifyProductId === shopifyProductId);
+        
+        if (!productTest) {
+          console.log('[Shoptimizer] No test for this specific product on PDP');
+          // Still check for collection cards below
+        } else {
+          console.log('[Shoptimizer] Active test found for this product:', productTest.id);
+          
+          // Assign user to variant (or retrieve existing assignment)
+          const variant = await assignUserToVariant(sessionId, productTest.id);
+          console.log('[Shoptimizer] User assigned to:', variant);
+          
+          // Apply variant changes to product page
+          applyVariant(productTest, variant);
+          
+          // Track impression
+          trackImpression(sessionId, productTest.id, variant, 'product');
+          
+          // Store for potential JS access
+          window.shoptimizerSession = sessionId;
+          window.shoptimizerVariant = variant;
+          window.shoptimizerTestId = productTest.id;
+          
+          console.log('[Shoptimizer] Initialized successfully (PDP A/B testing active)');
+        }
       }
       
-      console.log('[Shoptimizer] Active test found for this product:', productTest.id);
+      // COLLECTION/LISTING PAGE LOGIC (runs on all pages including PDP)
+      // Process product cards on collection/listing/homepage/search results
+      await processCollectionPageProducts(sessionId, data.tests);
       
-      // Assign user to variant (or retrieve existing assignment)
-      const variant = await assignUserToVariant(sessionId, productTest.id);
-      console.log('[Shoptimizer] User assigned to:', variant);
+      // Watch for lazy-loaded products (infinite scroll, AJAX pagination)
+      watchForLazyLoadedProducts(sessionId, data.tests);
       
-      // Apply variant changes to product page
-      applyVariant(productTest, variant);
-      
-      // Track impression
-      trackImpression(sessionId, productTest.id, variant);
-      
-      // Store for potential JS access
-      window.shoptimizerSession = sessionId;
-      window.shoptimizerVariant = variant;
-      window.shoptimizerTestId = productTest.id;
-      
-      console.log('[Shoptimizer] Initialized successfully (A/B testing active)');
+      console.log('[Shoptimizer] Initialized successfully (all page types)');
       
     } catch (err) {
       console.error('[Shoptimizer] Initialization error:', err.message || err);
