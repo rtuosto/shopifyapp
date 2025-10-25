@@ -1510,6 +1510,289 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/simulate/batch-stream - SSE streaming version for live updates
+  app.post("/api/simulate/batch-stream", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      const { 
+        testId, 
+        visitors = 1000,
+        controlConversionRate = 0.03,
+        variantConversionRate = 0.03,
+        avgOrderValue
+      } = req.body;
+
+      if (!testId) {
+        return res.status(400).json({ error: "testId is required" });
+      }
+
+      const test = await storage.getTest(shop, testId);
+      if (!test) {
+        return res.status(404).json({ error: "Test not found" });
+      }
+
+      if (test.status !== "active") {
+        return res.status(400).json({ error: "Test must be active to simulate batch" });
+      }
+
+      // Get product for pricing
+      const product = await storage.getProduct(shop, test.productId);
+      if (!product) {
+        return res.status(400).json({ error: "Product not found" });
+      }
+
+      // Setup SSE
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.flushHeaders();
+
+      const sendEvent = (event: string, data: any) => {
+        res.write(`event: ${event}\n`);
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      };
+
+      const basePrice = avgOrderValue || parseFloat(product.price);
+      const { randomUUID } = await import("crypto");
+      const { assignVisitor } = await import('./assignment-service');
+
+      const allocationBefore = {
+        control: parseFloat(test.controlAllocation || "50"),
+        variant: parseFloat(test.variantAllocation || "50"),
+      };
+
+      const impressionRecords = [];
+      const conversionRecords = [];
+      
+      let controlImpressions = 0;
+      let variantImpressions = 0;
+      let controlConversions = 0;
+      let variantConversions = 0;
+      let controlRevenue = 0;
+      let variantRevenue = 0;
+
+      sendEvent('start', {
+        testId,
+        totalVisitors: visitors,
+        allocationBefore,
+      });
+
+      console.log(`[Simulator Stream] Starting batch simulation for ${visitors} visitors`);
+
+      // REALISTIC FLOW: Simulate each visitor and stream progress
+      for (let i = 0; i < visitors; i++) {
+        const sessionId = randomUUID();
+        
+        const assignment = await assignVisitor(storage, {
+          shop,
+          testId,
+          sessionId,
+          test,
+        });
+        
+        impressionRecords.push({
+          testId,
+          sessionId,
+          variant: assignment.variant,
+        });
+        
+        if (assignment.variant === 'control') {
+          controlImpressions++;
+        } else {
+          variantImpressions++;
+        }
+        
+        const conversionRate = assignment.variant === 'control' 
+          ? controlConversionRate 
+          : variantConversionRate;
+        
+        const converts = Math.random() < conversionRate;
+        
+        if (converts) {
+          const variance = 0.8 + Math.random() * 0.4;
+          const orderValue = basePrice * variance;
+          
+          conversionRecords.push({
+            testId,
+            sessionId,
+            variant: assignment.variant,
+            revenue: orderValue.toFixed(2),
+          });
+          
+          if (assignment.variant === 'control') {
+            controlConversions++;
+            controlRevenue += orderValue;
+          } else {
+            variantConversions++;
+            variantRevenue += orderValue;
+          }
+        }
+
+        // Stream progress every 100 impressions
+        if ((i + 1) % 100 === 0) {
+          const totalImpressions = controlImpressions + variantImpressions;
+          const controlRPV = controlImpressions > 0 ? controlRevenue / controlImpressions : 0;
+          const variantRPV = variantImpressions > 0 ? variantRevenue / variantImpressions : 0;
+          const currentControlAlloc = totalImpressions > 0 ? (controlImpressions / totalImpressions) * 100 : 50;
+          const currentVariantAlloc = totalImpressions > 0 ? (variantImpressions / totalImpressions) * 100 : 50;
+
+          sendEvent('progress', {
+            impressions: i + 1,
+            controlImpressions,
+            variantImpressions,
+            controlConversions,
+            variantConversions,
+            controlRevenue: controlRevenue.toFixed(2),
+            variantRevenue: variantRevenue.toFixed(2),
+            controlRPV: parseFloat(controlRPV.toFixed(2)),
+            variantRPV: parseFloat(variantRPV.toFixed(2)),
+            controlAllocation: parseFloat(currentControlAlloc.toFixed(1)),
+            variantAllocation: parseFloat(currentVariantAlloc.toFixed(1)),
+            percentage: ((i + 1) / visitors * 100).toFixed(1),
+          });
+        }
+      }
+
+      // Send final snapshot if not on 100-impression boundary
+      if (visitors % 100 !== 0) {
+        const totalImpressions = controlImpressions + variantImpressions;
+        const controlRPV = controlImpressions > 0 ? controlRevenue / controlImpressions : 0;
+        const variantRPV = variantImpressions > 0 ? variantRevenue / variantImpressions : 0;
+        const currentControlAlloc = totalImpressions > 0 ? (controlImpressions / totalImpressions) * 100 : 50;
+        const currentVariantAlloc = totalImpressions > 0 ? (variantImpressions / totalImpressions) * 100 : 50;
+
+        sendEvent('progress', {
+          impressions: visitors,
+          controlImpressions,
+          variantImpressions,
+          controlConversions,
+          variantConversions,
+          controlRevenue: controlRevenue.toFixed(2),
+          variantRevenue: variantRevenue.toFixed(2),
+          controlRPV: parseFloat(controlRPV.toFixed(2)),
+          variantRPV: parseFloat(variantRPV.toFixed(2)),
+          controlAllocation: parseFloat(currentControlAlloc.toFixed(1)),
+          variantAllocation: parseFloat(currentVariantAlloc.toFixed(1)),
+          percentage: 100,
+        });
+      }
+
+      // Persist to database
+      await storage.createTestImpressionsBulk(impressionRecords);
+      if (conversionRecords.length > 0) {
+        await storage.createTestConversionsBulk(conversionRecords);
+      }
+
+      const totalRevenue = controlRevenue + variantRevenue;
+      const totalConversions = controlConversions + variantConversions;
+
+      const newControlImpressions = (test.controlImpressions || 0) + controlImpressions;
+      const newVariantImpressions = (test.variantImpressions || 0) + variantImpressions;
+      const newControlConversions = (test.controlConversions || 0) + controlConversions;
+      const newVariantConversions = (test.variantConversions || 0) + variantConversions;
+      const newControlRevenue = parseFloat(test.controlRevenue || "0") + controlRevenue;
+      const newVariantRevenue = parseFloat(test.variantRevenue || "0") + variantRevenue;
+      
+      const newImpressions = (test.impressions || 0) + visitors;
+      const newConversions = (test.conversions || 0) + totalConversions;
+      const newRevenue = parseFloat(test.revenue || "0") + totalRevenue;
+      const arpu = newConversions > 0 ? newRevenue / newConversions : 0;
+
+      const updatedTest = await storage.updateTest(shop, testId, {
+        impressions: newImpressions,
+        conversions: newConversions,
+        revenue: newRevenue.toString(),
+        arpu: arpu.toString(),
+        controlImpressions: newControlImpressions,
+        variantImpressions: newVariantImpressions,
+        controlConversions: newControlConversions,
+        variantConversions: newVariantConversions,
+        controlRevenue: newControlRevenue.toString(),
+        variantRevenue: newVariantRevenue.toString(),
+      });
+
+      // Update Bayesian allocation
+      let allocationAfter = allocationBefore;
+      let bayesianUpdate = null;
+      
+      if (updatedTest) {
+        try {
+          const { computeAllocationUpdate, updateBayesianState, BayesianState } = await import('./statistics/allocation-service');
+          
+          const bayesianConfig = updatedTest.bayesianConfig as BayesianState || {};
+          const metrics = {
+            controlImpressions: newControlImpressions,
+            variantImpressions: newVariantImpressions,
+            controlConversions: newControlConversions,
+            variantConversions: newVariantConversions,
+            controlRevenue: newControlRevenue,
+            variantRevenue: newVariantRevenue,
+          };
+          
+          const updatedState = updateBayesianState(bayesianConfig, metrics);
+          const result = computeAllocationUpdate(updatedState, metrics);
+          
+          await storage.updateTest(shop, testId, {
+            controlAllocation: (result.allocation.control * 100).toFixed(2),
+            variantAllocation: (result.allocation.variant * 100).toFixed(2),
+            bayesianConfig: {
+              ...result.bayesianState,
+              probVariantBetter: result.metrics.probabilityVariantWins,
+            },
+          });
+          
+          allocationAfter = {
+            control: parseFloat((result.allocation.control * 100).toFixed(1)),
+            variant: parseFloat((result.allocation.variant * 100).toFixed(1)),
+          };
+          
+          bayesianUpdate = {
+            newAllocation: allocationAfter,
+            metrics: result.metrics,
+            reasoning: result.reasoning,
+          };
+        } catch (error) {
+          console.error("[Bayesian Update] Failed to update allocation:", error);
+        }
+      }
+
+      // Send completion event
+      sendEvent('complete', {
+        testId,
+        impressions: visitors,
+        conversions: totalConversions,
+        revenue: totalRevenue.toFixed(2),
+        arpu: arpu.toFixed(2),
+        allocationBefore,
+        allocationAfter,
+        variantPerformance: {
+          control: {
+            impressions: controlImpressions,
+            conversions: controlConversions,
+            revenue: controlRevenue.toFixed(2),
+            conversionRate: controlImpressions > 0 ? (controlConversions / controlImpressions * 100).toFixed(2) : '0',
+            arpu: controlConversions > 0 ? (controlRevenue / controlConversions).toFixed(2) : '0',
+          },
+          variant: {
+            impressions: variantImpressions,
+            conversions: variantConversions,
+            revenue: variantRevenue.toFixed(2),
+            conversionRate: variantImpressions > 0 ? (variantConversions / variantImpressions * 100).toFixed(2) : '0',
+            arpu: variantConversions > 0 ? (variantRevenue / variantConversions).toFixed(2) : '0',
+          },
+        },
+        bayesianUpdate,
+      });
+
+      res.end();
+    } catch (error) {
+      console.error("Error in streaming simulation:", error);
+      res.write(`event: error\n`);
+      res.write(`data: ${JSON.stringify({ error: "Simulation failed" })}\n\n`);
+      res.end();
+    }
+  });
+
   // ==========================================
   // STOREFRONT API (PUBLIC - No Auth Required)
   // ==========================================

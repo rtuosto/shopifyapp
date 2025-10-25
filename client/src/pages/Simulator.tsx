@@ -7,7 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Play, Zap, CheckCircle2, AlertCircle } from "lucide-react";
+import { Play, Zap, CheckCircle2, AlertCircle, Radio } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Progress } from "@/components/ui/progress";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import type { Test, Product } from "@shared/schema";
 
@@ -87,6 +89,18 @@ export default function Simulator() {
   const [visitors, setVisitors] = useState(1000);
   const [controlConversionRate, setControlConversionRate] = useState(3.0);
   const [variantConversionRate, setVariantConversionRate] = useState(3.5);
+  
+  // Streaming state
+  const [liveMode, setLiveMode] = useState(true);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamProgress, setStreamProgress] = useState(0);
+  const [streamingEvolutionData, setStreamingEvolutionData] = useState<Array<{
+    impressions: number;
+    controlRPV: number;
+    variantRPV: number;
+    controlAllocation: number;
+    variantAllocation: number;
+  }>>([]);
 
   // Fetch active tests
   const { data: tests = [], isLoading: testsLoading } = useQuery<EnrichedTest[]>({
@@ -153,7 +167,147 @@ export default function Simulator() {
     },
   });
 
-  const isSimulating = batchSimulation.isPending;
+  // Streaming simulation handler
+  const startStreamingSimulation = () => {
+    if (!selectedTestId) return;
+
+    setIsStreaming(true);
+    setStreamProgress(0);
+    setStreamingEvolutionData([]);
+    setLastSimulationResult(null);
+
+    let accumulatedEvolutionData: Array<{
+      impressions: number;
+      controlRPV: number;
+      variantRPV: number;
+      controlAllocation: number;
+      variantAllocation: number;
+    }> = [];
+
+    fetch("/api/simulate/batch-stream", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        testId: selectedTestId,
+        visitors,
+        controlConversionRate: controlConversionRate / 100,
+        variantConversionRate: variantConversionRate / 100,
+      }),
+    }).then((response) => {
+      if (!response.ok) {
+        throw new Error("Failed to start streaming simulation");
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      const processStream = async () => {
+        if (!reader) return;
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            
+            // Keep the last incomplete line in the buffer
+            buffer = lines.pop() || "";
+
+            let currentEvent = "";
+            for (const line of lines) {
+              if (line.startsWith("event:")) {
+                currentEvent = line.substring(6).trim();
+              } else if (line.startsWith("data:") && currentEvent) {
+                try {
+                  const data = JSON.parse(line.substring(5).trim());
+
+                  if (currentEvent === "progress") {
+                    setStreamProgress(parseFloat(data.percentage));
+                    const newDataPoint = {
+                      impressions: data.impressions,
+                      controlRPV: data.controlRPV,
+                      variantRPV: data.variantRPV,
+                      controlAllocation: data.controlAllocation,
+                      variantAllocation: data.variantAllocation,
+                    };
+                    accumulatedEvolutionData.push(newDataPoint);
+                    setStreamingEvolutionData([...accumulatedEvolutionData]);
+                  } else if (currentEvent === "complete") {
+                    setIsStreaming(false);
+                    const result: SimulationResult = {
+                      type: "batch",
+                      timestamp: new Date().toLocaleTimeString(),
+                      testName: selectedTest?.productName || "Unknown",
+                      allocationBefore: data.allocationBefore,
+                      allocationAfter: data.allocationAfter,
+                      variantPerformance: data.variantPerformance,
+                      bayesianUpdate: data.bayesianUpdate,
+                      evolutionData: accumulatedEvolutionData,
+                    };
+                    setLastSimulationResult(result);
+
+                    toast({
+                      title: "Live Simulation Complete",
+                      description: `Simulated ${data.impressions} visitors in real-time`,
+                    });
+
+                    queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+                    queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+                  } else if (currentEvent === "error") {
+                    setIsStreaming(false);
+                    toast({
+                      title: "Simulation Failed",
+                      description: data.error,
+                      variant: "destructive",
+                    });
+                  }
+                  
+                  currentEvent = ""; // Reset after processing
+                } catch (parseError) {
+                  console.error("Failed to parse SSE data:", parseError);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Stream processing error:", error);
+          setIsStreaming(false);
+          toast({
+            title: "Stream Error",
+            description: "Failed to process simulation stream",
+            variant: "destructive",
+          });
+        } finally {
+          reader.releaseLock();
+        }
+      };
+
+      processStream();
+    }).catch((error) => {
+      console.error("Streaming error:", error);
+      setIsStreaming(false);
+      toast({
+        title: "Simulation Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    });
+  };
+
+  const handleRunSimulation = () => {
+    if (liveMode) {
+      startStreamingSimulation();
+    } else {
+      batchSimulation.mutate();
+    }
+  };
+
+  const isSimulating = batchSimulation.isPending || isStreaming;
   const canSimulate = !!selectedTestId && !isSimulating;
 
   // Calculate allocation percentages
@@ -404,16 +558,26 @@ export default function Simulator() {
                   )}
 
                   {/* Evolution Charts */}
-                  {lastSimulationResult.evolutionData && lastSimulationResult.evolutionData.length > 0 && (
+                  {((lastSimulationResult.evolutionData && lastSimulationResult.evolutionData.length > 0) || streamingEvolutionData.length > 0) && (
                     <div className="space-y-4">
                       {/* RPV Evolution Chart */}
                       <div className="p-4 border rounded-lg space-y-3" data-testid="chart-rpv-evolution">
-                        <div className="text-sm font-medium">RPV Evolution Over Time</div>
-                        <p className="text-xs text-muted-foreground">
-                          Revenue Per Visitor tracked at 100-impression intervals
-                        </p>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-sm font-medium">RPV Evolution Over Time</div>
+                            <p className="text-xs text-muted-foreground">
+                              Revenue Per Visitor tracked at 100-impression intervals
+                            </p>
+                          </div>
+                          {isStreaming && (
+                            <div className="flex items-center gap-1 text-xs text-green-600">
+                              <Radio className="w-3 h-3 animate-pulse" />
+                              <span>Live</span>
+                            </div>
+                          )}
+                        </div>
                         <ResponsiveContainer width="100%" height={300}>
-                          <LineChart data={lastSimulationResult.evolutionData}>
+                          <LineChart data={isStreaming ? streamingEvolutionData : (lastSimulationResult.evolutionData || [])}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis 
                               dataKey="impressions" 
@@ -434,6 +598,7 @@ export default function Simulator() {
                               name="Control RPV"
                               strokeWidth={2}
                               dot={{ r: 3 }}
+                              isAnimationActive={isStreaming}
                             />
                             <Line 
                               type="monotone" 
@@ -442,6 +607,7 @@ export default function Simulator() {
                               name="Variant RPV"
                               strokeWidth={2}
                               dot={{ r: 3 }}
+                              isAnimationActive={isStreaming}
                             />
                           </LineChart>
                         </ResponsiveContainer>
@@ -449,12 +615,22 @@ export default function Simulator() {
 
                       {/* Allocation Evolution Chart */}
                       <div className="p-4 border rounded-lg space-y-3" data-testid="chart-allocation-evolution">
-                        <div className="text-sm font-medium">Traffic Allocation Evolution</div>
-                        <p className="text-xs text-muted-foreground">
-                          Bayesian allocation adjustments tracked at 100-impression intervals
-                        </p>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-sm font-medium">Traffic Allocation Evolution</div>
+                            <p className="text-xs text-muted-foreground">
+                              Bayesian allocation adjustments tracked at 100-impression intervals
+                            </p>
+                          </div>
+                          {isStreaming && (
+                            <div className="flex items-center gap-1 text-xs text-green-600">
+                              <Radio className="w-3 h-3 animate-pulse" />
+                              <span>Live</span>
+                            </div>
+                          )}
+                        </div>
                         <ResponsiveContainer width="100%" height={300}>
-                          <LineChart data={lastSimulationResult.evolutionData}>
+                          <LineChart data={isStreaming ? streamingEvolutionData : (lastSimulationResult.evolutionData || [])}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis 
                               dataKey="impressions" 
@@ -476,6 +652,7 @@ export default function Simulator() {
                               name="Control %"
                               strokeWidth={2}
                               dot={{ r: 3 }}
+                              isAnimationActive={isStreaming}
                             />
                             <Line 
                               type="monotone" 
@@ -484,6 +661,7 @@ export default function Simulator() {
                               name="Variant %"
                               strokeWidth={2}
                               dot={{ r: 3 }}
+                              isAnimationActive={isStreaming}
                             />
                           </LineChart>
                         </ResponsiveContainer>
@@ -701,6 +879,39 @@ export default function Simulator() {
               </div>
             </div>
 
+            {/* Live Mode Toggle */}
+            <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
+              <div className="flex items-center gap-2">
+                <Radio className="w-4 h-4 text-primary" />
+                <div>
+                  <div className="text-sm font-medium">Live Streaming Mode</div>
+                  <div className="text-xs text-muted-foreground">
+                    Watch charts update in real-time as the simulation runs
+                  </div>
+                </div>
+              </div>
+              <Switch
+                checked={liveMode}
+                onCheckedChange={setLiveMode}
+                data-testid="toggle-live-mode"
+                disabled={isSimulating}
+              />
+            </div>
+
+            {/* Progress Indicator */}
+            {isStreaming && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Simulation Progress</span>
+                  <span className="font-medium">{streamProgress}%</span>
+                </div>
+                <Progress value={streamProgress} className="h-2" data-testid="progress-simulation" />
+                <p className="text-xs text-muted-foreground text-center">
+                  Streaming real-time updates...
+                </p>
+              </div>
+            )}
+
             {!selectedTestId && (
               <div className="flex items-center gap-2 text-sm text-yellow-600 bg-yellow-50 dark:bg-yellow-950 p-3 rounded-lg">
                 <AlertCircle className="w-4 h-4" />
@@ -709,13 +920,15 @@ export default function Simulator() {
             )}
 
             <Button
-              onClick={() => batchSimulation.mutate()}
+              onClick={handleRunSimulation}
               disabled={!canSimulate}
               className="w-full gap-2"
               data-testid="button-run-batch"
             >
-              <Play className="w-4 h-4" />
-              {batchSimulation.isPending ? "Simulating..." : "Run Batch Simulation"}
+              {liveMode ? <Radio className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+              {isSimulating 
+                ? (liveMode ? `Streaming... ${streamProgress}%` : "Simulating...") 
+                : (liveMode ? "Start Live Simulation" : "Run Batch Simulation")}
             </Button>
           </div>
         </CardContent>
@@ -730,6 +943,10 @@ export default function Simulator() {
           <p>
             <strong>Batch Simulation:</strong> Generates realistic traffic and conversions in one step. 
             Visitors are allocated using the test's current Bayesian allocation (Thompson Sampling), and conversions are calculated based on your specified rates.
+          </p>
+          <p>
+            <strong>Live Streaming Mode:</strong> Watch the simulation unfold in real-time! Charts update progressively every 100 visitors, 
+            letting you see how the Bayesian engine adapts traffic allocation as performance data accumulates. Perfect for understanding Thompson Sampling in action.
           </p>
           <p>
             <strong>Evolution Charts:</strong> Track how RPV and traffic allocation change over time as the Bayesian engine learns which variant performs better.
