@@ -1602,6 +1602,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Migration endpoint: Backfill legacy fixed tests to Bayesian
+  app.post("/api/migrate/bayesian", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      
+      // Get all tests (any status) that need migration
+      const allTests = await storage.getTests(shop);
+      const legacyTests = allTests.filter(t => t.allocationStrategy !== "bayesian");
+      
+      if (legacyTests.length === 0) {
+        return res.json({ 
+          success: true, 
+          migrated: 0, 
+          message: "No legacy tests found - all tests are already using Bayesian allocation" 
+        });
+      }
+      
+      console.log(`[Migration] Found ${legacyTests.length} legacy tests to migrate`);
+      
+      const { initializeBayesianState } = await import('./statistics/allocation-service');
+      let migratedCount = 0;
+      
+      for (const test of legacyTests) {
+        // Get product for price estimation
+        const product = await storage.getProduct(shop, test.productId);
+        if (!product) {
+          console.log(`[Migration] Skipping test ${test.id} - product not found`);
+          continue;
+        }
+        
+        // Initialize Bayesian state
+        const estimatedCR = 0.02; // 2% default
+        const estimatedAOV = parseFloat(product.price);
+        
+        const bayesianState = initializeBayesianState({
+          conversionRate: estimatedCR,
+          avgOrderValue: estimatedAOV,
+          riskMode: 'cautious',
+          safetyBudget: 50,
+        });
+        
+        // Update test to Bayesian with proper initial allocation
+        await storage.updateTest(shop, test.id, {
+          allocationStrategy: "bayesian",
+          bayesianConfig: bayesianState,
+          controlAllocation: "75", // Cautious start
+          variantAllocation: "5",
+        });
+        
+        migratedCount++;
+        console.log(`[Migration] Migrated test ${test.id} (${test.testType}) to Bayesian`);
+      }
+      
+      res.json({
+        success: true,
+        migrated: migratedCount,
+        message: `Successfully migrated ${migratedCount} tests to Bayesian allocation`,
+      });
+    } catch (error) {
+      console.error("[Migration] Error migrating tests:", error);
+      const errorMessage = error instanceof Error ? error.message : "Migration failed";
+      res.status(500).json({ error: errorMessage });
+    }
+  });
+
   // Get installation instructions (for Settings page)
   app.get("/api/installation-script", requireShopifySessionOrDev, async (req, res) => {
     try {
