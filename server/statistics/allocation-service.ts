@@ -261,10 +261,25 @@ export function computeAllocationUpdate(
 
   // Update safety budget - only subtract cost for NEW impressions since last update
   const currentTotalImpressions = metrics.controlImpressions + metrics.variantImpressions;
-  const lastTotalImpressions = bayesianState.lastTotalImpressions || 0;
-  const newImpressions = Math.max(0, currentTotalImpressions - lastTotalImpressions);
-  const safetyBudgetRemaining = (bayesianState.safetyBudgetRemaining || 50) - 
-    (costOfWaitingPerSession * newImpressions);
+  const lastTotalImpressions = bayesianState.lastTotalImpressions;
+  
+  // Migration handling: if lastTotalImpressions is undefined/null, this is the first update
+  // after the fix for an existing test. Initialize to current total WITHOUT charging budget.
+  let newImpressions = 0;
+  if (lastTotalImpressions !== undefined && lastTotalImpressions !== null && lastTotalImpressions > 0) {
+    newImpressions = Math.max(0, currentTotalImpressions - lastTotalImpressions);
+  }
+  
+  let currentSafetyBudget = bayesianState.safetyBudgetRemaining || 50;
+  
+  // Sanity check: if safety budget is unreasonably negative (< -1000), reset it
+  // This handles tests that were broken by the previous bug
+  if (currentSafetyBudget < -1000) {
+    console.log(`[Safety Budget] Resetting unreasonably negative budget (${currentSafetyBudget.toFixed(2)}) to initial value`);
+    currentSafetyBudget = bayesianState.safetyBudgetTotal || 50;
+  }
+  
+  const safetyBudgetRemaining = currentSafetyBudget - (costOfWaitingPerSession * newImpressions);
 
   // Check promotion criteria
   const promotionCheck = checkPromotionCriteria(
