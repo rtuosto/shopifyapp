@@ -82,10 +82,10 @@ export const tests = pgTable("tests", {
   controlData: jsonb("control_data").$type<Record<string, any>>().notNull(),
   variantData: jsonb("variant_data").$type<Record<string, any>>().notNull(),
   
-  // Optimization Strategy (extensible for Bayesian & Bandits)
-  allocationStrategy: text("allocation_strategy").notNull().default("fixed"), // "fixed" | "bayesian" | "bandit"
-  controlAllocation: decimal("control_allocation", { precision: 5, scale: 2 }).default("50"), // Percentage (0-100)
-  variantAllocation: decimal("variant_allocation", { precision: 5, scale: 2 }).default("50"), // Percentage (0-100)
+  // Optimization Strategy (Bayesian only - uses Thompson Sampling for dynamic allocation)
+  allocationStrategy: text("allocation_strategy").notNull().default("bayesian"), // Always "bayesian"
+  controlAllocation: decimal("control_allocation", { precision: 5, scale: 2 }).default("95"), // Percentage (0-100), starts at 95% (TTTS)
+  variantAllocation: decimal("variant_allocation", { precision: 5, scale: 2 }).default("5"), // Percentage (0-100), starts at 5% (TTTS)
   
   // Statistical Configuration
   confidenceThreshold: decimal("confidence_threshold", { precision: 3, scale: 2 }).default("0.95"), // 95% confidence
