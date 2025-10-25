@@ -744,24 +744,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function to calculate incremental metrics from tests
+  function calculateIncrementalMetrics(tests: any[]) {
+    const testCount = tests.length;
+    
+    if (testCount === 0) {
+      return {
+        testCount: 0,
+        incrementalRPV: 0,
+        incrementalRevenue: 0,
+        totalRevenue: 0,
+        incrementalConversions: 0,
+        totalConversions: 0,
+      };
+    }
+
+    let totalIncrementalRevenue = 0;
+    let totalVariantRevenue = 0;
+    let totalIncrementalConversions = 0;
+    let totalVariantConversions = 0;
+    let weightedRPVLiftSum = 0;
+    let totalImpressions = 0;
+
+    for (const test of tests) {
+      const controlImpressions = test.controlImpressions || 0;
+      const variantImpressions = test.variantImpressions || 0;
+      const controlConversions = test.controlConversions || 0;
+      const variantConversions = test.variantConversions || 0;
+      const controlRevenue = parseFloat(test.controlRevenue || "0");
+      const variantRevenue = parseFloat(test.variantRevenue || "0");
+
+      // Calculate RPV for each arm
+      const controlRPV = controlImpressions > 0 ? controlRevenue / controlImpressions : 0;
+      const variantRPV = variantImpressions > 0 ? variantRevenue / variantImpressions : 0;
+      
+      // Incremental revenue = actual variant revenue - what control would have earned
+      const expectedControlRevenue = variantImpressions * controlRPV;
+      const incrementalRevenue = variantRevenue - expectedControlRevenue;
+      totalIncrementalRevenue += incrementalRevenue;
+      totalVariantRevenue += variantRevenue;
+
+      // Incremental conversions = actual variant conversions - what control rate would have achieved
+      const controlConversionRate = controlImpressions > 0 ? controlConversions / controlImpressions : 0;
+      const expectedControlConversions = variantImpressions * controlConversionRate;
+      const incrementalConversions = variantConversions - expectedControlConversions;
+      totalIncrementalConversions += incrementalConversions;
+      totalVariantConversions += variantConversions;
+
+      // Weight RPV lift by impressions for proper averaging
+      const rpvLift = variantRPV - controlRPV;
+      const testImpressions = controlImpressions + variantImpressions;
+      weightedRPVLiftSum += rpvLift * testImpressions;
+      totalImpressions += testImpressions;
+    }
+
+    // Calculate weighted average incremental RPV
+    const incrementalRPV = totalImpressions > 0 ? weightedRPVLiftSum / totalImpressions : 0;
+
+    return {
+      testCount,
+      incrementalRPV,
+      incrementalRevenue: totalIncrementalRevenue,
+      totalRevenue: totalVariantRevenue,
+      incrementalConversions: totalIncrementalConversions,
+      totalConversions: totalVariantConversions,
+    };
+  }
+
   // Dashboard summary (protected)
   app.get("/api/dashboard", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
-      const [products, recommendations, tests, latestMetric, syncStatus] = await Promise.all([
+      const [products, recommendations, allTests, latestMetric, syncStatus] = await Promise.all([
         storage.getProducts(shop),
         storage.getRecommendations(shop, "pending"),
-        storage.getTests(shop, "active"),
+        storage.getTests(shop), // Get ALL tests for metrics calculation
         storage.getLatestMetric(shop),
         Promise.resolve(getSyncStatus(shop)),
       ]);
 
+      // Calculate all-time metrics (all tests regardless of status)
+      const allTimeMetrics = calculateIncrementalMetrics(allTests);
+
+      // Calculate active test metrics (only active tests)
+      const activeTests = allTests.filter(t => t.status === "active");
+      const activeMetrics = calculateIncrementalMetrics(activeTests);
+
       res.json({
         totalProducts: products.length,
         pendingRecommendations: recommendations.length,
-        activeTests: tests.length,
+        activeTests: activeTests.length,
         latestMetric,
         syncStatus,
+        allTimeMetrics,
+        activeMetrics,
       });
     } catch (error) {
       console.error("Error fetching dashboard data:", error);

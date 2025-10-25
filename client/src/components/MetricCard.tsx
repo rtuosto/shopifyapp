@@ -7,9 +7,10 @@ interface MetricCardProps {
   change?: number;
   trend?: "up" | "down" | "neutral";
   subtitle?: string;
+  valueClassName?: string;
 }
 
-export default function MetricCard({ title, value, change, trend = "neutral", subtitle }: MetricCardProps) {
+export default function MetricCard({ title, value, change, trend = "neutral", subtitle, valueClassName }: MetricCardProps) {
   const getTrendIcon = () => {
     if (trend === "up") return <ArrowUp className="w-4 h-4" />;
     if (trend === "down") return <ArrowDown className="w-4 h-4" />;
@@ -29,7 +30,7 @@ export default function MetricCard({ title, value, change, trend = "neutral", su
           {title}
         </p>
         <div className="flex items-baseline justify-between gap-2">
-          <h3 className="text-2xl font-bold tabular-nums" data-testid="text-metric-value">
+          <h3 className={`text-2xl font-bold tabular-nums ${valueClassName || ''}`} data-testid="text-metric-value">
             {value}
           </h3>
           {change !== undefined && (

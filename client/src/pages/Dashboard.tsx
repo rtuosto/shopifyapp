@@ -22,12 +22,23 @@ interface SyncStatus {
   productCount?: number;
 }
 
+interface IncrementalMetrics {
+  testCount: number;
+  incrementalRPV: number;
+  incrementalRevenue: number;
+  totalRevenue: number;
+  incrementalConversions: number;
+  totalConversions: number;
+}
+
 interface DashboardData {
   totalProducts: number;
   pendingRecommendations: number;
   activeTests: number;
   latestMetric?: Metric;
   syncStatus?: SyncStatus;
+  allTimeMetrics: IncrementalMetrics;
+  activeMetrics: IncrementalMetrics;
 }
 
 interface EnrichedTest extends Test {
@@ -579,6 +590,37 @@ export default function Dashboard() {
     return lastSync.toLocaleDateString();
   };
 
+  // Helper to format incremental values with proper sign and styling
+  const formatIncrementalValue = (value: number, decimals: number = 2): { text: string; className: string } => {
+    if (value >= 0) {
+      return {
+        text: `+$${value.toFixed(decimals)}`,
+        className: 'text-green-600 dark:text-green-500'
+      };
+    } else {
+      return {
+        text: `-$${Math.abs(value).toFixed(decimals)}`,
+        className: 'text-red-600 dark:text-red-500'
+      };
+    }
+  };
+
+  // Helper to format incremental conversions with proper sign and styling
+  const formatIncrementalConversions = (value: number): { text: string; className: string } => {
+    const rounded = Math.round(value);
+    if (rounded >= 0) {
+      return {
+        text: `+${rounded}`,
+        className: 'text-green-600 dark:text-green-500'
+      };
+    } else {
+      return {
+        text: `${rounded}`, // Negative sign already included
+        className: 'text-red-600 dark:text-red-500'
+      };
+    }
+  };
+
   return (
     <div className="space-y-6">
       <DashboardHeader 
@@ -589,27 +631,124 @@ export default function Dashboard() {
         isGeneratingRecommendations={generateRecommendationsMutation.isPending}
       />
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard 
-          title="ARPU" 
-          value={currentArpu > 0 ? `$${currentArpu.toFixed(2)}` : '$0.00'}
-          subtitle="avg revenue per user"
-        />
-        <MetricCard 
-          title="Total Revenue" 
-          value={`$${totalRevenue.toFixed(2)}`}
-          subtitle="from active tests"
-        />
-        <MetricCard 
-          title="Conversions" 
-          value={totalConversions.toString()}
-          subtitle="total purchases"
-        />
-        <MetricCard 
-          title="Active Tests" 
-          value={activeTestsCount.toString()}
-          subtitle="running now"
-        />
+      {/* All-Time Performance */}
+      <div>
+        <h3 className="text-sm font-semibold text-muted-foreground mb-3" data-testid="text-all-time-heading">
+          All-Time Performance
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <MetricCard 
+            title="Tests Run" 
+            value={dashboardData?.allTimeMetrics?.testCount?.toString() || '0'}
+            subtitle="total experiments"
+            data-testid="card-all-time-tests"
+          />
+          <MetricCard 
+            title="Incremental RPV" 
+            value={(() => {
+              const irpv = dashboardData?.allTimeMetrics?.incrementalRPV || 0;
+              return formatIncrementalValue(irpv, 2).text;
+            })()}
+            subtitle="avg lift per visitor"
+            valueClassName={(() => {
+              const irpv = dashboardData?.allTimeMetrics?.incrementalRPV || 0;
+              return formatIncrementalValue(irpv, 2).className;
+            })()}
+            data-testid="card-all-time-irpv"
+          />
+          <MetricCard 
+            title="Revenue Impact" 
+            value={(() => {
+              if (!dashboardData?.allTimeMetrics) return '$0 / $0';
+              const { incrementalRevenue, totalRevenue } = dashboardData.allTimeMetrics;
+              const formatted = formatIncrementalValue(incrementalRevenue, 0);
+              return `${formatted.text} / $${totalRevenue.toFixed(0)}`;
+            })()}
+            valueClassName={(() => {
+              if (!dashboardData?.allTimeMetrics) return '';
+              const { incrementalRevenue } = dashboardData.allTimeMetrics;
+              return formatIncrementalValue(incrementalRevenue, 0).className;
+            })()}
+            subtitle="incremental / total"
+            data-testid="card-all-time-revenue"
+          />
+          <MetricCard 
+            title="Conversion Impact" 
+            value={(() => {
+              if (!dashboardData?.allTimeMetrics) return '0 / 0';
+              const { incrementalConversions, totalConversions } = dashboardData.allTimeMetrics;
+              const formatted = formatIncrementalConversions(incrementalConversions);
+              return `${formatted.text} / ${totalConversions}`;
+            })()}
+            valueClassName={(() => {
+              if (!dashboardData?.allTimeMetrics) return '';
+              const { incrementalConversions } = dashboardData.allTimeMetrics;
+              return formatIncrementalConversions(incrementalConversions).className;
+            })()}
+            subtitle="incremental / total"
+            data-testid="card-all-time-conversions"
+          />
+        </div>
+      </div>
+
+      {/* Currently Active */}
+      <div>
+        <h3 className="text-sm font-semibold text-muted-foreground mb-3" data-testid="text-active-heading">
+          Currently Active
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <MetricCard 
+            title="Active Tests" 
+            value={dashboardData?.activeMetrics?.testCount?.toString() || '0'}
+            subtitle="running now"
+            data-testid="card-active-tests"
+          />
+          <MetricCard 
+            title="Incremental RPV" 
+            value={(() => {
+              const irpv = dashboardData?.activeMetrics?.incrementalRPV || 0;
+              return formatIncrementalValue(irpv, 2).text;
+            })()}
+            subtitle="current lift per visitor"
+            valueClassName={(() => {
+              const irpv = dashboardData?.activeMetrics?.incrementalRPV || 0;
+              return formatIncrementalValue(irpv, 2).className;
+            })()}
+            data-testid="card-active-irpv"
+          />
+          <MetricCard 
+            title="Revenue Impact" 
+            value={(() => {
+              if (!dashboardData?.activeMetrics) return '$0 / $0';
+              const { incrementalRevenue, totalRevenue } = dashboardData.activeMetrics;
+              const formatted = formatIncrementalValue(incrementalRevenue, 0);
+              return `${formatted.text} / $${totalRevenue.toFixed(0)}`;
+            })()}
+            valueClassName={(() => {
+              if (!dashboardData?.activeMetrics) return '';
+              const { incrementalRevenue } = dashboardData.activeMetrics;
+              return formatIncrementalValue(incrementalRevenue, 0).className;
+            })()}
+            subtitle="incremental / total"
+            data-testid="card-active-revenue"
+          />
+          <MetricCard 
+            title="Conversion Impact" 
+            value={(() => {
+              if (!dashboardData?.activeMetrics) return '0 / 0';
+              const { incrementalConversions, totalConversions } = dashboardData.activeMetrics;
+              const formatted = formatIncrementalConversions(incrementalConversions);
+              return `${formatted.text} / ${totalConversions}`;
+            })()}
+            valueClassName={(() => {
+              if (!dashboardData?.activeMetrics) return '';
+              const { incrementalConversions } = dashboardData.activeMetrics;
+              return formatIncrementalConversions(incrementalConversions).className;
+            })()}
+            subtitle="incremental / total"
+            data-testid="card-active-conversions"
+          />
+        </div>
       </div>
 
       {activeTestsCount === 0 && completedTests.length === 0 && (
