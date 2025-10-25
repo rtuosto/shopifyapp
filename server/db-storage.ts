@@ -26,43 +26,50 @@ import type { IStorage } from "./storage";
 export class DbStorage implements IStorage {
   // Products (shop-scoped)
   async getProduct(shop: string, id: string): Promise<Product | undefined> {
-    const result = await db.select().from(products).where(eq(products.id, id)).limit(1);
+    const result = await db.select().from(products)
+      .where(and(eq(products.shop, shop), eq(products.id, id)))
+      .limit(1);
     return result[0];
   }
 
   async getProducts(shop: string): Promise<Product[]> {
-    return await db.select().from(products);
+    return await db.select().from(products)
+      .where(eq(products.shop, shop));
   }
 
   async getProductByShopifyId(shop: string, shopifyProductId: string): Promise<Product | undefined> {
     const result = await db.select().from(products)
-      .where(eq(products.shopifyProductId, shopifyProductId))
+      .where(and(eq(products.shop, shop), eq(products.shopifyProductId, shopifyProductId)))
       .limit(1);
     return result[0];
   }
 
   async createProduct(shop: string, product: InsertProduct): Promise<Product> {
-    const [result] = await db.insert(products).values(product).returning();
+    const [result] = await db.insert(products).values({ ...product, shop }).returning();
     return result;
   }
 
   async updateProduct(shop: string, id: string, updates: Partial<InsertProduct>): Promise<Product | undefined> {
+    // Remove shop from updates to prevent cross-tenant reassignment
+    const { shop: _, ...safeUpdates } = updates as any;
     const [result] = await db.update(products)
-      .set({ ...(updates as any), updatedAt: new Date() })
-      .where(eq(products.id, id))
+      .set({ ...safeUpdates, updatedAt: new Date() })
+      .where(and(eq(products.shop, shop), eq(products.id, id)))
       .returning();
     return result;
   }
 
   async deleteProduct(shop: string, id: string): Promise<boolean> {
-    const result = await db.delete(products).where(eq(products.id, id)).returning();
+    const result = await db.delete(products)
+      .where(and(eq(products.shop, shop), eq(products.id, id)))
+      .returning();
     return result.length > 0;
   }
 
   // Recommendations (shop-scoped) - KEY FOR AVOIDING LLM COSTS
   async getRecommendation(shop: string, id: string): Promise<Recommendation | undefined> {
     const result = await db.select().from(recommendations)
-      .where(eq(recommendations.id, id))
+      .where(and(eq(recommendations.shop, shop), eq(recommendations.id, id)))
       .limit(1);
     return result[0];
   }
@@ -70,35 +77,38 @@ export class DbStorage implements IStorage {
   async getRecommendations(shop: string, status?: string): Promise<Recommendation[]> {
     if (status) {
       return await db.select().from(recommendations)
-        .where(eq(recommendations.status, status))
+        .where(and(eq(recommendations.shop, shop), eq(recommendations.status, status)))
         .orderBy(desc(recommendations.createdAt));
     }
     return await db.select().from(recommendations)
+      .where(eq(recommendations.shop, shop))
       .orderBy(desc(recommendations.createdAt));
   }
 
   async getRecommendationsByProduct(shop: string, productId: string): Promise<Recommendation[]> {
     return await db.select().from(recommendations)
-      .where(eq(recommendations.productId, productId))
+      .where(and(eq(recommendations.shop, shop), eq(recommendations.productId, productId)))
       .orderBy(desc(recommendations.createdAt));
   }
 
   async createRecommendation(shop: string, recommendation: InsertRecommendation): Promise<Recommendation> {
-    const [result] = await db.insert(recommendations).values(recommendation).returning();
+    const [result] = await db.insert(recommendations).values({ ...recommendation, shop }).returning();
     return result;
   }
 
   async updateRecommendation(shop: string, id: string, updates: Partial<InsertRecommendation>): Promise<Recommendation | undefined> {
+    // Remove shop from updates to prevent cross-tenant reassignment
+    const { shop: _, ...safeUpdates } = updates as any;
     const [result] = await db.update(recommendations)
-      .set(updates as any)
-      .where(eq(recommendations.id, id))
+      .set(safeUpdates)
+      .where(and(eq(recommendations.shop, shop), eq(recommendations.id, id)))
       .returning();
     return result;
   }
 
   async deleteRecommendation(shop: string, id: string): Promise<boolean> {
     const result = await db.delete(recommendations)
-      .where(eq(recommendations.id, id))
+      .where(and(eq(recommendations.shop, shop), eq(recommendations.id, id)))
       .returning();
     return result.length > 0;
   }
@@ -106,7 +116,7 @@ export class DbStorage implements IStorage {
   // Tests (shop-scoped)
   async getTest(shop: string, id: string): Promise<Test | undefined> {
     const result = await db.select().from(tests)
-      .where(eq(tests.id, id))
+      .where(and(eq(tests.shop, shop), eq(tests.id, id)))
       .limit(1);
     return result[0];
   }
@@ -114,42 +124,47 @@ export class DbStorage implements IStorage {
   async getTests(shop: string, status?: string): Promise<Test[]> {
     if (status) {
       return await db.select().from(tests)
-        .where(eq(tests.status, status))
+        .where(and(eq(tests.shop, shop), eq(tests.status, status)))
         .orderBy(desc(tests.createdAt));
     }
     return await db.select().from(tests)
+      .where(eq(tests.shop, shop))
       .orderBy(desc(tests.createdAt));
   }
 
   async getTestsByProduct(shop: string, productId: string): Promise<Test[]> {
     return await db.select().from(tests)
-      .where(eq(tests.productId, productId))
+      .where(and(eq(tests.shop, shop), eq(tests.productId, productId)))
       .orderBy(desc(tests.createdAt));
   }
 
   async createTest(shop: string, test: InsertTest): Promise<Test> {
-    const [result] = await db.insert(tests).values(test).returning();
+    const [result] = await db.insert(tests).values({ ...test, shop }).returning();
     return result;
   }
 
   async updateTest(shop: string, id: string, updates: Partial<InsertTest>): Promise<Test | undefined> {
+    // Remove shop from updates to prevent cross-tenant reassignment
+    const { shop: _, ...safeUpdates } = updates as any;
     const [result] = await db.update(tests)
-      .set({ ...(updates as any), updatedAt: new Date() })
-      .where(eq(tests.id, id))
+      .set({ ...safeUpdates, updatedAt: new Date() })
+      .where(and(eq(tests.shop, shop), eq(tests.id, id)))
       .returning();
     return result;
   }
 
   async deleteTest(shop: string, id: string): Promise<boolean> {
     const result = await db.delete(tests)
-      .where(eq(tests.id, id))
+      .where(and(eq(tests.shop, shop), eq(tests.id, id)))
       .returning();
     return result.length > 0;
   }
 
   // Metrics (shop-scoped)
   async getMetrics(shop: string, limit?: number): Promise<Metric[]> {
-    const query = db.select().from(metrics).orderBy(desc(metrics.date));
+    const query = db.select().from(metrics)
+      .where(eq(metrics.shop, shop))
+      .orderBy(desc(metrics.date));
     if (limit) {
       return await query.limit(limit);
     }
@@ -158,24 +173,25 @@ export class DbStorage implements IStorage {
 
   async getLatestMetric(shop: string): Promise<Metric | undefined> {
     const result = await db.select().from(metrics)
+      .where(eq(metrics.shop, shop))
       .orderBy(desc(metrics.date))
       .limit(1);
     return result[0];
   }
 
   async createMetric(shop: string, metric: InsertMetric): Promise<Metric> {
-    const [result] = await db.insert(metrics).values(metric).returning();
+    const [result] = await db.insert(metrics).values({ ...metric, shop }).returning();
     return result;
   }
 
   // Session Assignments (shop-scoped)
   async getSessionAssignments(shop: string, sessionId: string): Promise<SessionAssignment[]> {
     return await db.select().from(sessionAssignments)
-      .where(eq(sessionAssignments.sessionId, sessionId));
+      .where(and(eq(sessionAssignments.shop, shop), eq(sessionAssignments.sessionId, sessionId)));
   }
 
   async createSessionAssignment(shop: string, assignment: InsertSessionAssignment): Promise<SessionAssignment> {
-    const [result] = await db.insert(sessionAssignments).values(assignment).returning();
+    const [result] = await db.insert(sessionAssignments).values({ ...assignment, shop }).returning();
     return result;
   }
 }

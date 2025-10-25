@@ -12,10 +12,16 @@ Shoptimizer is an embedded Shopify app designed to enhance sales for store owner
 - Focus on delivering functional, well-tested features that directly impact conversion optimization.
 
 ## System Architecture
-Shoptimizer utilizes a full-stack architecture with a React, Shadcn UI, Wouter, and TanStack Query frontend, integrated via Shopify App Bridge. The backend runs on Express.js with PostgreSQL for persistent storage and an in-memory store for application data. It integrates with the Shopify Admin GraphQL API v12 for product management and uses webhooks for conversion tracking. OpenAI's GPT-4 powers AI-driven recommendations.
+Shoptimizer utilizes a full-stack architecture with a React, Shadcn UI, Wouter, and TanStack Query frontend, integrated via Shopify App Bridge. The backend runs on Express.js with PostgreSQL for persistent multi-tenant storage using Drizzle ORM. It integrates with the Shopify Admin GraphQL API v12 for product management and uses webhooks for conversion tracking. OpenAI's GPT-4 powers AI-driven recommendations.
+
+**Storage Architecture:**
+- **Multi-Tenant PostgreSQL**: All data is shop-scoped with composite unique constraints to ensure complete data isolation between Shopify stores
+- **DbStorage Implementation**: Production storage layer that enforces shop boundaries on all database operations (SELECT, INSERT, UPDATE, DELETE)
+- **Persistence**: AI recommendations, products, tests, metrics, and session assignments persist across server restarts, eliminating redundant LLM API calls and reducing costs
+- **Security**: Shop reassignment attacks prevented by stripping shop field from all update operations
 
 **Key Architectural Decisions & Features:**
-- **AI Recommendations**: GPT-4 analyzes product data to provide actionable optimization suggestions with psychological insights and SEO explanations.
+- **AI Recommendations**: GPT-4 analyzes product data to provide actionable optimization suggestions with psychological insights and SEO explanations. Recommendations are cached in PostgreSQL to avoid unnecessary API calls on server restarts.
 - **UUID Session-Based Attribution**: A robust system using UUIDs stored in localStorage ensures persistent variant assignments across user sessions, accurately attributing conversions for A/B tests. This includes backend API endpoints for managing assignments and impressions, and webhook integration for conversion tracking.
 - **Extensible Testing Architecture**: The database schema supports diverse test scopes (product, template, page, global) and advanced allocation strategies (fixed, Bayesian, bandit) for future optimization features.
 - **Test Preview System**: Offers side-by-side control vs. variant comparison with multi-device views and visual diff highlighting.
@@ -33,7 +39,7 @@ Shoptimizer utilizes a full-stack architecture with a React, Shadcn UI, Wouter, 
 ## External Dependencies
 - **Shopify Admin GraphQL API v12**: For store data interaction (products, orders).
 - **OpenAI GPT-4**: Powers the AI recommendation engine.
-- **PostgreSQL**: Used for persistent session and OAuth token storage.
+- **PostgreSQL (Neon)**: Used for multi-tenant persistent storage of products, recommendations, tests, metrics, session assignments, and OAuth tokens.
 - **Shopify App Bridge**: Enables the embedded app experience.
 - **Wouter**: Client-side routing.
 - **Shadcn UI & Tailwind CSS**: UI component library and styling.

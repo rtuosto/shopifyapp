@@ -1,12 +1,13 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, decimal, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, decimal, jsonb, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Products table - stores Shopify product data
+// Products table - stores Shopify product data (multi-tenant)
 export const products = pgTable("products", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  shopifyProductId: text("shopify_product_id").notNull().unique(),
+  shop: varchar("shop").notNull().default("default-shop"), // Shopify store identifier
+  shopifyProductId: text("shopify_product_id").notNull(),
   title: text("title").notNull(),
   description: text("description"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
@@ -16,10 +17,13 @@ export const products = pgTable("products", {
   reviewCount: integer("review_count").default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  shopProductUnique: unique("products_shop_shopify_product_id_unique").on(table.shop, table.shopifyProductId),
+}));
 
 export const insertProductSchema = createInsertSchema(products).omit({
   id: true,
+  shop: true, // Shop is automatically added by storage layer
   createdAt: true,
   updatedAt: true,
 });
@@ -27,11 +31,12 @@ export const insertProductSchema = createInsertSchema(products).omit({
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
 
-// AI Recommendations table
+// AI Recommendations table (multi-tenant)
 // TODO: Add data-driven confidence scores based on historical test performance
 // TODO: Add estimated impact calculations from similar past tests in this category
 export const recommendations = pgTable("recommendations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shop: varchar("shop").notNull().default("default-shop"), // Shopify store identifier
   productId: varchar("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   description: text("description").notNull(),
@@ -48,15 +53,17 @@ export const recommendations = pgTable("recommendations", {
 
 export const insertRecommendationSchema = createInsertSchema(recommendations).omit({
   id: true,
+  shop: true, // Shop is automatically added by storage layer
   createdAt: true,
 });
 
 export type InsertRecommendation = z.infer<typeof insertRecommendationSchema>;
 export type Recommendation = typeof recommendations.$inferSelect;
 
-// A/B Tests table - Extensible for product-level, template-level, and advanced optimization
+// A/B Tests table - Extensible for product-level, template-level, and advanced optimization (multi-tenant)
 export const tests = pgTable("tests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shop: varchar("shop").notNull().default("default-shop"), // Shopify store identifier
   
   // Scope & Target (extensible for future template/page tests)
   scope: text("scope").notNull().default("product"), // "product" | "template" | "page" | "global"
@@ -108,6 +115,7 @@ export const tests = pgTable("tests", {
 
 export const insertTestSchema = createInsertSchema(tests).omit({
   id: true,
+  shop: true, // Shop is automatically added by storage layer
   createdAt: true,
   updatedAt: true,
 });
@@ -115,9 +123,10 @@ export const insertTestSchema = createInsertSchema(tests).omit({
 export type InsertTest = z.infer<typeof insertTestSchema>;
 export type Test = typeof tests.$inferSelect;
 
-// Analytics/Metrics table for tracking performance over time
+// Analytics/Metrics table for tracking performance over time (multi-tenant)
 export const metrics = pgTable("metrics", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shop: varchar("shop").notNull().default("default-shop"), // Shopify store identifier
   date: timestamp("date").notNull(),
   conversionRate: decimal("conversion_rate", { precision: 5, scale: 2 }).notNull(),
   avgOrderValue: decimal("avg_order_value", { precision: 10, scale: 2 }).notNull(),
@@ -129,15 +138,17 @@ export const metrics = pgTable("metrics", {
 
 export const insertMetricSchema = createInsertSchema(metrics).omit({
   id: true,
+  shop: true, // Shop is automatically added by storage layer
   createdAt: true,
 });
 
 export type InsertMetric = z.infer<typeof insertMetricSchema>;
 export type Metric = typeof metrics.$inferSelect;
 
-// Session Assignments table - Tracks persistent variant assignments for A/B testing attribution
+// Session Assignments table - Tracks persistent variant assignments for A/B testing attribution (multi-tenant)
 export const sessionAssignments = pgTable("session_assignments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shop: varchar("shop").notNull().default("default-shop"), // Shopify store identifier
   sessionId: varchar("session_id").notNull(), // UUID generated in browser, stored in localStorage
   testId: varchar("test_id").notNull().references(() => tests.id, { onDelete: "cascade" }),
   variant: text("variant").notNull(), // "control" | "variant"
@@ -147,6 +158,7 @@ export const sessionAssignments = pgTable("session_assignments", {
 
 export const insertSessionAssignmentSchema = createInsertSchema(sessionAssignments).omit({
   id: true,
+  shop: true, // Shop is automatically added by storage layer
   assignedAt: true,
 });
 
