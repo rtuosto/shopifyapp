@@ -243,6 +243,12 @@
    * Scoped to the card element to avoid affecting PDP elements
    */
   function applyVariantToCard(cardElement, test, variant) {
+    // Double-check: skip if already processed with the same variant
+    if (cardElement.dataset.shoptimizerProcessed === 'true' && 
+        cardElement.dataset.shoptimizerVariant === variant) {
+      return;
+    }
+
     const data = variant === 'control' ? test.controlData : test.variantData;
     const productId = getProductIdFromCard(cardElement);
 
@@ -264,6 +270,11 @@
       for (const selector of titleSelectors) {
         const titleElement = cardElement.querySelector(selector);
         if (titleElement) {
+          // Skip if already has this exact value (prevents unnecessary DOM updates)
+          if (titleElement.textContent === data.title) {
+            break;
+          }
+          
           // Store original for potential rollback
           if (!titleElement.dataset.originalTitle) {
             titleElement.dataset.originalTitle = titleElement.textContent;
@@ -291,6 +302,11 @@
       const formattedPrice = formatPrice(data.price);
       
       priceElements.forEach(el => {
+        // Skip if already has this exact value (prevents unnecessary DOM updates)
+        if (el.textContent === formattedPrice) {
+          return;
+        }
+        
         // Store original for potential rollback
         if (!el.dataset.originalPrice) {
           el.dataset.originalPrice = el.textContent;
@@ -363,9 +379,10 @@
 
   /**
    * Process all product cards on collection/listing pages
+   * Returns true if any cards were modified (to signal observer to disconnect/reconnect)
    */
   async function processCollectionPageProducts(sessionId, tests) {
-    if (!tests || tests.length === 0) return;
+    if (!tests || tests.length === 0) return false;
 
     // Common product card selectors across Shopify themes
     const cardSelectors = [
@@ -381,21 +398,20 @@
     const productCards = document.querySelectorAll(cardSelectors.join(', '));
     
     if (productCards.length === 0) {
-      console.log('[Shoptimizer] No product cards found on this page');
-      return;
+      return false;
     }
 
-    console.log(`[Shoptimizer] Found ${productCards.length} product card(s) on collection page`);
+    let modifiedCount = 0;
+    let newCardsProcessed = 0;
 
     for (const card of productCards) {
-      // Skip if already processed
+      // Skip if already processed (check the specific flag we set)
       if (card.dataset.shoptimizerProcessed === 'true') {
         continue;
       }
 
       const productId = getProductIdFromCard(card);
       if (!productId) {
-        console.log('[Shoptimizer] Could not extract product ID from card, skipping');
         continue;
       }
 
@@ -405,13 +421,13 @@
         continue; // No test for this product, skip
       }
 
-      console.log(`[Shoptimizer] Found active test for product ${productId}:`, productTest.id);
-
       // Assign variant (reuse existing logic)
       const variant = await assignUserToVariant(sessionId, productTest.id);
       
       // Apply variant to this card
       applyVariantToCard(card, productTest, variant);
+      modifiedCount++;
+      newCardsProcessed++;
 
       // Track collection page impression (once per card)
       const cardKey = `${productTest.id}-${productId}`;
@@ -420,20 +436,71 @@
         processedProductCards.add(cardKey);
       }
     }
+
+    if (newCardsProcessed > 0) {
+      console.log(`[Shoptimizer] Processed ${newCardsProcessed} new product card(s) on collection page`);
+    }
+
+    return modifiedCount > 0;
   }
 
   /**
    * Watch for lazy-loaded product cards (infinite scroll, AJAX)
    */
   function watchForLazyLoadedProducts(sessionId, tests) {
-    if (!tests || tests.length === 0) return;
+    if (!tests || tests.length === 0) return null;
 
     let debounceTimer;
+    let isProcessing = false;
+    let needsRecheck = false;
+    
     const observer = new MutationObserver((mutations) => {
+      // If we're currently processing, set flag to recheck after current batch
+      if (isProcessing) {
+        needsRecheck = true;
+        return;
+      }
+
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        console.log('[Shoptimizer] DOM changed, checking for new product cards...');
-        processCollectionPageProducts(sessionId, tests);
+      debounceTimer = setTimeout(async () => {
+        // Set processing flag to prevent re-entry during our DOM modifications
+        isProcessing = true;
+        needsRecheck = false;
+
+        try {
+          const modified = await processCollectionPageProducts(sessionId, tests);
+          
+          if (modified) {
+            console.log('[Shoptimizer] Applied variants to new product cards');
+          }
+          
+          // If new mutations occurred while we were processing, do another sweep
+          if (needsRecheck) {
+            console.log('[Shoptimizer] New cards detected during processing, rechecking...');
+            needsRecheck = false;
+            await processCollectionPageProducts(sessionId, tests);
+          }
+        } catch (err) {
+          console.error('[Shoptimizer] Error processing cards:', err);
+        } finally {
+          isProcessing = false;
+          
+          // Final check in case mutations happened during the finally block
+          if (needsRecheck) {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(async () => {
+              if (!isProcessing) {
+                isProcessing = true;
+                needsRecheck = false;
+                try {
+                  await processCollectionPageProducts(sessionId, tests);
+                } finally {
+                  isProcessing = false;
+                }
+              }
+            }, 100);
+          }
+        }
       }, 300); // Debounce 300ms to avoid excessive processing
     });
 
@@ -443,6 +510,8 @@
     });
 
     console.log('[Shoptimizer] MutationObserver active for lazy-loaded products');
+    
+    return observer;
   }
 
   // ============================================
