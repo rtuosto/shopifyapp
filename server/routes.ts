@@ -451,32 +451,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Initialize Bayesian state if using Bayesian allocation
-      let updateData: any = {
+      // Initialize Bayesian state (all tests now use Bayesian allocation)
+      const { initializeBayesianState } = await import('./statistics/allocation-service');
+      
+      // Estimate conversion rate and AOV from product price
+      const estimatedCR = 0.02; // 2% default
+      const estimatedAOV = parseFloat(product.price);
+      
+      const bayesianState = initializeBayesianState({
+        conversionRate: estimatedCR,
+        avgOrderValue: estimatedAOV,
+        riskMode: 'cautious',
+        safetyBudget: 50,
+      });
+      
+      const updateData: any = {
         status: "active",
         startDate: new Date(),
+        bayesianConfig: bayesianState,
+        controlAllocation: "75", // Start cautious: 75% control
+        variantAllocation: "5",  // 5% variant
       };
       
-      if (test.allocationStrategy === "bayesian") {
-        const { initializeBayesianState } = await import('./statistics/allocation-service');
-        
-        // Estimate conversion rate and AOV from product price
-        const estimatedCR = 0.02; // 2% default
-        const estimatedAOV = parseFloat(product.price);
-        
-        const bayesianState = initializeBayesianState({
-          conversionRate: estimatedCR,
-          avgOrderValue: estimatedAOV,
-          riskMode: 'cautious',
-          safetyBudget: 50,
-        });
-        
-        updateData.bayesianConfig = bayesianState;
-        updateData.controlAllocation = "75"; // Start cautious: 75% control
-        updateData.variantAllocation = "5";  // 5% variant
-        
-        console.log(`[Test Activation] Initialized Bayesian state with cautious allocation (75/5)`);
-      }
+      console.log(`[Test Activation] Initialized Bayesian state with cautious allocation (75/5)`);
       
       // Activate the test in our database
       const activatedTest = await storage.updateTest(shop, testId, updateData);
@@ -572,9 +569,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Test not found" });
       }
       
-      if (test.status !== "active" || test.allocationStrategy !== "bayesian") {
+      if (test.status !== "active") {
         return res.status(400).json({ 
-          error: "Can only update allocation for active Bayesian tests" 
+          error: "Can only update allocation for active tests" 
         });
       }
       
@@ -636,9 +633,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Test not found" });
       }
       
-      if (test.status !== "active" || test.allocationStrategy !== "bayesian") {
+      if (test.status !== "active") {
         return res.status(400).json({ 
-          error: "Can only check promotion for active Bayesian tests" 
+          error: "Can only check promotion for active tests" 
         });
       }
       
@@ -1317,7 +1314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let bayesianUpdate = null;
       let allocationAfter = allocationBefore;
       
-      if (updatedTest && updatedTest.allocationStrategy === "bayesian") {
+      if (updatedTest) {
         try {
           const { computeAllocationUpdate, updateBayesianState, BayesianState } = await import('./statistics/allocation-service');
           
