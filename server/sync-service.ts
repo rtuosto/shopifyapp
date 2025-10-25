@@ -18,6 +18,15 @@ interface ShopifyProduct {
       currencyCode: string;
     };
   };
+  variants?: {
+    edges: Array<{
+      node: {
+        id: string;
+        price: string;
+        title: string;
+      };
+    }>;
+  };
   images: {
     edges: Array<{
       node: {
@@ -43,12 +52,20 @@ export async function syncProductsFromShopify(session: Session): Promise<number>
     for (const edge of shopifyProducts) {
       const shopifyProduct: ShopifyProduct = edge.node;
       
+      // Extract all variants with their IDs and prices
+      const variants = shopifyProduct.variants?.edges.map(v => ({
+        id: v.node.id,
+        price: v.node.price,
+        title: v.node.title,
+      })) || [];
+      
       const productData: InsertProduct = {
         shopifyProductId: shopifyProduct.id,
         title: shopifyProduct.title,
         description: shopifyProduct.description || null,
         price: shopifyProduct.priceRangeV2.minVariantPrice.amount,
         compareAtPrice: null,
+        variants: variants, // Store all variant IDs and prices
         images: shopifyProduct.images.edges.map(img => img.node.url),
         rating: null,
         reviewCount: 0,

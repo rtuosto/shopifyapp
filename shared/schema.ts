@@ -12,6 +12,11 @@ export const products = pgTable("products", {
   description: text("description"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),
+  variants: jsonb("variants").$type<Array<{
+    id: string;
+    price: string;
+    title?: string;
+  }>>().notNull().default(sql`'[]'::jsonb`), // All product variants with IDs and prices
   images: jsonb("images").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   rating: decimal("rating", { precision: 3, scale: 2 }),
   reviewCount: integer("review_count").default(0),

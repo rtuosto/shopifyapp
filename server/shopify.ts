@@ -50,6 +50,15 @@ export async function fetchProducts(session: Session) {
                     currencyCode
                   }
                 }
+                variants(first: 100) {
+                  edges {
+                    node {
+                      id
+                      price
+                      title
+                    }
+                  }
+                }
                 images(first: 5) {
                   edges {
                     node {
