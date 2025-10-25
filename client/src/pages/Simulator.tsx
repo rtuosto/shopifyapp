@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -101,6 +101,19 @@ export default function Simulator() {
     controlAllocation: number;
     variantAllocation: number;
   }>>([]);
+  
+  // Store EventSource instance for cleanup
+  const eventSourceRef = useRef<EventSource | null>(null);
+  
+  // Cleanup EventSource on unmount
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    };
+  }, []);
 
   // Fetch active tests
   const { data: tests = [], isLoading: testsLoading } = useQuery<EnrichedTest[]>({
@@ -167,9 +180,15 @@ export default function Simulator() {
     },
   });
 
-  // Streaming simulation handler
+  // Streaming simulation handler using EventSource API for proper SSE
   const startStreamingSimulation = () => {
     if (!selectedTestId) return;
+    
+    // Close any existing EventSource
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
 
     setIsStreaming(true);
     setStreamProgress(0);
@@ -184,121 +203,93 @@ export default function Simulator() {
       variantAllocation: number;
     }> = [];
 
-    fetch("/api/simulate/batch-stream", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        testId: selectedTestId,
-        visitors,
-        controlConversionRate: controlConversionRate / 100,
-        variantConversionRate: variantConversionRate / 100,
-      }),
-    }).then((response) => {
-      if (!response.ok) {
-        throw new Error("Failed to start streaming simulation");
-      }
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      const processStream = async () => {
-        if (!reader) return;
-
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            
-            // Keep the last incomplete line in the buffer
-            buffer = lines.pop() || "";
-
-            let currentEvent = "";
-            for (const line of lines) {
-              if (line.startsWith("event:")) {
-                currentEvent = line.substring(6).trim();
-                console.log(`[SSE Client] Received event type: ${currentEvent}`);
-              } else if (line.startsWith("data:") && currentEvent) {
-                try {
-                  const data = JSON.parse(line.substring(5).trim());
-                  console.log(`[SSE Client] Parsed ${currentEvent} data:`, currentEvent === 'progress' ? `${data.impressions} impressions` : data);
-
-                  if (currentEvent === "progress") {
-                    setStreamProgress(parseFloat(data.percentage));
-                    const newDataPoint = {
-                      impressions: data.impressions,
-                      controlRPV: data.controlRPV,
-                      variantRPV: data.variantRPV,
-                      controlAllocation: data.controlAllocation,
-                      variantAllocation: data.variantAllocation,
-                    };
-                    accumulatedEvolutionData.push(newDataPoint);
-                    setStreamingEvolutionData([...accumulatedEvolutionData]);
-                  } else if (currentEvent === "complete") {
-                    setIsStreaming(false);
-                    const result: SimulationResult = {
-                      type: "batch",
-                      timestamp: new Date().toLocaleTimeString(),
-                      testName: selectedTest?.productName || "Unknown",
-                      allocationBefore: data.allocationBefore,
-                      allocationAfter: data.allocationAfter,
-                      variantPerformance: data.variantPerformance,
-                      bayesianUpdate: data.bayesianUpdate,
-                      evolutionData: accumulatedEvolutionData,
-                    };
-                    setLastSimulationResult(result);
-
-                    toast({
-                      title: "Live Simulation Complete",
-                      description: `Simulated ${data.impressions} visitors in real-time`,
-                    });
-
-                    queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
-                    queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-                  } else if (currentEvent === "error") {
-                    setIsStreaming(false);
-                    toast({
-                      title: "Simulation Failed",
-                      description: data.error,
-                      variant: "destructive",
-                    });
-                  }
-                  
-                  currentEvent = ""; // Reset after processing
-                } catch (parseError) {
-                  console.error("Failed to parse SSE data:", parseError);
-                }
-              }
-            }
-          }
-        } catch (error) {
-          console.error("Stream processing error:", error);
-          setIsStreaming(false);
-          toast({
-            title: "Stream Error",
-            description: "Failed to process simulation stream",
-            variant: "destructive",
-          });
-        } finally {
-          reader.releaseLock();
-        }
-      };
-
-      processStream();
-    }).catch((error) => {
-      console.error("Streaming error:", error);
-      setIsStreaming(false);
-      toast({
-        title: "Simulation Failed",
-        description: error.message,
-        variant: "destructive",
-      });
+    // Build URL with query parameters (EventSource only supports GET)
+    const params = new URLSearchParams({
+      testId: selectedTestId,
+      visitors: visitors.toString(),
+      controlConversionRate: (controlConversionRate / 100).toString(),
+      variantConversionRate: (variantConversionRate / 100).toString(),
     });
+    const url = `/api/simulate/batch-stream?${params.toString()}`;
+
+    console.log('[SSE Client] Connecting to:', url);
+    const eventSource = new EventSource(url);
+    eventSourceRef.current = eventSource;
+
+    eventSource.addEventListener('start', (event) => {
+      const data = JSON.parse(event.data);
+      console.log('[SSE Client] Received start event:', data);
+    });
+
+    eventSource.addEventListener('progress', (event) => {
+      const data = JSON.parse(event.data);
+      console.log('[SSE Client] Received progress event:', `${data.impressions} impressions`);
+      
+      setStreamProgress(parseFloat(data.percentage));
+      const newDataPoint = {
+        impressions: data.impressions,
+        controlRPV: data.controlRPV,
+        variantRPV: data.variantRPV,
+        controlAllocation: data.controlAllocation,
+        variantAllocation: data.variantAllocation,
+      };
+      accumulatedEvolutionData.push(newDataPoint);
+      setStreamingEvolutionData([...accumulatedEvolutionData]);
+    });
+
+    eventSource.addEventListener('complete', (event) => {
+      const data = JSON.parse(event.data);
+      console.log('[SSE Client] Received complete event:', data);
+      
+      setIsStreaming(false);
+      const result: SimulationResult = {
+        type: "batch",
+        timestamp: new Date().toLocaleTimeString(),
+        testName: selectedTest?.productName || "Unknown",
+        allocationBefore: data.allocationBefore,
+        allocationAfter: data.allocationAfter,
+        variantPerformance: data.variantPerformance,
+        bayesianUpdate: data.bayesianUpdate,
+        evolutionData: accumulatedEvolutionData,
+      };
+      setLastSimulationResult(result);
+
+      toast({
+        title: "Live Simulation Complete",
+        description: `Simulated ${data.impressions} visitors in real-time`,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      
+      eventSource.close();
+      eventSourceRef.current = null;
+    });
+
+    eventSource.onerror = (event) => {
+      console.error('[SSE Client] Connection error:', event);
+      setIsStreaming(false);
+      
+      // EventSource error events don't have data payload
+      // Check readyState to determine error type
+      if (eventSource.readyState === EventSource.CONNECTING) {
+        // Connection lost, will auto-retry
+        toast({
+          title: "Connection Lost",
+          description: "Attempting to reconnect...",
+          variant: "destructive",
+        });
+      } else if (eventSource.readyState === EventSource.CLOSED) {
+        // Connection failed, likely server error
+        toast({
+          title: "Connection Failed",
+          description: "Failed to connect to streaming server. Please check parameters and try again.",
+          variant: "destructive",
+        });
+        eventSource.close();
+        eventSourceRef.current = null;
+      }
+    };
   };
 
   const handleRunSimulation = () => {

@@ -1510,23 +1510,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POST /api/simulate/batch-stream - SSE streaming version for live updates
-  app.post("/api/simulate/batch-stream", requireShopifySessionOrDev, async (req, res) => {
+  // GET /api/simulate/batch-stream - SSE streaming version for live updates (uses GET for EventSource compatibility)
+  app.get("/api/simulate/batch-stream", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
       const { 
         testId, 
-        visitors = 1000,
-        controlConversionRate = 0.03,
-        variantConversionRate = 0.03,
+        visitors = '1000',
+        controlConversionRate = '0.03',
+        variantConversionRate = '0.03',
         avgOrderValue
-      } = req.body;
+      } = req.query;
 
       if (!testId) {
         return res.status(400).json({ error: "testId is required" });
       }
+      
+      // Convert query params to numbers and validate
+      const visitorsNum = parseInt(visitors as string);
+      const controlCR = parseFloat(controlConversionRate as string);
+      const variantCR = parseFloat(variantConversionRate as string);
+      const avgOV = avgOrderValue ? parseFloat(avgOrderValue as string) : undefined;
+      
+      // Validate parsed values BEFORE setting SSE headers
+      if (isNaN(visitorsNum) || visitorsNum <= 0) {
+        return res.status(400).json({ error: "Invalid visitors parameter" });
+      }
+      if (isNaN(controlCR) || controlCR < 0 || controlCR > 1) {
+        return res.status(400).json({ error: "Invalid controlConversionRate parameter" });
+      }
+      if (isNaN(variantCR) || variantCR < 0 || variantCR > 1) {
+        return res.status(400).json({ error: "Invalid variantConversionRate parameter" });
+      }
+      if (avgOV !== undefined && (isNaN(avgOV) || avgOV <= 0)) {
+        return res.status(400).json({ error: "Invalid avgOrderValue parameter" });
+      }
 
-      const test = await storage.getTest(shop, testId);
+      const test = await storage.getTest(shop, testId as string);
       if (!test) {
         return res.status(404).json({ error: "Test not found" });
       }
@@ -1559,7 +1579,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
-      const basePrice = avgOrderValue || parseFloat(product.price);
+      const basePrice = avgOV || parseFloat(product.price);
       const { randomUUID } = await import("crypto");
       const { assignVisitor } = await import('./assignment-service');
 
@@ -1580,14 +1600,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       sendEvent('start', {
         testId,
-        totalVisitors: visitors,
+        totalVisitors: visitorsNum,
         allocationBefore,
       });
 
-      console.log(`[Simulator Stream] Starting batch simulation for ${visitors} visitors`);
+      console.log(`[Simulator Stream] Starting batch simulation for ${visitorsNum} visitors`);
 
       // REALISTIC FLOW: Simulate each visitor and stream progress
-      for (let i = 0; i < visitors; i++) {
+      for (let i = 0; i < visitorsNum; i++) {
         const sessionId = randomUUID();
         
         const assignment = await assignVisitor(storage, {
@@ -1610,8 +1630,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         const conversionRate = assignment.variant === 'control' 
-          ? controlConversionRate 
-          : variantConversionRate;
+          ? controlCR 
+          : variantCR;
         
         const converts = Math.random() < conversionRate;
         
