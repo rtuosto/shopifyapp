@@ -659,33 +659,31 @@ export default function Dashboard() {
           <MetricCard 
             title="Revenue Impact" 
             value={(() => {
-              if (!dashboardData?.allTimeMetrics) return '$0 / $0';
-              const { incrementalRevenue, totalRevenue } = dashboardData.allTimeMetrics;
-              const formatted = formatIncrementalValue(incrementalRevenue, 0);
-              return `${formatted.text} / $${totalRevenue.toFixed(0)}`;
+              if (!dashboardData?.allTimeMetrics) return '$0';
+              const { incrementalRevenue } = dashboardData.allTimeMetrics;
+              return formatIncrementalValue(incrementalRevenue, 0).text;
             })()}
             valueClassName={(() => {
               if (!dashboardData?.allTimeMetrics) return '';
               const { incrementalRevenue } = dashboardData.allTimeMetrics;
               return formatIncrementalValue(incrementalRevenue, 0).className;
             })()}
-            subtitle="incremental / total"
+            subtitle="lift from tests"
             data-testid="card-all-time-revenue"
           />
           <MetricCard 
             title="Conversion Impact" 
             value={(() => {
-              if (!dashboardData?.allTimeMetrics) return '0 / 0';
-              const { incrementalConversions, totalConversions } = dashboardData.allTimeMetrics;
-              const formatted = formatIncrementalConversions(incrementalConversions);
-              return `${formatted.text} / ${totalConversions}`;
+              if (!dashboardData?.allTimeMetrics) return '0';
+              const { incrementalConversions } = dashboardData.allTimeMetrics;
+              return formatIncrementalConversions(incrementalConversions).text;
             })()}
             valueClassName={(() => {
               if (!dashboardData?.allTimeMetrics) return '';
               const { incrementalConversions } = dashboardData.allTimeMetrics;
               return formatIncrementalConversions(incrementalConversions).className;
             })()}
-            subtitle="incremental / total"
+            subtitle="lift from tests"
             data-testid="card-all-time-conversions"
           />
         </div>
@@ -719,33 +717,31 @@ export default function Dashboard() {
           <MetricCard 
             title="Revenue Impact" 
             value={(() => {
-              if (!dashboardData?.activeMetrics) return '$0 / $0';
-              const { incrementalRevenue, totalRevenue } = dashboardData.activeMetrics;
-              const formatted = formatIncrementalValue(incrementalRevenue, 0);
-              return `${formatted.text} / $${totalRevenue.toFixed(0)}`;
+              if (!dashboardData?.activeMetrics) return '$0';
+              const { incrementalRevenue } = dashboardData.activeMetrics;
+              return formatIncrementalValue(incrementalRevenue, 0).text;
             })()}
             valueClassName={(() => {
               if (!dashboardData?.activeMetrics) return '';
               const { incrementalRevenue } = dashboardData.activeMetrics;
               return formatIncrementalValue(incrementalRevenue, 0).className;
             })()}
-            subtitle="incremental / total"
+            subtitle="lift from tests"
             data-testid="card-active-revenue"
           />
           <MetricCard 
             title="Conversion Impact" 
             value={(() => {
-              if (!dashboardData?.activeMetrics) return '0 / 0';
-              const { incrementalConversions, totalConversions } = dashboardData.activeMetrics;
-              const formatted = formatIncrementalConversions(incrementalConversions);
-              return `${formatted.text} / ${totalConversions}`;
+              if (!dashboardData?.activeMetrics) return '0';
+              const { incrementalConversions } = dashboardData.activeMetrics;
+              return formatIncrementalConversions(incrementalConversions).text;
             })()}
             valueClassName={(() => {
               if (!dashboardData?.activeMetrics) return '';
               const { incrementalConversions } = dashboardData.activeMetrics;
               return formatIncrementalConversions(incrementalConversions).className;
             })()}
-            subtitle="incremental / total"
+            subtitle="lift from tests"
             data-testid="card-active-conversions"
           />
         </div>
