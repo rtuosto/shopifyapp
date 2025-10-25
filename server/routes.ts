@@ -1658,8 +1658,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             percentage: ((i + 1) / visitors * 100).toFixed(1),
           });
           
-          // Yield to event loop to allow buffer to flush
-          await new Promise(resolve => setImmediate(resolve));
+          // Add actual time delay to force network flush (setImmediate doesn't flush buffers)
+          await new Promise(resolve => setTimeout(resolve, 50));
         }
       }
 
