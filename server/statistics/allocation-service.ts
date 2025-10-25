@@ -123,6 +123,24 @@ export function updateBayesianState(
   newControlOrderValues: number[] = [],
   newVariantOrderValues: number[] = []
 ): BayesianState {
+  // Handle empty or incomplete state - initialize with defaults
+  if (!currentState || !currentState.control || !currentState.variant) {
+    // Estimate conversion rate and AOV from current metrics
+    const estimatedCR = metrics.controlImpressions > 0 
+      ? metrics.controlConversions / metrics.controlImpressions 
+      : 0.02;
+    const estimatedAOV = metrics.controlConversions > 0
+      ? metrics.controlRevenue / metrics.controlConversions
+      : 100;
+    
+    currentState = initializeBayesianState({
+      conversionRate: estimatedCR,
+      avgOrderValue: estimatedAOV,
+      riskMode: 'cautious',
+      safetyBudget: 50,
+    });
+  }
+
   // Update control incidence
   const controlIncidence = updateIncidencePosterior(
     currentState.control.incidence,
