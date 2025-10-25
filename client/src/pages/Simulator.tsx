@@ -882,18 +882,18 @@ export default function Simulator() {
         <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
             <strong>Batch Simulation:</strong> Generates realistic traffic and conversions in one step. 
-            Visitors are split 50/50 between control and variant, and conversions are calculated based on your specified rate.
+            Visitors are allocated using the test's current Bayesian allocation (Thompson Sampling), and conversions are calculated based on your specified rates.
           </p>
           <p>
             <strong>Traffic Simulation:</strong> Adds product page impressions to verify allocation tracking. 
-            Useful for calculating conversion rates and ensuring the 50/50 split is maintained.
+            Uses the test's dynamic allocation percentages determined by the Bayesian engine.
           </p>
           <p>
             <strong>Order Simulation:</strong> Creates purchase conversions with realistic revenue variance (±20%). 
             Updates test metrics including conversions, revenue, and ARPU.
           </p>
           <p>
-            <strong>Allocation Verification:</strong> All simulations use 50/50 allocation between control and variant. 
+            <strong>Allocation Verification:</strong> All simulations use the test's current allocation percentages. 
             Results are displayed above with detailed breakdown to confirm proper distribution.
           </p>
         </CardContent>
