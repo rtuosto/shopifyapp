@@ -114,7 +114,7 @@
   // Variant Assignment (with backend sync)
   // ============================================
 
-  async function assignUserToVariant(sessionId, testId) {
+  async function assignUserToVariant(sessionId, testId, controlAllocation, variantAllocation) {
     // Check if user already has a local assignment
     const existing = getLocalAssignment(testId);
     if (existing) {
@@ -122,8 +122,20 @@
       return existing;
     }
 
-    // Randomly assign (50/50 split)
-    const variant = Math.random() < 0.5 ? 'control' : 'variant';
+    // Use dynamic allocation percentages (Bayesian or fixed)
+    // controlAllocation and variantAllocation are in range 0-100
+    const controlPct = parseFloat(controlAllocation) || 50;
+    const variantPct = parseFloat(variantAllocation) || 50;
+    
+    // Normalize to ensure they sum to 100
+    const total = controlPct + variantPct;
+    const normalizedControlPct = (controlPct / total) * 100;
+    
+    // Randomly assign based on allocation percentages
+    const random = Math.random() * 100;
+    const variant = random < normalizedControlPct ? 'control' : 'variant';
+    
+    console.log(`[Shoptimizer] Assigned to ${variant} (allocation: control=${controlPct}%, variant=${variantPct}%)`);
     
     // Save locally
     saveLocalAssignment(testId, variant);
@@ -421,8 +433,8 @@
         continue; // No test for this product, skip
       }
 
-      // Assign variant (reuse existing logic)
-      const variant = await assignUserToVariant(sessionId, productTest.id);
+      // Assign variant (reuse existing logic with dynamic allocations)
+      const variant = await assignUserToVariant(sessionId, productTest.id, productTest.controlAllocation, productTest.variantAllocation);
       
       // Apply variant to this card
       applyVariantToCard(card, productTest, variant);
@@ -641,8 +653,8 @@
         } else {
           console.log('[Shoptimizer] Active test found for this product:', productTest.id);
           
-          // Assign user to variant (or retrieve existing assignment)
-          const variant = await assignUserToVariant(sessionId, productTest.id);
+          // Assign user to variant (or retrieve existing assignment with dynamic allocations)
+          const variant = await assignUserToVariant(sessionId, productTest.id, productTest.controlAllocation, productTest.variantAllocation);
           console.log('[Shoptimizer] User assigned to:', variant);
           
           // Apply variant changes to product page

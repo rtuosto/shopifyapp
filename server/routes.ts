@@ -341,11 +341,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Activate the test in our database
-      const activatedTest = await storage.updateTest(shop, testId, {
+      // Initialize Bayesian state if using Bayesian allocation
+      let updateData: any = {
         status: "active",
         startDate: new Date(),
-      });
+      };
+      
+      if (test.allocationStrategy === "bayesian") {
+        const { initializeBayesianState } = await import('./statistics/allocation-service');
+        
+        // Estimate conversion rate and AOV from product price
+        const estimatedCR = 0.02; // 2% default
+        const estimatedAOV = parseFloat(product.price);
+        
+        const bayesianState = initializeBayesianState({
+          conversionRate: estimatedCR,
+          avgOrderValue: estimatedAOV,
+          riskMode: 'cautious',
+          safetyBudget: 50,
+        });
+        
+        updateData.bayesianConfig = bayesianState;
+        updateData.controlAllocation = "75"; // Start cautious: 75% control
+        updateData.variantAllocation = "5";  // 5% variant
+        
+        console.log(`[Test Activation] Initialized Bayesian state with cautious allocation (75/5)`);
+      }
+      
+      // Activate the test in our database
+      const activatedTest = await storage.updateTest(shop, testId, updateData);
       
       console.log(`[Test Activation] Test activated successfully`);
       
@@ -423,6 +447,158 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deactivating test:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to deactivate test";
+      res.status(500).json({ error: errorMessage });
+    }
+  });
+
+  // Bayesian allocation update
+  app.post("/api/tests/:id/update-allocation", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      const testId = req.params.id;
+      
+      const test = await storage.getTest(shop, testId);
+      if (!test) {
+        return res.status(404).json({ error: "Test not found" });
+      }
+      
+      if (test.status !== "active" || test.allocationStrategy !== "bayesian") {
+        return res.status(400).json({ 
+          error: "Can only update allocation for active Bayesian tests" 
+        });
+      }
+      
+      // Import allocation service
+      const { computeAllocationUpdate, updateBayesianState, BayesianState } = await import('./statistics/allocation-service');
+      
+      // Update Bayesian state with current metrics
+      const bayesianConfig = test.bayesianConfig as BayesianState || {};
+      const metrics = {
+        controlImpressions: test.controlImpressions || 0,
+        variantImpressions: test.variantImpressions || 0,
+        controlConversions: test.controlConversions || 0,
+        variantConversions: test.variantConversions || 0,
+        controlRevenue: parseFloat(test.controlRevenue || "0"),
+        variantRevenue: parseFloat(test.variantRevenue || "0"),
+      };
+      
+      const updatedState = updateBayesianState(bayesianConfig, metrics);
+      
+      // Compute new allocation
+      const result = computeAllocationUpdate(updatedState, metrics);
+      
+      // Update test in database
+      const updatedTest = await storage.updateTest(shop, testId, {
+        controlAllocation: (result.allocation.control * 100).toFixed(2),
+        variantAllocation: (result.allocation.variant * 100).toFixed(2),
+        bayesianConfig: result.bayesianState,
+      });
+      
+      console.log(`[Bayesian Update] Test ${testId}: Control ${(result.allocation.control * 100).toFixed(1)}% / Variant ${(result.allocation.variant * 100).toFixed(1)}%`);
+      console.log(`[Bayesian Update] ${result.reasoning}`);
+      
+      res.json({
+        test: updatedTest,
+        allocation: result.allocation,
+        metrics: result.metrics,
+        promotionCheck: result.promotionCheck,
+        shouldStop: result.shouldStop,
+        reasoning: result.reasoning,
+      });
+    } catch (error) {
+      console.error("Error updating allocation:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to update allocation";
+      res.status(500).json({ error: errorMessage });
+    }
+  });
+
+  // Check promotion criteria and auto-promote if ready
+  app.post("/api/tests/:id/check-promotion", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      const testId = req.params.id;
+      
+      const test = await storage.getTest(shop, testId);
+      if (!test) {
+        return res.status(404).json({ error: "Test not found" });
+      }
+      
+      if (test.status !== "active" || test.allocationStrategy !== "bayesian") {
+        return res.status(400).json({ 
+          error: "Can only check promotion for active Bayesian tests" 
+        });
+      }
+      
+      // Import allocation service
+      const { computeAllocationUpdate, BayesianState } = await import('./statistics/allocation-service');
+      
+      const bayesianConfig = test.bayesianConfig as BayesianState || {};
+      const metrics = {
+        controlImpressions: test.controlImpressions || 0,
+        variantImpressions: test.variantImpressions || 0,
+        controlConversions: test.controlConversions || 0,
+        variantConversions: test.variantConversions || 0,
+        controlRevenue: parseFloat(test.controlRevenue || "0"),
+        variantRevenue: parseFloat(test.variantRevenue || "0"),
+      };
+      
+      // Compute allocation to get promotion check
+      const result = computeAllocationUpdate(bayesianConfig, metrics);
+      
+      // If promotion criteria met, upgrade to 100% variant
+      if (result.promotionCheck.shouldPromote && result.promotionCheck.winner === "variant") {
+        const updatedTest = await storage.updateTest(shop, testId, {
+          controlAllocation: "0",
+          variantAllocation: "100",
+          status: "completed",
+          endDate: new Date(),
+          bayesianConfig: {
+            ...result.bayesianState,
+            promotionCheckCount: (result.bayesianState.promotionCheckCount || 0) + 1,
+          },
+        });
+        
+        console.log(`[Auto-Promotion] Test ${testId} promoted to 100% variant`);
+        console.log(`[Auto-Promotion] Criteria: ${result.reasoning}`);
+        
+        return res.json({
+          promoted: true,
+          winner: "variant",
+          test: updatedTest,
+          promotionCheck: result.promotionCheck,
+          reasoning: result.reasoning,
+        });
+      }
+      
+      // If should stop due to budget exhaustion, cancel test
+      if (result.shouldStop) {
+        const updatedTest = await storage.updateTest(shop, testId, {
+          status: "cancelled",
+          endDate: new Date(),
+          bayesianConfig: result.bayesianState,
+        });
+        
+        console.log(`[Auto-Stop] Test ${testId} stopped: safety budget exhausted`);
+        
+        return res.json({
+          promoted: false,
+          stopped: true,
+          test: updatedTest,
+          promotionCheck: result.promotionCheck,
+          reasoning: result.reasoning,
+        });
+      }
+      
+      // Not ready yet
+      res.json({
+        promoted: false,
+        stopped: false,
+        promotionCheck: result.promotionCheck,
+        reasoning: result.reasoning,
+      });
+    } catch (error) {
+      console.error("Error checking promotion:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to check promotion";
       res.status(500).json({ error: errorMessage });
     }
   });
