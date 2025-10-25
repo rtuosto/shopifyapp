@@ -25,7 +25,7 @@ Shoptimizer utilizes a full-stack architecture with a React, Shadcn UI, Wouter, 
 - **Test Deployment & Conversion Tracking**: Activates A/B tests by deploying variants, captures control states for safe rollback, and registers `ORDERS_CREATE` webhooks for automatic conversion attribution and ARPU calculation.
 - **Safe Rollback**: Deactivates tests and restores original product values.
 - **Traffic & Conversion Simulator**: A comprehensive system for validating A/B test tracking and performance before live deployment, including batch and advanced controls for traffic and order simulation.
-- **Collection Page Variant Support**: Ensures consistent variant display on collection pages, homepages, and search results to prevent test contamination. Uses DOM manipulation and MutationObserver for dynamic content.
+- **Collection Page Variant Support**: Ensures consistent variant display on collection pages, homepages, and search results to prevent test contamination. Uses DOM manipulation and MutationObserver for dynamic content with intelligent infinite loop prevention (isProcessing guard + needsRecheck pattern) to avoid redundant processing while catching lazy-loaded cards.
 - **Auto-Configuration**: The SDK automatically detects the backend URL from `REPLIT_DOMAINS` for simplified one-line installation and deployment.
 - **CORS Configuration**: Public SDK endpoints are configured with CORS headers (`Access-Control-Allow-Origin: *`) to enable seamless cross-origin requests from Shopify stores.
 - **UI/UX**: Leverages Shadcn UI components and Tailwind CSS for an intuitive and embedded Shopify app experience.
