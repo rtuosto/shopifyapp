@@ -626,9 +626,6 @@ export default function Dashboard() {
       <DashboardHeader 
         activeTests={activeTestsCount} 
         lastSync={getLastSyncText()}
-        onRefresh={() => syncMutation.mutate()}
-        onGenerateRecommendations={() => generateRecommendationsMutation.mutate()}
-        isGeneratingRecommendations={generateRecommendationsMutation.isPending}
       />
       
       {/* All-Time Performance */}
