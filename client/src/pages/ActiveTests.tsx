@@ -363,24 +363,38 @@ export default function ActiveTests() {
                       </div>
                         
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          {/* Current Traffic Split */}
+                          {/* Actual Traffic Distribution */}
                           <div className="space-y-2">
-                            <p className="text-xs text-muted-foreground">Current Traffic Split</p>
+                            <p className="text-xs text-muted-foreground">Actual Traffic Distribution</p>
                             <div className="space-y-1">
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm">Control:</span>
-                                <span className="text-sm font-bold">{test.controlAllocation || '50'}%</span>
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm">Variant:</span>
-                                <span className="text-sm font-bold text-green-600">{test.variantAllocation || '50'}%</span>
-                              </div>
-                            </div>
-                            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                              <div 
-                                className="bg-blue-500 h-full transition-all duration-500"
-                                style={{ width: `${test.controlAllocation || '50'}%` }}
-                              />
+                              {(() => {
+                                const totalImpressions = (test.controlImpressions || 0) + (test.variantImpressions || 0);
+                                const controlPct = totalImpressions > 0 
+                                  ? ((test.controlImpressions || 0) / totalImpressions * 100).toFixed(1)
+                                  : '0.0';
+                                const variantPct = totalImpressions > 0
+                                  ? ((test.variantImpressions || 0) / totalImpressions * 100).toFixed(1)
+                                  : '0.0';
+                                
+                                return (
+                                  <>
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm">Control:</span>
+                                      <span className="text-sm font-bold">{controlPct}%</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm">Variant:</span>
+                                      <span className="text-sm font-bold text-green-600">{variantPct}%</span>
+                                    </div>
+                                    <div className="w-full bg-muted rounded-full h-2 overflow-hidden mt-2">
+                                      <div 
+                                        className="bg-blue-500 h-full transition-all duration-500"
+                                        style={{ width: `${controlPct}%` }}
+                                      />
+                                    </div>
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
 
