@@ -1285,6 +1285,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let controlRevenue = 0;
       let variantRevenue = 0;
 
+      // Track evolution at 100-impression intervals for charts
+      const evolutionData: Array<{
+        impressions: number;
+        controlRPV: number;
+        variantRPV: number;
+        controlAllocation: number;
+        variantAllocation: number;
+      }> = [];
+
       console.log(`[Simulator] Starting batch simulation for ${visitors} visitors`);
       console.log(`[Simulator] Current allocation - Control: ${allocationBefore.control}%, Variant: ${allocationBefore.variant}%`);
       console.log(`[Simulator] Conversion rates - Control: ${controlConversionRate * 100}%, Variant: ${variantConversionRate * 100}%`);
@@ -1343,6 +1352,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
             variantRevenue += orderValue;
           }
         }
+
+        // Capture snapshot every 100 impressions for evolution charts
+        if ((i + 1) % 100 === 0) {
+          const totalImpressions = controlImpressions + variantImpressions;
+          const controlRPV = controlImpressions > 0 ? controlRevenue / controlImpressions : 0;
+          const variantRPV = variantImpressions > 0 ? variantRevenue / variantImpressions : 0;
+          const currentControlAlloc = totalImpressions > 0 ? (controlImpressions / totalImpressions) * 100 : 50;
+          const currentVariantAlloc = totalImpressions > 0 ? (variantImpressions / totalImpressions) * 100 : 50;
+
+          evolutionData.push({
+            impressions: i + 1,
+            controlRPV: parseFloat(controlRPV.toFixed(2)),
+            variantRPV: parseFloat(variantRPV.toFixed(2)),
+            controlAllocation: parseFloat(currentControlAlloc.toFixed(1)),
+            variantAllocation: parseFloat(currentVariantAlloc.toFixed(1)),
+          });
+        }
+      }
+
+      // Capture final snapshot if not on a 100-impression boundary
+      if (visitors % 100 !== 0) {
+        const totalImpressions = controlImpressions + variantImpressions;
+        const controlRPV = controlImpressions > 0 ? controlRevenue / controlImpressions : 0;
+        const variantRPV = variantImpressions > 0 ? variantRevenue / variantImpressions : 0;
+        const currentControlAlloc = totalImpressions > 0 ? (controlImpressions / totalImpressions) * 100 : 50;
+        const currentVariantAlloc = totalImpressions > 0 ? (variantImpressions / totalImpressions) * 100 : 50;
+
+        evolutionData.push({
+          impressions: visitors,
+          controlRPV: parseFloat(controlRPV.toFixed(2)),
+          variantRPV: parseFloat(variantRPV.toFixed(2)),
+          controlAllocation: parseFloat(currentControlAlloc.toFixed(1)),
+          variantAllocation: parseFloat(currentVariantAlloc.toFixed(1)),
+        });
       }
 
       console.log(`[Simulator] Assignments - Control: ${controlImpressions}, Variant: ${variantImpressions}`);
@@ -1459,6 +1502,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         },
         bayesianUpdate,
+        evolutionData, // Time-series data for charts
       });
     } catch (error) {
       console.error("Error simulating batch:", error);

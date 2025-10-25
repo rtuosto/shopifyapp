@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Play, Users, ShoppingCart, Zap, CheckCircle2, AlertCircle } from "lucide-react";
+import { Play, Zap, CheckCircle2, AlertCircle } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import type { Test, Product } from "@shared/schema";
 
 interface EnrichedTest extends Test {
@@ -68,6 +69,13 @@ interface SimulationResult {
     variant: number;
   };
   revenue?: string;
+  evolutionData?: Array<{
+    impressions: number;
+    controlRPV: number;
+    variantRPV: number;
+    controlAllocation: number;
+    variantAllocation: number;
+  }>;
 }
 
 export default function Simulator() {
@@ -79,10 +87,6 @@ export default function Simulator() {
   const [visitors, setVisitors] = useState(1000);
   const [controlConversionRate, setControlConversionRate] = useState(3.0);
   const [variantConversionRate, setVariantConversionRate] = useState(3.5);
-  
-  // Individual simulation parameters
-  const [impressions, setImpressions] = useState(100);
-  const [orders, setOrders] = useState(10);
 
   // Fetch active tests
   const { data: tests = [], isLoading: testsLoading } = useQuery<EnrichedTest[]>({
@@ -123,6 +127,7 @@ export default function Simulator() {
         allocationAfter: data.allocationAfter,
         variantPerformance: data.variantPerformance,
         bayesianUpdate: data.bayesianUpdate,
+        evolutionData: data.evolutionData,
       };
       setLastSimulationResult(result);
       
@@ -148,82 +153,7 @@ export default function Simulator() {
     },
   });
 
-  // Traffic simulation mutation
-  const trafficSimulation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/simulate/traffic", {
-        testId: selectedTestId,
-        impressions,
-      });
-      return res.json();
-    },
-    onSuccess: (data) => {
-      const result: SimulationResult = {
-        type: "traffic",
-        timestamp: new Date().toLocaleTimeString(),
-        testName: selectedTest?.productName || "Unknown",
-        impressions: data.impressions,
-      };
-      setLastSimulationResult(result);
-      
-      toast({
-        title: "Traffic Simulated",
-        description: `Generated ${data.impressions.total} impressions`,
-      });
-      
-      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Simulation Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Order simulation mutation
-  const orderSimulation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/simulate/orders", {
-        testId: selectedTestId,
-        orders,
-      });
-      return res.json();
-    },
-    onSuccess: (data) => {
-      const result: SimulationResult = {
-        type: "orders",
-        timestamp: new Date().toLocaleTimeString(),
-        testName: selectedTest?.productName || "Unknown",
-        orders: data.orders,
-        revenue: data.revenue,
-        metrics: {
-          totalConversions: data.totalConversions,
-          totalRevenue: data.totalRevenue,
-          arpu: data.arpu,
-        },
-      };
-      setLastSimulationResult(result);
-      
-      toast({
-        title: "Orders Simulated",
-        description: `Generated ${data.orders.total} orders with $${data.revenue} revenue`,
-      });
-      
-      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Simulation Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const isSimulating = batchSimulation.isPending || trafficSimulation.isPending || orderSimulation.isPending;
+  const isSimulating = batchSimulation.isPending;
   const canSimulate = !!selectedTestId && !isSimulating;
 
   // Calculate allocation percentages
@@ -472,6 +402,94 @@ export default function Simulator() {
                       </p>
                     </div>
                   )}
+
+                  {/* Evolution Charts */}
+                  {lastSimulationResult.evolutionData && lastSimulationResult.evolutionData.length > 0 && (
+                    <div className="space-y-4">
+                      {/* RPV Evolution Chart */}
+                      <div className="p-4 border rounded-lg space-y-3" data-testid="chart-rpv-evolution">
+                        <div className="text-sm font-medium">RPV Evolution Over Time</div>
+                        <p className="text-xs text-muted-foreground">
+                          Revenue Per Visitor tracked at 100-impression intervals
+                        </p>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={lastSimulationResult.evolutionData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis 
+                              dataKey="impressions" 
+                              label={{ value: 'Impressions', position: 'insideBottom', offset: -5 }}
+                            />
+                            <YAxis 
+                              label={{ value: 'RPV ($)', angle: -90, position: 'insideLeft' }}
+                            />
+                            <Tooltip 
+                              formatter={(value: number) => `$${value.toFixed(2)}`}
+                              labelFormatter={(label) => `${label} impressions`}
+                            />
+                            <Legend />
+                            <Line 
+                              type="monotone" 
+                              dataKey="controlRPV" 
+                              stroke="#8884d8" 
+                              name="Control RPV"
+                              strokeWidth={2}
+                              dot={{ r: 3 }}
+                            />
+                            <Line 
+                              type="monotone" 
+                              dataKey="variantRPV" 
+                              stroke="#82ca9d" 
+                              name="Variant RPV"
+                              strokeWidth={2}
+                              dot={{ r: 3 }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      {/* Allocation Evolution Chart */}
+                      <div className="p-4 border rounded-lg space-y-3" data-testid="chart-allocation-evolution">
+                        <div className="text-sm font-medium">Traffic Allocation Evolution</div>
+                        <p className="text-xs text-muted-foreground">
+                          Bayesian allocation adjustments tracked at 100-impression intervals
+                        </p>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={lastSimulationResult.evolutionData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis 
+                              dataKey="impressions" 
+                              label={{ value: 'Impressions', position: 'insideBottom', offset: -5 }}
+                            />
+                            <YAxis 
+                              label={{ value: 'Allocation (%)', angle: -90, position: 'insideLeft' }}
+                              domain={[0, 100]}
+                            />
+                            <Tooltip 
+                              formatter={(value: number) => `${value.toFixed(1)}%`}
+                              labelFormatter={(label) => `${label} impressions`}
+                            />
+                            <Legend />
+                            <Line 
+                              type="monotone" 
+                              dataKey="controlAllocation" 
+                              stroke="#8884d8" 
+                              name="Control %"
+                              strokeWidth={2}
+                              dot={{ r: 3 }}
+                            />
+                            <Line 
+                              type="monotone" 
+                              dataKey="variantAllocation" 
+                              stroke="#82ca9d" 
+                              name="Variant %"
+                              strokeWidth={2}
+                              dot={{ r: 3 }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -594,90 +612,6 @@ export default function Simulator() {
                 </div>
               )}
 
-              {/* Traffic Simulation Results */}
-              {lastSimulationResult.type === "traffic" && lastSimulationResult.impressions && (
-                <div className="p-4 border rounded-lg space-y-3">
-                  <div className="text-sm font-medium">Traffic Allocation</div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-1">
-                      <div className="text-xs text-muted-foreground">Total</div>
-                      <div className="text-2xl font-bold" data-testid="text-traffic-total">
-                        {lastSimulationResult.impressions.total}
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="text-xs text-muted-foreground">Control (50%)</div>
-                      <div className="text-2xl font-bold" data-testid="text-traffic-control">
-                        {lastSimulationResult.impressions.control}
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="text-xs text-muted-foreground">Variant (50%)</div>
-                      <div className="text-2xl font-bold" data-testid="text-traffic-variant">
-                        {lastSimulationResult.impressions.variant}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Order Simulation Results */}
-              {lastSimulationResult.type === "orders" && lastSimulationResult.orders && (
-                <div className="space-y-3">
-                  <div className="p-4 border rounded-lg space-y-3">
-                    <div className="text-sm font-medium">Order Allocation</div>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-1">
-                        <div className="text-xs text-muted-foreground">Total</div>
-                        <div className="text-2xl font-bold" data-testid="text-orders-total">
-                          {lastSimulationResult.orders.total}
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-xs text-muted-foreground">Control (50%)</div>
-                        <div className="text-2xl font-bold" data-testid="text-orders-control">
-                          {lastSimulationResult.orders.control}
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-xs text-muted-foreground">Variant (50%)</div>
-                        <div className="text-2xl font-bold" data-testid="text-orders-variant">
-                          {lastSimulationResult.orders.variant}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {lastSimulationResult.metrics && (
-                    <div className="p-4 border rounded-lg space-y-3">
-                      <div className="text-sm font-medium">Updated Metrics</div>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-1">
-                          <div className="text-xs text-muted-foreground">Revenue</div>
-                          <div className="text-lg font-bold" data-testid="text-orders-revenue">
-                            ${lastSimulationResult.revenue}
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="text-xs text-muted-foreground">Total Conversions</div>
-                          <div className="text-lg font-bold" data-testid="text-orders-total-conversions">
-                            {lastSimulationResult.metrics.totalConversions}
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="text-xs text-muted-foreground">ARPU</div>
-                          <div className="text-lg font-bold" data-testid="text-orders-arpu">
-                            ${lastSimulationResult.metrics.arpu}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Revenue includes ±20% variance per order for realistic simulation
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -787,93 +721,6 @@ export default function Simulator() {
         </CardContent>
       </Card>
 
-      {/* Advanced Simulation */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Traffic Simulation */}
-        <Card data-testid="card-traffic-simulation">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-chart-1" />
-              <CardTitle>Traffic Simulation</CardTitle>
-            </div>
-            <CardDescription>Simulate product page impressions</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="impressions">Impressions</Label>
-                <Input
-                  id="impressions"
-                  type="number"
-                  value={impressions}
-                  onChange={(e) => setImpressions(Number(e.target.value))}
-                  min={1}
-                  max={10000}
-                  data-testid="input-impressions"
-                  disabled={!canSimulate}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Number of product page views to simulate
-                </p>
-              </div>
-
-              <Button
-                onClick={() => trafficSimulation.mutate()}
-                disabled={!canSimulate}
-                className="w-full gap-2"
-                variant="outline"
-                data-testid="button-simulate-traffic"
-              >
-                <Users className="w-4 h-4" />
-                {trafficSimulation.isPending ? "Simulating..." : "Simulate Traffic"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Order Simulation */}
-        <Card data-testid="card-order-simulation">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <ShoppingCart className="w-5 h-5 text-chart-2" />
-              <CardTitle>Order Simulation</CardTitle>
-            </div>
-            <CardDescription>Simulate conversions and revenue</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="orders">Orders</Label>
-                <Input
-                  id="orders"
-                  type="number"
-                  value={orders}
-                  onChange={(e) => setOrders(Number(e.target.value))}
-                  min={1}
-                  max={1000}
-                  data-testid="input-orders"
-                  disabled={!canSimulate}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Number of purchase orders to simulate
-                </p>
-              </div>
-
-              <Button
-                onClick={() => orderSimulation.mutate()}
-                disabled={!canSimulate}
-                className="w-full gap-2"
-                variant="outline"
-                data-testid="button-simulate-orders"
-              >
-                <ShoppingCart className="w-4 h-4" />
-                {orderSimulation.isPending ? "Simulating..." : "Simulate Orders"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Information Card */}
       <Card data-testid="card-info">
         <CardHeader>
@@ -885,16 +732,12 @@ export default function Simulator() {
             Visitors are allocated using the test's current Bayesian allocation (Thompson Sampling), and conversions are calculated based on your specified rates.
           </p>
           <p>
-            <strong>Traffic Simulation:</strong> Adds product page impressions to verify allocation tracking. 
-            Uses the test's dynamic allocation percentages determined by the Bayesian engine.
+            <strong>Evolution Charts:</strong> Track how RPV and traffic allocation change over time as the Bayesian engine learns which variant performs better.
+            The x-axis shows impressions (every 100), while the y-axes show RPV and allocation percentages respectively.
           </p>
           <p>
-            <strong>Order Simulation:</strong> Creates purchase conversions with exact product pricing. 
-            Updates test metrics including conversions, revenue, and RPV.
-          </p>
-          <p>
-            <strong>Allocation Verification:</strong> All simulations use the test's current allocation percentages. 
-            Results are displayed above with detailed breakdown to confirm proper distribution.
+            <strong>Allocation Verification:</strong> The simulation uses the test's current allocation percentages, 
+            adapting dynamically based on performance. Results include detailed breakdowns to confirm proper distribution.
           </p>
         </CardContent>
       </Card>
