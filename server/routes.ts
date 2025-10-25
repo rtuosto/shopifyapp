@@ -917,6 +917,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Test must be active to simulate traffic" });
       }
 
+      console.log(`[Simulate Traffic] START - testId: ${testId}, requested impressions: ${impressions}`);
+      console.log(`[Simulate Traffic] Test state BEFORE: impressions=${test.impressions}, control=${test.controlImpressions}, variant=${test.variantImpressions}`);
+      
       // Use current allocation percentages for realistic simulation
       const controlAllocation = parseFloat(test.controlAllocation || "50") / 100;
       const variantAllocation = parseFloat(test.variantAllocation || "50") / 100;
@@ -924,6 +927,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const controlImpressions = Math.floor(impressions * (controlAllocation / totalAllocation));
       const variantImpressions = impressions - controlImpressions;
+
+      console.log(`[Simulate Traffic] Will create ${controlImpressions} control + ${variantImpressions} variant = ${controlImpressions + variantImpressions} total records`);
 
       // Create individual impression records with unique session IDs
       const { randomUUID } = await import("crypto");
@@ -934,6 +939,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           variant: "control",
         });
       }
+      console.log(`[Simulate Traffic] Created ${controlImpressions} control impression records`);
+      
       for (let i = 0; i < variantImpressions; i++) {
         await storage.createTestImpression({
           testId,
@@ -941,6 +948,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           variant: "variant",
         });
       }
+      console.log(`[Simulate Traffic] Created ${variantImpressions} variant impression records`);
 
       // Update test with new aggregate impressions
       const newControlImpressions = (test.controlImpressions || 0) + controlImpressions;
