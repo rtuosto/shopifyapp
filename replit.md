@@ -3,7 +3,31 @@
 ## Overview
 Shoptimizer is an embedded Shopify app designed to enhance sales for store owners by leveraging AI for conversion rate optimization. It automatically analyzes products, recommends optimization tests, and facilitates A/B testing for key product elements like titles, descriptions, and prices. The core objective is to improve Average Revenue Per User (ARPU) through intelligent automation and real-time conversion tracking.
 
-## Recent Changes (October 24, 2025)
+## Recent Changes (October 25, 2025)
+
+**Collection Page Variant Support - PRODUCTION READY ✅**
+- ✅ **Critical UX enhancement:** Variants now display consistently on collection pages AND product detail pages
+- ✅ **Test validity:** Prevents contamination where users see $10.00 on collection page but $9.99 on PDP
+- ✅ Product card detection: Uses data attributes ([data-product-id], data-product-handle, href patterns)
+- ✅ Scoped DOM updates: Modifies price/title within each card element to avoid PDP conflicts
+- ✅ MutationObserver: Handles lazy-loaded products with 300ms debounce for infinite scroll themes
+- ✅ Performance optimized:
+  - Fetch tests once per page load, cache in memory
+  - Skip already-processed cards (dataset.shoptimizerProcessed flag)
+  - Debounced observer callbacks prevent excessive processing
+- ✅ Collection impressions: Track with context: 'collection' to distinguish from 'product' impressions
+- ✅ Session consistency: Same user sees same variant across homepage, collections, search, and PDPs
+- ✅ Theme compatibility: Multiple selector fallbacks cover most Shopify themes
+- ✅ Reuses existing architecture: No schema changes, extends scope="product" tests to multi-page display
+- ✅ Architect approved: No security issues, performance concerns addressed
+
+**Implementation Details:**
+- Initialization flow: Runs both PDP logic AND collection page processing on all pages
+- Card selectors: .product-card, .product-item, .grid-product, [data-product-id], li.grid__item
+- Processed cards tracked in Set to prevent duplicate impressions on observer re-fires
+- Works on: Collection pages, homepage featured products, search results, any page with product grids
+
+**Previous Changes (October 24, 2025)**
 
 **Auto-Configuration Feature - NEW ✨**
 - ✅ SDK now automatically detects Replit backend URL from `REPLIT_DOMAINS` environment variable
