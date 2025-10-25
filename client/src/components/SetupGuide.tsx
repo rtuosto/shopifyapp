@@ -80,7 +80,7 @@ export default function SetupGuide() {
             <div className="flex-1">
               <h3 className="font-semibold text-lg">Step 1: Install Shoptimizer SDK</h3>
               <p className="text-sm text-muted-foreground mb-3">
-                Add this script to your Shopify theme to enable A/B testing
+                Add this script to your theme.liquid file to enable A/B testing across all pages
               </p>
               
               <div className="flex items-center justify-between mb-2">

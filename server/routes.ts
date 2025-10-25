@@ -1066,9 +1066,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const replitDomain = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPLIT_DEV_DOMAIN;
       const apiUrl = replitDomain ? `https://${replitDomain}` : 'http://localhost:5000';
       
-      const scriptTag = `{% if template == 'product' %}
-  <script src="${apiUrl}/shoptimizer.js" defer></script>
-{% endif %}`;
+      const scriptTag = `<script src="${apiUrl}/shoptimizer.js" defer></script>`;
 
       const webhookUrl = `${apiUrl}/api/webhooks/orders/create`;
       
