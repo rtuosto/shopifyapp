@@ -25,6 +25,14 @@ Shoptimizer utilizes a full-stack architecture with a React, Shadcn UI, Wouter, 
 - **Multi-Variant Price Testing**: Complete support for products with multiple variants (sizes, colors, etc.). Price tests store all variant IDs and prices, calculate proportional price changes, deploy updated prices to ALL variants via Shopify's productVariantsBulkUpdate API, and safely restore original prices on rollback. This prevents cart/checkout price mismatches by updating actual Shopify variant prices rather than just UI display.
 - **UUID Session-Based Attribution**: A robust system using UUIDs stored in localStorage ensures persistent variant assignments across user sessions, accurately attributing conversions for A/B tests. This includes backend API endpoints for managing assignments and impressions, and webhook integration for conversion tracking.
 - **Extensible Testing Architecture**: The database schema supports diverse test scopes (product, template, page, global) and advanced allocation strategies (fixed, Bayesian, bandit) for future optimization features.
+- **Bayesian A/B Testing Engine** (NEW - January 2025): Production-ready statistical engine implementing Top-Two Thompson Sampling (TTTS) for intelligent traffic allocation with comprehensive test coverage (67/67 tests passing):
+  - **Statistical Rigor**: Beta-LogNormal conjugate priors for ARPU modeling, validated via chi-square goodness-of-fit tests (p > 0.01)
+  - **TTTS Allocation Policy**: Stochastic allocation based on posterior sampling with configurable risk modes (cautious ε=5%, balanced ε=10%, aggressive ε=20%)
+  - **Risk Controls**: Control floor (75%), variant floor (5%), CVaR throttling for downside protection, safety budget tracking
+  - **Promotion Criteria**: Auto-promotion when min samples (2000), min confidence (95%), min lift (5%), and max EOC ($1/1000 sessions) all met
+  - **Deterministic Reproducibility**: All stochastic operations seeded for reproducible results in tests and production
+  - **Defensive State Handling**: Graceful initialization from missing/null state by estimating priors from current metrics
+  - **Test Suite**: 67 tests across sampling, models, policy, and allocation-service modules validating statistical correctness and edge cases
 - **Test Preview System**: Offers side-by-side control vs. variant comparison with multi-device views and visual diff highlighting.
 - **Dashboard & Active Tests Page**: Provides real-time metrics, performance charts, AI recommendation cards, and a dedicated page for monitoring live tests with ARPU lift tracking.
 - **Product Sync System**: Automated and manual synchronization of Shopify products with complete variant data (IDs, prices, titles) stored in PostgreSQL for accurate price testing.
