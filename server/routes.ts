@@ -267,6 +267,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get single test with Bayesian state and metrics
+  app.get("/api/tests/:id", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      const test = await storage.getTest(shop, req.params.id);
+      
+      if (!test) {
+        return res.status(404).json({ error: "Test not found" });
+      }
+      
+      // Enrich with product data
+      const product = await storage.getProduct(shop, test.productId);
+      
+      // Calculate derived metrics
+      const controlARPU = test.controlImpressions > 0 
+        ? parseFloat(test.controlRevenue) / test.controlImpressions 
+        : 0;
+      const variantARPU = test.variantImpressions > 0 
+        ? parseFloat(test.variantRevenue) / test.variantImpressions 
+        : 0;
+      const arpuLift = controlARPU > 0 
+        ? ((variantARPU - controlARPU) / controlARPU) * 100 
+        : 0;
+      
+      res.json({
+        ...test,
+        productName: product?.title || "Unknown Product",
+        metrics: {
+          control: {
+            impressions: test.controlImpressions,
+            conversions: test.controlConversions,
+            revenue: parseFloat(test.controlRevenue),
+            arpu: controlARPU,
+            conversionRate: test.controlImpressions > 0 
+              ? (test.controlConversions / test.controlImpressions) * 100 
+              : 0,
+          },
+          variant: {
+            impressions: test.variantImpressions,
+            conversions: test.variantConversions,
+            revenue: parseFloat(test.variantRevenue),
+            arpu: variantARPU,
+            conversionRate: test.variantImpressions > 0 
+              ? (test.variantConversions / test.variantImpressions) * 100 
+              : 0,
+          },
+          arpuLift,
+        },
+        bayesianState: test.bayesianConfig || null,
+      });
+    } catch (error) {
+      console.error("Error fetching test:", error);
+      res.status(500).json({ error: "Failed to fetch test" });
+    }
+  });
+
   app.post("/api/tests", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
