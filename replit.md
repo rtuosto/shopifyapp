@@ -37,6 +37,11 @@ Shoptimizer utilizes a full-stack architecture with a React, Shadcn UI, Wouter, 
 - **Dashboard & Active Tests Page**: Provides real-time metrics, performance charts, AI recommendation cards, and a dedicated page for monitoring live tests with ARPU lift tracking.
 - **Product Sync System**: Automated and manual synchronization of Shopify products with complete variant data (IDs, prices, titles) stored in PostgreSQL for accurate price testing.
 - **Smart Automation System**: Includes auto-sync, auto-generation of AI recommendations, and dismissal with replacement for recommendations.
+- **Two-Layer Conflict Prevention**: Prevents data contamination from conflicting active tests on the same product element using product-scoped filtering (shop + productId + testType):
+  - **Layer 1 - Proactive Filtering**: AI recommendation generation automatically excludes test types that have active tests on the product, avoiding unnecessary recommendations
+  - **Layer 2 - Defensive Validation**: Test activation endpoint blocks duplicate activations with 409 error and clear merchant-facing message ("Can't activate: This product already has an active [type] test")
+  - **Storage Helper**: `getActiveTestsByProduct(shop, productId, testType?)` provides reusable query for filtering active tests with optional test type scoping
+  - **Frontend Error Handling**: Proper JSON error parsing displays clean conflict messages in toasts without technical jargon
 - **Test Deployment & Conversion Tracking**: Activates A/B tests by deploying variants to Shopify (for price tests), captures control states for safe rollback, and registers `ORDERS_CREATE` webhooks for automatic conversion attribution and ARPU calculation.
 - **Safe Rollback**: Deactivates tests and restores original product values in Shopify. For price tests, restores ALL original variant prices from stored control data.
 - **Traffic & Conversion Simulator**: A comprehensive system for validating A/B test tracking and performance before live deployment, including batch and advanced controls for traffic and order simulation.
