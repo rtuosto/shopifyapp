@@ -177,7 +177,15 @@ export default function ActiveTests() {
               const conversions = test.conversions || 0;
               const conversionRate = impressions > 0 ? (conversions / impressions) * 100 : 0;
               const arpuLift = parseFloat(test.arpuLift || "0");
-              const hasSignificantData = conversions >= 5; // Arbitrary threshold for "significant"
+              
+              // Determine if test has significant data
+              // Both Bayesian and Fixed tests need minimum data per variant for confident decisions
+              const hasSignificantData = test.allocationStrategy === "bayesian"
+                ? impressions >= 2000 && // Matches Bayesian promotion criteria
+                  (test.controlConversions || 0) >= 30 && // Control has meaningful data
+                  (test.variantConversions || 0) >= 30    // Variant has meaningful data
+                : (test.controlConversions || 0) >= 3 &&  // Fixed: Both variants need minimum data
+                  (test.variantConversions || 0) >= 3;    // Lower threshold since traffic is balanced
               
               return (
                 <Card key={test.id} data-testid={`card-test-${index}`}>
