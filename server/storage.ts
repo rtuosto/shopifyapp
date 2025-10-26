@@ -15,10 +15,17 @@ import {
   type InsertTestConversion,
   type TestEvolutionSnapshot,
   type InsertTestEvolutionSnapshot,
+  type Shop,
+  type InsertShop,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
+  // Shops (quota tracking)
+  getShop(shop: string): Promise<Shop | undefined>;
+  createOrUpdateShop(shop: string, data: Partial<InsertShop>): Promise<Shop>;
+  incrementQuota(shop: string, amount: number): Promise<Shop | undefined>;
+
   // Products (shop-scoped)
   getProduct(shop: string, id: string): Promise<Product | undefined>;
   getProducts(shop: string): Promise<Product[]>;
@@ -69,6 +76,7 @@ export interface IStorage {
 
 export class MemStorage implements IStorage {
   // Shop-scoped storage: Map<shop, Map<id, entity>>
+  private shops: Map<string, Shop>;
   private products: Map<string, Map<string, Product>>;
   private recommendations: Map<string, Map<string, Recommendation>>;
   private tests: Map<string, Map<string, Test>>;
@@ -76,6 +84,7 @@ export class MemStorage implements IStorage {
   private sessionAssignments: Map<string, Map<string, SessionAssignment>>;
 
   constructor() {
+    this.shops = new Map();
     this.products = new Map();
     this.recommendations = new Map();
     this.tests = new Map();
@@ -89,6 +98,39 @@ export class MemStorage implements IStorage {
       map.set(shop, new Map());
     }
     return map.get(shop)!;
+  }
+
+  // Shops (quota tracking)
+  async getShop(shop: string): Promise<Shop | undefined> {
+    return this.shops.get(shop);
+  }
+
+  async createOrUpdateShop(shop: string, data: Partial<InsertShop>): Promise<Shop> {
+    const existing = this.shops.get(shop);
+    const shopData: Shop = {
+      shop,
+      planTier: data.planTier || existing?.planTier || "basic",
+      recommendationQuota: data.recommendationQuota ?? existing?.recommendationQuota ?? 20,
+      recommendationsUsed: data.recommendationsUsed ?? existing?.recommendationsUsed ?? 0,
+      quotaResetDate: data.quotaResetDate || existing?.quotaResetDate || new Date(),
+      createdAt: existing?.createdAt || new Date(),
+      updatedAt: new Date(),
+    };
+    this.shops.set(shop, shopData);
+    return shopData;
+  }
+
+  async incrementQuota(shop: string, amount: number): Promise<Shop | undefined> {
+    const existing = this.shops.get(shop);
+    if (!existing) return undefined;
+    
+    const updated: Shop = {
+      ...existing,
+      recommendationsUsed: existing.recommendationsUsed + amount,
+      updatedAt: new Date(),
+    };
+    this.shops.set(shop, updated);
+    return updated;
   }
 
   private initializeSampleData(shop: string) {

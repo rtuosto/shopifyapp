@@ -9,6 +9,7 @@ import {
   testImpressions,
   testConversions,
   testEvolutionSnapshots,
+  shops,
   type Product,
   type InsertProduct,
   type Recommendation,
@@ -25,6 +26,8 @@ import {
   type InsertTestConversion,
   type TestEvolutionSnapshot,
   type InsertTestEvolutionSnapshot,
+  type Shop,
+  type InsertShop,
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -33,6 +36,53 @@ import type { IStorage } from "./storage";
  * Persists data across server restarts, avoiding unnecessary LLM calls
  */
 export class DbStorage implements IStorage {
+  // Shops (quota tracking)
+  async getShop(shop: string): Promise<Shop | undefined> {
+    const result = await db.select().from(shops)
+      .where(eq(shops.shop, shop))
+      .limit(1);
+    return result[0];
+  }
+
+  async createOrUpdateShop(shop: string, data: Partial<InsertShop>): Promise<Shop> {
+    const existing = await this.getShop(shop);
+    
+    if (existing) {
+      // Update existing shop
+      const [result] = await db.update(shops)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(shops.shop, shop))
+        .returning();
+      return result;
+    } else {
+      // Create new shop with defaults
+      const [result] = await db.insert(shops)
+        .values({
+          shop,
+          planTier: data.planTier || "basic",
+          recommendationQuota: data.recommendationQuota ?? 20,
+          recommendationsUsed: data.recommendationsUsed ?? 0,
+          quotaResetDate: data.quotaResetDate || new Date(),
+        })
+        .returning();
+      return result;
+    }
+  }
+
+  async incrementQuota(shop: string, amount: number): Promise<Shop | undefined> {
+    const existing = await this.getShop(shop);
+    if (!existing) return undefined;
+    
+    const [result] = await db.update(shops)
+      .set({ 
+        recommendationsUsed: existing.recommendationsUsed + amount,
+        updatedAt: new Date(),
+      })
+      .where(eq(shops.shop, shop))
+      .returning();
+    return result;
+  }
+
   // Products (shop-scoped)
   async getProduct(shop: string, id: string): Promise<Product | undefined> {
     const result = await db.select().from(products)

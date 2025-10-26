@@ -3,13 +3,14 @@ import { createServer, type Server } from "http";
 import cors from "cors";
 import { storage } from "./storage";
 import { shopify, fetchProducts, updateProduct, getProductVariants, sessionStorage } from "./shopify";
-import { generateOptimizationRecommendations } from "./ai-service";
+import { generateOptimizationRecommendations, generateBatchRecommendations } from "./ai-service";
 import { insertRecommendationSchema, insertTestSchema } from "@shared/schema";
 import { requireShopifySessionOrDev } from "./middleware/shopify-auth";
 import { syncProductsFromShopify, initializeShopData } from "./sync-service";
 import { getSyncStatus, completeSyncSuccess } from "./sync-status";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { selectTopProducts } from "./recommendation-engine";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // CORS configuration for public storefront API endpoints
@@ -281,6 +282,299 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating recommendation:", error);
       res.status(500).json({ error: "Failed to update recommendation" });
+    }
+  });
+
+  // Quota management
+  app.get("/api/quota", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      let shopData = await storage.getShop(shop);
+      
+      // Create shop record if doesn't exist
+      if (!shopData) {
+        shopData = await storage.createOrUpdateShop(shop, {});
+      }
+      
+      res.json({
+        quota: shopData.recommendationQuota,
+        used: shopData.recommendationsUsed,
+        remaining: shopData.recommendationQuota - shopData.recommendationsUsed,
+        planTier: shopData.planTier,
+        resetDate: shopData.quotaResetDate,
+      });
+    } catch (error) {
+      console.error("Error fetching quota:", error);
+      res.status(500).json({ error: "Failed to fetch quota" });
+    }
+  });
+
+  // Store-wide intelligent recommendation generation
+  app.post("/api/recommendations/store-analysis", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      
+      // Check quota
+      let shopData = await storage.getShop(shop);
+      if (!shopData) {
+        shopData = await storage.createOrUpdateShop(shop, {});
+      }
+      
+      const quotaRemaining = shopData.recommendationQuota - shopData.recommendationsUsed;
+      const quotaNeeded = 10; // Store-wide analysis generates 10 recommendations
+      
+      if (quotaRemaining < quotaNeeded) {
+        return res.status(403).json({ 
+          error: "Insufficient quota", 
+          required: quotaNeeded,
+          available: quotaRemaining,
+          message: `You need ${quotaNeeded} AI ideas but only have ${quotaRemaining} remaining.`
+        });
+      }
+      
+      // Get all products and active tests
+      const products = await storage.getProducts(shop);
+      if (products.length === 0) {
+        return res.status(400).json({ error: "No products found. Please sync your store first." });
+      }
+      
+      const activeTests = await storage.getTests(shop, 'active');
+      const activeProductIds = activeTests.map(t => t.productId);
+      
+      console.log(`[Store Analysis] Found ${products.length} products, ${activeProductIds.length} with active tests`);
+      
+      // Run intelligent product selection algorithm
+      const topProducts = selectTopProducts(products, activeProductIds, 25);
+      console.log(`[Store Analysis] Selected top ${topProducts.length} products for AI analysis`);
+      
+      if (topProducts.length === 0) {
+        return res.status(400).json({ error: "No eligible products found for recommendations." });
+      }
+      
+      // Prepare products for batch AI analysis
+      const productsForAI = topProducts.map(scored => ({
+        id: scored.product.id,
+        title: scored.product.title,
+        description: scored.product.description || "",
+        price: parseFloat(scored.product.price),
+        margin: scored.product.margin ? parseFloat(scored.product.margin) : undefined,
+        revenue30d: scored.product.revenue30d ? parseFloat(scored.product.revenue30d) : undefined,
+        totalSold: scored.product.totalSold || undefined,
+      }));
+      
+      // Call batch AI service
+      console.log(`[Store Analysis] Calling batch AI with ${productsForAI.length} products`);
+      const aiRecommendations = await generateBatchRecommendations(productsForAI, 10);
+      console.log(`[Store Analysis] AI returned ${aiRecommendations.length} recommendations`);
+      
+      // Store recommendations in database
+      const created = await Promise.all(
+        aiRecommendations.map(rec =>
+          storage.createRecommendation(shop, {
+            productId: rec.productId,
+            title: rec.title,
+            description: rec.description,
+            testType: rec.testType,
+            proposedChanges: rec.proposedChanges,
+            insights: rec.insights,
+          })
+        )
+      );
+      
+      // Update quota
+      await storage.incrementQuota(shop, quotaNeeded);
+      console.log(`[Store Analysis] Updated quota: +${quotaNeeded} used`);
+      
+      res.json({
+        recommendations: created,
+        quotaUsed: quotaNeeded,
+        quotaRemaining: quotaRemaining - quotaNeeded,
+      });
+    } catch (error) {
+      console.error("Error generating store-wide recommendations:", error);
+      res.status(500).json({ error: "Failed to generate recommendations" });
+    }
+  });
+
+  // Product-specific recommendation generation (uses 1 quota)
+  app.post("/api/recommendations/product/:productId/generate", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      const { productId } = req.params;
+      
+      // Check quota
+      let shopData = await storage.getShop(shop);
+      if (!shopData) {
+        shopData = await storage.createOrUpdateShop(shop, {});
+      }
+      
+      const quotaRemaining = shopData.recommendationQuota - shopData.recommendationsUsed;
+      if (quotaRemaining < 1) {
+        return res.status(403).json({ 
+          error: "Insufficient quota", 
+          available: quotaRemaining,
+          message: "You've used all your AI ideas for this month."
+        });
+      }
+      
+      // Get product
+      const product = await storage.getProduct(shop, productId);
+      if (!product) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+      
+      // Get active tests to filter conflicts
+      const activeTests = await storage.getActiveTestsByProduct(shop, productId);
+      const activeTestTypes = new Set(activeTests.map(t => t.testType));
+      
+      // Generate recommendation using existing AI service
+      const aiRecommendations = await generateOptimizationRecommendations({
+        title: product.title,
+        description: product.description || "",
+        price: parseFloat(product.price),
+      });
+      
+      // Filter out conflicting test types
+      const availableRecommendations = aiRecommendations.filter(rec => !activeTestTypes.has(rec.testType));
+      
+      if (availableRecommendations.length === 0) {
+        return res.status(400).json({ 
+          error: "No recommendations available. This product may already have tests for all recommendation types." 
+        });
+      }
+      
+      // Take first available recommendation
+      const recommendation = availableRecommendations[0];
+      const created = await storage.createRecommendation(shop, {
+        productId: product.id,
+        ...recommendation,
+      });
+      
+      // Update quota
+      await storage.incrementQuota(shop, 1);
+      
+      res.json({
+        recommendation: created,
+        quotaUsed: 1,
+        quotaRemaining: quotaRemaining - 1,
+      });
+    } catch (error) {
+      console.error("Error generating product recommendation:", error);
+      res.status(500).json({ error: "Failed to generate recommendation" });
+    }
+  });
+
+  // Dismiss recommendation with optional replace
+  app.post("/api/recommendations/:id/dismiss", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      const { id } = req.params;
+      const { replace = false } = req.body;
+      
+      // Get the recommendation
+      const rec = await storage.getRecommendation(shop, id);
+      if (!rec) {
+        return res.status(404).json({ error: "Recommendation not found" });
+      }
+      
+      // Mark as dismissed
+      await storage.updateRecommendation(shop, id, {
+        status: "dismissed",
+        dismissedAt: new Date(),
+      });
+      
+      let replacement = null;
+      let quotaUsed = 0;
+      
+      // Generate replacement if requested
+      if (replace) {
+        const shopData = await storage.getShop(shop);
+        const quotaRemaining = shopData ? (shopData.recommendationQuota - shopData.recommendationsUsed) : 0;
+        
+        if (quotaRemaining < 1) {
+          return res.status(403).json({ 
+            error: "Insufficient quota for replacement", 
+            dismissed: true,
+            replacement: null,
+          });
+        }
+        
+        // Get product and active tests
+        const product = await storage.getProduct(shop, rec.productId);
+        if (product) {
+          const activeTests = await storage.getActiveTestsByProduct(shop, rec.productId);
+          const activeTestTypes = new Set(activeTests.map(t => t.testType));
+          
+          // Generate new recommendations
+          const aiRecommendations = await generateOptimizationRecommendations({
+            title: product.title,
+            description: product.description || "",
+            price: parseFloat(product.price),
+          });
+          
+          // Filter conflicts and already-dismissed type
+          const availableRecommendations = aiRecommendations.filter(
+            r => !activeTestTypes.has(r.testType) && r.testType !== rec.testType
+          );
+          
+          if (availableRecommendations.length > 0) {
+            replacement = await storage.createRecommendation(shop, {
+              productId: product.id,
+              ...availableRecommendations[0],
+            });
+            await storage.incrementQuota(shop, 1);
+            quotaUsed = 1;
+          }
+        }
+      }
+      
+      res.json({
+        dismissed: true,
+        replacement,
+        quotaUsed,
+      });
+    } catch (error) {
+      console.error("Error dismissing recommendation:", error);
+      res.status(500).json({ error: "Failed to dismiss recommendation" });
+    }
+  });
+
+  // Get archived (dismissed) recommendations
+  app.get("/api/recommendations/archived", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      const archived = await storage.getRecommendations(shop, "dismissed");
+      res.json(archived);
+    } catch (error) {
+      console.error("Error fetching archived recommendations:", error);
+      res.status(500).json({ error: "Failed to fetch archived recommendations" });
+    }
+  });
+
+  // Restore dismissed recommendation
+  app.post("/api/recommendations/:id/restore", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      const { id } = req.params;
+      
+      const rec = await storage.getRecommendation(shop, id);
+      if (!rec) {
+        return res.status(404).json({ error: "Recommendation not found" });
+      }
+      
+      if (rec.status !== "dismissed") {
+        return res.status(400).json({ error: "Only dismissed recommendations can be restored" });
+      }
+      
+      const updated = await storage.updateRecommendation(shop, id, {
+        status: "pending",
+        dismissedAt: null,
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error restoring recommendation:", error);
+      res.status(500).json({ error: "Failed to restore recommendation" });
     }
   });
 
