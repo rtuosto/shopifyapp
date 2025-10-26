@@ -1,7 +1,7 @@
 # Shoptimizer - AI-Powered Shopify Conversion Optimization
 
 ## Overview
-Shoptimizer is an embedded Shopify app designed to enhance sales for store owners by leveraging AI for conversion rate optimization. It automatically analyzes products, recommends optimization tests, and facilitates A/B testing for key product elements like titles, descriptions, and prices. The core objective is to improve Average Revenue Per User (ARPU) through intelligent automation and real-time conversion tracking. Shoptimizer aims to provide a seamless and powerful tool for Shopify merchants to boost their sales and improve their store's performance.
+Shoptimizer is an embedded Shopify app designed to enhance sales for store owners. It leverages AI to analyze products, recommend optimization tests, and facilitate A/B testing for key product elements like titles, descriptions, and prices. The primary goal is to improve Average Revenue Per User (ARPU) through intelligent automation and real-time conversion tracking, providing Shopify merchants with a powerful tool to boost sales and store performance.
 
 ## User Preferences
 - I prefer clear, concise explanations for any proposed changes or architectural decisions.
@@ -12,92 +12,34 @@ Shoptimizer is an embedded Shopify app designed to enhance sales for store owner
 - Focus on delivering functional, well-tested features that directly impact conversion optimization.
 
 ## System Architecture
-Shoptimizer utilizes a full-stack architecture with a React, Shadcn UI, Wouter, and TanStack Query frontend, integrated via Shopify App Bridge. The backend runs on Express.js with PostgreSQL for persistent multi-tenant storage using Drizzle ORM. It integrates with the Shopify Admin GraphQL API v12 for product management and uses webhooks for conversion tracking. OpenAI's GPT-4 powers AI-driven recommendations.
-
-**Storage Architecture:**
-- **Multi-Tenant PostgreSQL**: All data is shop-scoped with composite unique constraints to ensure complete data isolation between Shopify stores
-- **DbStorage Implementation**: Production storage layer that enforces shop boundaries on all database operations (SELECT, INSERT, UPDATE, DELETE)
-- **Persistence**: AI recommendations, products, tests, metrics, and session assignments persist across server restarts, eliminating redundant LLM API calls and reducing costs
-- **Security**: Shop reassignment attacks prevented by stripping shop field from all update operations
+Shoptimizer utilizes a full-stack architecture. The frontend uses React with Shadcn UI, Wouter, and TanStack Query, integrated via Shopify App Bridge. The backend is built with Express.js and uses PostgreSQL with Drizzle ORM for multi-tenant data storage. It integrates with the Shopify Admin GraphQL API for product management and uses webhooks for conversion tracking. OpenAI's GPT-4 powers AI-driven recommendations.
 
 **Key Architectural Decisions & Features:**
-- **Profit-Optimized AI Recommendation System** (October 2025 - Production Ready): Intelligent AI recommendation generation with quota management, profit-based product selection, and batch API optimization:
-  - **Quota Management**: 20 AI recommendations per month for Basic plan, tracked in `shops` table with monthly reset
-  - **Intelligent Product Selection**: Two-stage filtering algorithm for scalability:
-    1. **Multi-Dimensional Scoring**: Algorithm pre-scores entire product catalog using weighted combination:
-       - **Profit Score (40%)**: `(Price - Cost) × Margin_Multiplier` with fallback to 50% assumed margin when cost data unavailable
-       - **Sales Score (30%)**: Based on `revenue30d` with recency boost (1.5x if sold in last 7 days, 1.2x if sold in last 30 days)
-       - **Gap Score (20%)**: Heuristic scoring for optimization opportunities (weak description +50, short title +20, many variants without compareAtPrice +30, few images +15)
-       - **Price Score (10%)**: Premium products (top 30% by price) get 1.5x boost, encouraging focus on high-value items
-    2. **AI Analysis**: GPT-4 analyzes only top 20-30 candidates identified by scoring algorithm, dramatically reducing API costs
-  - **Cost Optimization**: Single batch AI call for 20-30 products achieves 90% cost reduction vs individual product calls
-  - **Quota Safety**: Quota incremented BEFORE AI calls with automatic rollback on failures, preventing overspend and ensuring accurate quota tracking even with concurrent requests
-  - **Dual-Mode Generation**:
-    - **Store-Wide Analysis** (`POST /api/recommendations/store-analysis`): Generates 10 recommendations from top candidates, costs 10 quota
-    - **Product-Specific** (`POST /api/recommendations/product/:productId/generate`): Targets single product, costs 1 quota
-  - **Archive & Replace System**:
-    - **Dismiss** (`POST /api/recommendations/:id/dismiss`): Marks recommendation as dismissed with timestamp
-    - **Replace** (`POST /api/recommendations/:id/dismiss?replace=true`): Dismisses old recommendation, generates new one for same product (different test type), costs 1 quota
-    - **Archive Access** (`GET /api/recommendations/archived`): Retrieves all dismissed recommendations
-    - **Restore** (`POST /api/recommendations/:id/restore`): Restores dismissed recommendation to pending status (no quota cost)
-  - **Conflict Prevention**: Proactive filtering ensures AI never generates recommendations for test types that already have active tests on same product
-  - **Margin Data Handling**: System falls back to price-based scoring when cost/margin data unavailable (common for merchants who don't track costs in Shopify)
-  - **API Endpoints**:
-    - `GET /api/quota` - Quota status (used, remaining, reset date, plan tier)
-    - `POST /api/recommendations/store-analysis` - Generate 10 store-wide recommendations (costs 10 quota)
-    - `POST /api/recommendations/product/:productId/generate` - Generate 1 product-specific recommendation (costs 1 quota)
-    - `POST /api/recommendations/:id/dismiss` - Dismiss recommendation with optional replacement
-    - `GET /api/recommendations/archived` - Retrieve dismissed recommendations
-    - `POST /api/recommendations/:id/restore` - Restore dismissed recommendation
-  - **Frontend Integration**: Dashboard displays color-coded quota badge (green < 50%, yellow 50-79%, red ≥80% used) with Sparkles icon
-- **AI Recommendations**: GPT-4 analyzes product data to provide actionable optimization suggestions with psychological insights and SEO explanations. Recommendations are cached in PostgreSQL to avoid unnecessary API calls on server restarts.
-- **Multi-Variant Price Testing**: Complete support for products with multiple variants (sizes, colors, etc.). Price tests store all variant IDs and prices, calculate proportional price changes, deploy updated prices to ALL variants via Shopify's productVariantsBulkUpdate API, and safely restore original prices on rollback. This prevents cart/checkout price mismatches by updating actual Shopify variant prices rather than just UI display.
-- **UUID Session-Based Attribution**: A robust system using UUIDs stored in localStorage ensures persistent variant assignments across user sessions, accurately attributing conversions for A/B tests. This includes backend API endpoints for managing assignments and impressions, and webhook integration for conversion tracking.
-- **Bayesian-Only Testing Architecture**: All A/B tests use Bayesian allocation with Thompson Sampling for intelligent, data-driven traffic distribution. Fixed 50/50 splits have been deprecated in favor of dynamic allocation that adapts in real-time based on variant performance.
-- **Bayesian A/B Testing Engine** (NEW - January 2025): Production-ready statistical engine implementing Top-Two Thompson Sampling (TTTS) for intelligent traffic allocation with comprehensive test coverage (67/67 tests passing):
-  - **Statistical Rigor**: Beta-LogNormal conjugate priors for ARPU modeling, validated via chi-square goodness-of-fit tests (p > 0.01)
-  - **TTTS Allocation Policy**: Stochastic allocation based on posterior sampling with configurable risk modes (cautious ε=5%, balanced ε=10%, aggressive ε=20%)
-  - **Risk Controls**: Control floor (75%), variant floor (5%), CVaR throttling for downside protection, safety budget tracking
-  - **Promotion Criteria**: Auto-promotion when min samples (2000), min confidence (95%), min lift (5%), and max EOC ($1/1000 sessions) all met
-  - **Deterministic Reproducibility**: All stochastic operations seeded for reproducible results in tests and production
-  - **Defensive State Handling**: Graceful initialization from missing/null state by estimating priors from current metrics
-  - **Test Suite**: 67 tests across sampling, models, policy, and allocation-service modules validating statistical correctness and edge cases
-- **Test Preview System**: Offers side-by-side control vs. variant comparison with multi-device views and visual diff highlighting.
-- **Dashboard & Active Tests Page**: Provides real-time metrics, performance charts, AI recommendation cards, and a dedicated page for monitoring live tests with ARPU lift tracking.
-- **Product Sync System**: Automated and manual synchronization of Shopify products with complete variant data (IDs, prices, titles) stored in PostgreSQL for accurate price testing.
-- **Smart Automation System**: Includes auto-sync, auto-generation of AI recommendations, and dismissal with replacement for recommendations.
-- **Two-Layer Conflict Prevention**: Prevents data contamination from conflicting active tests on the same product element using product-scoped filtering (shop + productId + testType):
-  - **Layer 1 - Proactive Filtering**: AI recommendation generation automatically excludes test types that have active tests on the product, avoiding unnecessary recommendations
-  - **Layer 2 - Defensive Validation**: Test activation endpoint blocks duplicate activations with 409 error and clear merchant-facing message ("Can't activate: This product already has an active [type] test")
-  - **Storage Helper**: `getActiveTestsByProduct(shop, productId, testType?)` provides reusable query for filtering active tests with optional test type scoping
-  - **Frontend Error Handling**: Proper JSON error parsing displays clean conflict messages in toasts without technical jargon
-- **Test Deployment & Conversion Tracking**: Activates A/B tests by deploying variants to Shopify (for price tests), captures control states for safe rollback, and registers `ORDERS_CREATE` webhooks for automatic conversion attribution and ARPU calculation.
-- **Safe Rollback**: Deactivates tests and restores original product values in Shopify. For price tests, restores ALL original variant prices from stored control data.
-- **Traffic & Conversion Simulator**: A comprehensive system for validating A/B test tracking and performance before live deployment, including batch simulation and live streaming mode:
-  - **Batch Mode**: Instant simulation results with evolution data captured at 100-impression intervals
-  - **Live Streaming Mode** (October 2025 - Production Ready): Real-time simulation using Server-Sent Events (SSE) with native EventSource API that streams progress updates every 100 visitors, allowing merchants to watch the Bayesian engine adapt traffic allocation in real-time. Features:
-    - **EventSource Architecture**: GET endpoint `/api/simulate/batch-stream` with query parameters (testId, visitors, controlConversionRate, variantConversionRate)
-    - **Server Validation**: Validates numeric inputs (visitors > 0, conversion rates 0-1) before setting SSE headers to return proper 400 errors for invalid parameters
-    - **Client Management**: useRef stores EventSource instance with useEffect cleanup on component unmount, prevents multiple connections
-    - **Error Handling**: Distinguishes between reconnectable (CONNECTING) and terminal (CLOSED) EventSource states for proper error messaging
-    - **Progressive Updates**: Streams `start`, `progress` (every 100 impressions), and `complete` events with live progress indicators
-    - **Simplified Results**: Shows "Added X visitors" summary with allocation before/after, variant performance, and Bayesian update (no charts on Simulator page)
-- **Test Evolution Charts**: Persistent visualization of test performance on Active Tests page, powered by `test_evolution_snapshots` table:
-  - **Database Storage**: Evolution snapshots stored every 100 impressions with cumulative metrics (impressions, conversions, revenue, RPV, allocation percentages)
-  - **RPV Evolution Chart**: Line chart showing Control RPV vs Variant RPV over impressions, visualizing revenue performance over time
-  - **Allocation Evolution Chart**: Line chart showing Control % vs Variant % over impressions, visualizing Thompson Sampling adaptation
-  - **Architecture**: TestEvolutionCharts component per test card fetches snapshots via GET `/api/tests/:id/evolution`, transforms decimal strings to numbers, renders Recharts LineCharts
-  - **Data Integrity**: Bigint fields for impressions/conversions prevent integer overflow during long-running tests or simulations
-  - **Performance**: Charts only render when snapshots exist, with loading states and proper error handling
-- **Collection Page Variant Support**: Ensures consistent variant display on collection pages, homepages, and search results to prevent test contamination. Uses DOM manipulation and MutationObserver for dynamic content with intelligent infinite loop prevention (isProcessing guard + needsRecheck pattern) to avoid redundant processing while catching lazy-loaded cards.
-- **Auto-Configuration**: The SDK automatically detects the backend URL from `REPLIT_DOMAINS` for simplified one-line installation and deployment.
-- **CORS Configuration**: Public SDK endpoints are configured with CORS headers (`Access-Control-Allow-Origin: *`) to enable seamless cross-origin requests from Shopify stores.
-- **UI/UX**: Leverages Shadcn UI components and Tailwind CSS for an intuitive and embedded Shopify app experience.
+- **Multi-Tenant PostgreSQL**: Ensures data isolation between Shopify stores with shop-scoped data and composite unique constraints.
+- **Profit-Optimized AI Recommendation System**: Generates intelligent AI recommendations with quota management, profit-based product selection, and cost-optimized batch processing. It includes a two-stage filtering algorithm for product selection, an archive and replace system for recommendations, and conflict prevention for active tests.
+- **Impact Score Tracking & Sorting**: GPT-4 assigns impact scores (1-10) to recommendations based on revenue potential, which are then used to prioritize recommendations in the UI.
+- **Multi-Variant Price Testing**: Supports A/B testing for products with multiple variants, ensuring all variant prices are updated proportionally and safely rolled back.
+- **UUID Session-Based Attribution**: Uses UUIDs for persistent variant assignments across user sessions, ensuring accurate conversion attribution.
+- **Bayesian-Only Testing Architecture**: All A/B tests use Bayesian allocation with Thompson Sampling for dynamic, data-driven traffic distribution.
+- **Bayesian A/B Testing Engine**: Implements Top-Two Thompson Sampling (TTTS) for intelligent traffic allocation, incorporating statistical rigor, risk controls, and auto-promotion criteria for tests.
+- **Test Preview System**: Offers a side-by-side comparison of control vs. variant with multi-device views.
+- **Dashboard & Active Tests Page**: Provides real-time metrics, performance charts, AI recommendations, and monitors live tests with ARPU lift tracking.
+- **Product Sync System**: Automates and manually synchronizes Shopify product data, including variant details, with the database.
+- **Smart Automation System**: Includes features like auto-sync, AI recommendation generation, and dismissal with replacement.
+- **Two-Layer Conflict Prevention**: Prevents conflicting active tests on the same product element through proactive filtering during recommendation generation and defensive validation during test activation.
+- **Test Deployment & Conversion Tracking**: Activates A/B tests, captures control states for rollback, and uses `ORDERS_CREATE` webhooks for conversion attribution.
+- **Safe Rollback**: Deactivates tests and restores original product values in Shopify.
+- **Traffic & Conversion Simulator**: Validates A/B test tracking and performance through batch and live-streaming simulations using Server-Sent Events (SSE).
+- **Test Evolution Charts**: Visualizes test performance over time on the Active Tests page, showing RPV and allocation evolution.
+- **Collection Page Variant Support**: Ensures consistent variant display on various Shopify pages using DOM manipulation and MutationObserver.
+- **Auto-Configuration**: The SDK automatically detects the backend URL for simplified installation.
+- **CORS Configuration**: Public SDK endpoints are configured with CORS headers for cross-origin requests.
+- **UI/UX**: Utilizes Shadcn UI components and Tailwind CSS for an embedded Shopify app experience.
 
 ## External Dependencies
 - **Shopify Admin GraphQL API v12**: For store data interaction (products, orders).
 - **OpenAI GPT-4**: Powers the AI recommendation engine.
-- **PostgreSQL (Neon)**: Used for multi-tenant persistent storage of products, recommendations, tests, metrics, session assignments, and OAuth tokens.
+- **PostgreSQL (Neon)**: Persistent multi-tenant storage.
 - **Shopify App Bridge**: Enables the embedded app experience.
 - **Wouter**: Client-side routing.
 - **Shadcn UI & Tailwind CSS**: UI component library and styling.
