@@ -192,8 +192,9 @@ export default function ActiveTests() {
   });
 
   // Calculate summary metrics with safe parsing
-  const totalImpressions = activeTests.reduce((sum, t) => sum + (t.impressions || 0), 0);
-  const totalConversions = activeTests.reduce((sum, t) => sum + (t.conversions || 0), 0);
+  // Parse bigint fields as numbers (they come from DB as strings)
+  const totalImpressions = activeTests.reduce((sum, t) => sum + (Number(t.impressions) || 0), 0);
+  const totalConversions = activeTests.reduce((sum, t) => sum + (Number(t.conversions) || 0), 0);
   const totalRevenue = activeTests.reduce((sum, t) => {
     const revenue = t.revenue ? parseFloat(t.revenue) : 0;
     return sum + (isNaN(revenue) ? 0 : revenue);
