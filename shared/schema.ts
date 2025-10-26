@@ -77,6 +77,7 @@ export const recommendations = pgTable("recommendations", {
     title: string;
     description: string;
   }>>().notNull(),
+  impactScore: integer("impact_score").notNull().default(5), // 1-10 score from AI (revenue impact)
   status: text("status").notNull().default("pending"), // "pending", "dismissed", "active", "completed"
   dismissedAt: timestamp("dismissed_at"), // When recommendation was dismissed (null if not dismissed)
   createdAt: timestamp("created_at").defaultNow().notNull(),
