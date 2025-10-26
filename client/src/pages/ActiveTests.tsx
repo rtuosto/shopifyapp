@@ -1,5 +1,4 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState } from "react";
 import {
   Card,
   CardContent,
@@ -204,12 +203,11 @@ function TestEvolutionCharts({ testId }: TestEvolutionChartsProps) {
 
 export default function ActiveTests() {
   const { toast } = useToast();
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
 
   // Fetch all tests with auto-refresh using refetchInterval
   const { data: tests = [], isLoading: testsLoading } = useQuery<Test[]>({
     queryKey: ["/api/tests"],
-    refetchInterval: autoRefreshEnabled ? 2000 : false,
+    refetchInterval: 2000,
   });
 
   // Fetch all products
@@ -313,36 +311,16 @@ export default function ActiveTests() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold" data-testid="text-page-title">
-            Active Tests
-          </h1>
-          <p
-            className="text-muted-foreground"
-            data-testid="text-page-description"
-          >
-            Activate draft tests and monitor live A/B test performance
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm">
-            <div
-              className={`w-2 h-2 rounded-full ${autoRefreshEnabled ? "bg-green-500 animate-pulse" : "bg-muted-foreground"}`}
-            ></div>
-            <span className="text-muted-foreground">
-              {autoRefreshEnabled ? "Live" : "Paused"}
-            </span>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
-            data-testid="button-toggle-auto-refresh"
-          >
-            {autoRefreshEnabled ? "Pause Updates" : "Resume Updates"}
-          </Button>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold" data-testid="text-page-title">
+          Active Tests
+        </h1>
+        <p
+          className="text-muted-foreground"
+          data-testid="text-page-description"
+        >
+          Activate draft tests and monitor live A/B test performance
+        </p>
       </div>
 
       {/* Summary Metrics */}
