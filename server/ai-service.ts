@@ -83,7 +83,7 @@ Return your response as a JSON object with a "recommendations" array.`;
           content: prompt,
         },
       ],
-      temperature: 0.7,
+      // GPT-5-mini uses default temperature (1.0) - custom temperature not supported
       response_format: { type: "json_object" },
     });
 
@@ -199,7 +199,7 @@ Return your response as a JSON object with a "recommendations" array, sorted by 
           content: prompt,
         },
       ],
-      temperature: 0.7,
+      // GPT-5-mini uses default temperature (1.0) - custom temperature not supported
       response_format: { type: "json_object" },
     });
 
