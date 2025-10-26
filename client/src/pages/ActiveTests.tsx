@@ -59,7 +59,7 @@ function TestEvolutionCharts({ testId }: TestEvolutionChartsProps) {
         <div>
           <div className="text-sm font-medium">RPV Evolution Over Time</div>
           <p className="text-xs text-muted-foreground">
-            Revenue Per Visitor tracked at 100-impression intervals
+            Cumulative revenue per visitor tracked at 100-impression intervals
           </p>
         </div>
         <ResponsiveContainer width="100%" height={200}>
@@ -67,7 +67,7 @@ function TestEvolutionCharts({ testId }: TestEvolutionChartsProps) {
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis 
               dataKey="impressions" 
-              label={{ value: 'Impressions', position: 'insideBottom', offset: -5 }}
+              label={{ value: 'Total Test Impressions', position: 'insideBottom', offset: -5 }}
             />
             <YAxis 
               label={{ value: 'RPV ($)', angle: -90, position: 'insideLeft' }}
@@ -102,7 +102,7 @@ function TestEvolutionCharts({ testId }: TestEvolutionChartsProps) {
         <div>
           <div className="text-sm font-medium">Traffic Allocation Evolution</div>
           <p className="text-xs text-muted-foreground">
-            Bayesian allocation adjustments tracked at 100-impression intervals
+            Cumulative traffic split adjustments tracked at 100-impression intervals
           </p>
         </div>
         <ResponsiveContainer width="100%" height={200}>
@@ -110,7 +110,7 @@ function TestEvolutionCharts({ testId }: TestEvolutionChartsProps) {
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis 
               dataKey="impressions" 
-              label={{ value: 'Impressions', position: 'insideBottom', offset: -5 }}
+              label={{ value: 'Total Test Impressions', position: 'insideBottom', offset: -5 }}
             />
             <YAxis 
               label={{ value: 'Allocation (%)', angle: -90, position: 'insideLeft' }}
