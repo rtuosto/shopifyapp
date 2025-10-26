@@ -7,7 +7,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import ThemeToggle from "@/components/ThemeToggle";
 import Dashboard from "@/pages/Dashboard";
-import ActiveTests from "@/pages/ActiveTests";
+import Tests from "@/pages/Tests";
 import AIRecommendations from "@/pages/AIRecommendations";
 import Simulator from "@/pages/Simulator";
 import Settings from "@/pages/Settings";
@@ -17,7 +17,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
-      <Route path="/active-tests" component={ActiveTests} />
+      <Route path="/tests" component={Tests} />
       <Route path="/recommendations" component={AIRecommendations} />
       <Route path="/simulator" component={Simulator} />
       <Route path="/settings" component={Settings} />
