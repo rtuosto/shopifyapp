@@ -1,0 +1,535 @@
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import AIRecommendationCard from "@/components/AIRecommendationCard";
+import TestPreviewModal from "@/components/TestPreviewModal";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Sparkles, Plus, Archive as ArchiveIcon, RotateCcw } from "lucide-react";
+import type { Product, Recommendation, Test } from "@shared/schema";
+
+export default function AIRecommendations() {
+  const { toast } = useToast();
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [dismissDialogOpen, setDismissDialogOpen] = useState(false);
+  const [storeIdeasDialogOpen, setStoreIdeasDialogOpen] = useState(false);
+  const [selectedRecommendation, setSelectedRecommendation] = useState<Recommendation | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState<string>("");
+  const [dismissingRecommendation, setDismissingRecommendation] = useState<Recommendation | null>(null);
+
+  // Fetch quota data
+  const { data: quotaData } = useQuery<{
+    quota: number;
+    used: number;
+    remaining: number;
+    planTier: string;
+    resetDate: string;
+  }>({
+    queryKey: ["/api/quota"],
+  });
+
+  // Fetch products
+  const { data: products = [] } = useQuery<Product[]>({
+    queryKey: ["/api/products"],
+  });
+
+  // Fetch pending recommendations
+  const { data: recommendations = [] } = useQuery<Recommendation[]>({
+    queryKey: ["/api/recommendations", "pending"],
+    queryFn: async () => {
+      const res = await fetch("/api/recommendations?status=pending");
+      if (!res.ok) throw new Error("Failed to fetch recommendations");
+      return res.json();
+    },
+  });
+
+  // Fetch archived recommendations
+  const { data: archivedRecommendations = [] } = useQuery<Recommendation[]>({
+    queryKey: ["/api/recommendations", "archived"],
+    queryFn: async () => {
+      const res = await fetch("/api/recommendations/archived");
+      if (!res.ok) throw new Error("Failed to fetch archived recommendations");
+      return res.json();
+    },
+  });
+
+  // Generate store-wide recommendations
+  const generateStoreRecommendationsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/recommendations/store-analysis");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Store Ideas Generated",
+        description: `Generated ${data.recommendations?.length || 0} recommendations for your top products`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/quota"] });
+      setStoreIdeasDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to Generate Ideas",
+        description: error.message || "Could not generate store-wide recommendations",
+        variant: "destructive",
+      });
+      setStoreIdeasDialogOpen(false);
+    },
+  });
+
+  // Generate product-specific recommendation
+  const generateProductRecommendationMutation = useMutation({
+    mutationFn: async (productId: string) => {
+      const res = await apiRequest("POST", `/api/recommendations/product/${productId}/generate`);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Product Idea Generated",
+        description: "Generated new recommendation for this product",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/quota"] });
+      setSelectedProductId("");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to Generate Idea",
+        description: error.message || "Could not generate product recommendation",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Dismiss recommendation (just dismiss or dismiss & replace)
+  const dismissRecommendationMutation = useMutation({
+    mutationFn: async ({ id, replace }: { id: string; replace: boolean }) => {
+      const res = await apiRequest("POST", `/api/recommendations/${id}/dismiss`, { replace });
+      return res.json();
+    },
+    onSuccess: (data, variables) => {
+      if (data.replacement) {
+        toast({
+          title: "Recommendation Replaced",
+          description: "Archived old recommendation and generated a new one",
+        });
+      } else {
+        toast({
+          title: "Recommendation Dismissed",
+          description: "Moved to archive",
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "archived"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/quota"] });
+      setDismissDialogOpen(false);
+      setDismissingRecommendation(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to Dismiss",
+        description: error.message || "Could not dismiss recommendation",
+        variant: "destructive",
+      });
+      setDismissDialogOpen(false);
+      setDismissingRecommendation(null);
+    },
+  });
+
+  // Restore recommendation
+  const restoreRecommendationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/recommendations/${id}/restore`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Recommendation Restored",
+        description: "Moved back to pending recommendations",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "archived"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to Restore",
+        description: error.message || "Could not restore recommendation",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create test from recommendation
+  const createTestMutation = useMutation({
+    mutationFn: async ({ recommendationId }: { recommendationId: string }) => {
+      const recommendation = recommendations.find(r => r.id === recommendationId);
+      if (!recommendation) throw new Error("Recommendation not found");
+
+      const product = products.find(p => p.id === recommendation.productId);
+      if (!product) throw new Error("Product not found");
+
+      const controlData: Record<string, any> = {
+        title: product.title,
+        description: product.description || "",
+        price: product.price,
+      };
+
+      if (recommendation.testType === "price") {
+        controlData.variantPrices = product.variants.map((v: any) => ({
+          id: v.id,
+          price: v.price,
+        }));
+      }
+
+      const variantData: Record<string, any> = {
+        ...controlData,
+        ...recommendation.proposedChanges,
+      };
+
+      if (recommendation.testType === "price" && controlData.variantPrices) {
+        const priceMultiplier = variantData.price / controlData.price;
+        variantData.variantPrices = controlData.variantPrices.map((v: any) => ({
+          id: v.id,
+          price: (parseFloat(v.price) * priceMultiplier).toFixed(2),
+        }));
+      }
+
+      const testData = {
+        productId: product.id,
+        recommendationId: recommendation.id,
+        testType: recommendation.testType,
+        status: "draft",
+        controlData,
+        variantData,
+        arpu: "0",
+        arpuLift: "0",
+        impressions: 0,
+        conversions: 0,
+        revenue: "0",
+      };
+
+      const res = await apiRequest("POST", "/api/tests", testData);
+      return res.json();
+    },
+    onSuccess: async (data, variables) => {
+      await apiRequest("PATCH", `/api/recommendations/${variables.recommendationId}`, { status: "testing" });
+      
+      toast({
+        title: "Test Created",
+        description: "Your A/B test has been created successfully",
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "pending"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to Create Test",
+        description: error.message || "Could not create test from recommendation",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handlePreview = (id: string) => {
+    const rec = recommendations.find(r => r.id === id) || archivedRecommendations.find(r => r.id === id);
+    if (!rec) return;
+
+    const product = products.find(p => p.id === rec.productId);
+    setSelectedRecommendation(rec);
+    setSelectedProduct(product || null);
+    setPreviewOpen(true);
+  };
+
+  const handleAccept = (id: string) => {
+    createTestMutation.mutate({ recommendationId: id });
+  };
+
+  const handleDismissClick = (id: string) => {
+    const rec = recommendations.find(r => r.id === id);
+    if (!rec) return;
+    setDismissingRecommendation(rec);
+    setDismissDialogOpen(true);
+  };
+
+  const handleRestore = (id: string) => {
+    restoreRecommendationMutation.mutate(id);
+  };
+
+  const quotaRemaining = quotaData?.remaining ?? 0;
+  const quotaUsed = quotaData?.used ?? 0;
+  const quotaTotal = quotaData?.quota ?? 20;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold" data-testid="text-page-title">AI Recommendations</h1>
+          <p className="text-muted-foreground mt-1">
+            AI-powered optimization ideas for your products
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Badge variant={quotaUsed < quotaTotal * 0.5 ? "secondary" : quotaUsed < quotaTotal * 0.8 ? "default" : "destructive"} className="gap-1">
+            <Sparkles className="w-3 h-3" />
+            {quotaUsed} of {quotaTotal} AI Ideas
+          </Badge>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex items-center gap-3">
+        <Button
+          onClick={() => setStoreIdeasDialogOpen(true)}
+          disabled={quotaRemaining < 10 || generateStoreRecommendationsMutation.isPending}
+          data-testid="button-generate-store-ideas"
+        >
+          <Sparkles className="w-4 h-4 mr-2" />
+          {generateStoreRecommendationsMutation.isPending ? "Generating..." : "Generate Store Ideas"}
+        </Button>
+        <div className="flex items-center gap-2">
+          <Select value={selectedProductId} onValueChange={(value) => setSelectedProductId(value)}>
+            <SelectTrigger className="w-[250px]" data-testid="select-product">
+              <SelectValue placeholder="Select a product..." />
+            </SelectTrigger>
+            <SelectContent>
+              {products.map((product) => (
+                <SelectItem key={product.id} value={product.id}>
+                  {product.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            onClick={() => {
+              if (selectedProductId) {
+                generateProductRecommendationMutation.mutate(selectedProductId);
+              }
+            }}
+            disabled={!selectedProductId || quotaRemaining < 1 || generateProductRecommendationMutation.isPending}
+            variant="outline"
+            data-testid="button-generate-product-idea"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Generate Idea
+          </Button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <Tabs defaultValue="pending" className="w-full">
+        <TabsList>
+          <TabsTrigger value="pending" data-testid="tab-pending">
+            Pending ({recommendations.length})
+          </TabsTrigger>
+          <TabsTrigger value="archive" data-testid="tab-archive">
+            <ArchiveIcon className="w-4 h-4 mr-2" />
+            Archive ({archivedRecommendations.length})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="pending" className="space-y-4 mt-6">
+          {recommendations.length === 0 ? (
+            <Card className="p-12 text-center">
+              <Sparkles className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Recommendations Yet</h3>
+              <p className="text-muted-foreground mb-4">
+                Generate AI-powered optimization ideas for your store
+              </p>
+              <Button
+                onClick={() => setStoreIdeasDialogOpen(true)}
+                disabled={quotaRemaining < 10}
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                Generate Store Ideas
+              </Button>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {recommendations.map((rec) => (
+                <AIRecommendationCard
+                  key={rec.id}
+                  title={rec.title}
+                  description={rec.description}
+                  productName={products.find(p => p.id === rec.productId)?.title || 'Unknown Product'}
+                  onAccept={() => handleAccept(rec.id)}
+                  onReject={() => handleDismissClick(rec.id)}
+                  onPreview={() => handlePreview(rec.id)}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="archive" className="space-y-4 mt-6">
+          {archivedRecommendations.length === 0 ? (
+            <Card className="p-12 text-center">
+              <ArchiveIcon className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Archived Recommendations</h3>
+              <p className="text-muted-foreground">
+                Dismissed recommendations will appear here
+              </p>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {archivedRecommendations.map((rec) => (
+                <Card key={rec.id} className="p-6 border-l-4 border-l-muted" data-testid={`card-archived-${rec.id}`}>
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="outline" className="gap-1">
+                            <ArchiveIcon className="w-3 h-3" />
+                            Archived
+                          </Badge>
+                        </div>
+                        <h3 className="text-base font-semibold">{rec.title}</h3>
+                        <p className="text-sm text-muted-foreground">{rec.description}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Product: {products.find(p => p.id === rec.productId)?.title || 'Unknown'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePreview(rec.id)}
+                        data-testid={`button-preview-${rec.id}`}
+                      >
+                        Preview
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleRestore(rec.id)}
+                        disabled={restoreRecommendationMutation.isPending}
+                        data-testid={`button-restore-${rec.id}`}
+                      >
+                        <RotateCcw className="w-3 h-3 mr-1" />
+                        Restore
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Store Ideas Confirmation Dialog */}
+      <AlertDialog open={storeIdeasDialogOpen} onOpenChange={setStoreIdeasDialogOpen}>
+        <AlertDialogContent data-testid="dialog-store-ideas">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Generate Store Ideas?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will analyze your top products and generate up to 10 AI recommendations.
+              <br />
+              <br />
+              <strong>Cost: 10 AI Ideas</strong> (You have {quotaRemaining} remaining)
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-store-ideas">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => generateStoreRecommendationsMutation.mutate()}
+              disabled={generateStoreRecommendationsMutation.isPending}
+              data-testid="button-confirm-store-ideas"
+            >
+              {generateStoreRecommendationsMutation.isPending ? "Generating..." : "Generate Ideas"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dismiss Dialog */}
+      <Dialog open={dismissDialogOpen} onOpenChange={setDismissDialogOpen}>
+        <DialogContent data-testid="dialog-dismiss">
+          <DialogHeader>
+            <DialogTitle>Dismiss Recommendation</DialogTitle>
+            <DialogDescription>
+              What would you like to do with this recommendation?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm">
+              <strong>Just Dismiss:</strong> Archive this recommendation
+            </p>
+            <p className="text-sm">
+              <strong>Dismiss & Replace:</strong> Archive this and generate a different recommendation for the same product (costs 1 AI Idea)
+            </p>
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (dismissingRecommendation) {
+                  dismissRecommendationMutation.mutate({ id: dismissingRecommendation.id, replace: false });
+                }
+              }}
+              disabled={dismissRecommendationMutation.isPending}
+              data-testid="button-just-dismiss"
+            >
+              <ArchiveIcon className="w-4 h-4 mr-2" />
+              Just Dismiss
+            </Button>
+            <Button
+              onClick={() => {
+                if (dismissingRecommendation) {
+                  dismissRecommendationMutation.mutate({ id: dismissingRecommendation.id, replace: true });
+                }
+              }}
+              disabled={dismissRecommendationMutation.isPending || quotaRemaining < 1}
+              data-testid="button-dismiss-replace"
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              Dismiss & Replace (1 Idea)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Modal */}
+      {selectedRecommendation && (
+        <TestPreviewModal
+          open={previewOpen}
+          onOpenChange={setPreviewOpen}
+          recommendation={selectedRecommendation}
+          product={selectedProduct}
+        />
+      )}
+    </div>
+  );
+}
