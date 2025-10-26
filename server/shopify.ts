@@ -55,6 +55,11 @@ export async function fetchProducts(session: Session) {
                     node {
                       id
                       price
+                      inventoryItem {
+                        unitCost {
+                          amount
+                        }
+                      }
                       title
                     }
                   }

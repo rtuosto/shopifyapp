@@ -3,6 +3,25 @@ import { pgTable, text, varchar, timestamp, integer, decimal, jsonb, unique } fr
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Shops table - stores per-shop settings and quota tracking (multi-tenant)
+export const shops = pgTable("shops", {
+  shop: varchar("shop").primaryKey(), // Shopify store identifier (mystore.myshopify.com)
+  planTier: varchar("plan_tier").notNull().default("basic"), // "basic" | "pro" | "enterprise"
+  recommendationQuota: integer("recommendation_quota").notNull().default(20), // Monthly quota
+  recommendationsUsed: integer("recommendations_used").notNull().default(0), // Used this month
+  quotaResetDate: timestamp("quota_reset_date").notNull().defaultNow(), // When quota resets
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertShopSchema = createInsertSchema(shops).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertShop = z.infer<typeof insertShopSchema>;
+export type Shop = typeof shops.$inferSelect;
+
 // Products table - stores Shopify product data (multi-tenant)
 export const products = pgTable("products", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -12,14 +31,20 @@ export const products = pgTable("products", {
   description: text("description"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),
+  cost: decimal("cost", { precision: 10, scale: 2 }), // COGS (nullable - not all merchants track)
+  margin: decimal("margin", { precision: 5, scale: 2 }), // Calculated margin percentage
   variants: jsonb("variants").$type<Array<{
     id: string;
     price: string;
+    cost?: string;
     title?: string;
-  }>>().notNull().default(sql`'[]'::jsonb`), // All product variants with IDs and prices
+  }>>().notNull().default(sql`'[]'::jsonb`), // All product variants with IDs, prices, and costs
   images: jsonb("images").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   rating: decimal("rating", { precision: 3, scale: 2 }),
   reviewCount: integer("review_count").default(0),
+  totalSold: integer("total_sold").default(0), // Total units sold (all time)
+  revenue30d: decimal("revenue_30d", { precision: 12, scale: 2 }).default("0"), // Revenue from last 30 days
+  lastSaleDate: timestamp("last_sale_date"), // When product was last sold
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -52,7 +77,8 @@ export const recommendations = pgTable("recommendations", {
     title: string;
     description: string;
   }>>().notNull(),
-  status: text("status").notNull().default("pending"), // "pending", "accepted", "rejected"
+  status: text("status").notNull().default("pending"), // "pending", "dismissed", "active", "completed"
+  dismissedAt: timestamp("dismissed_at"), // When recommendation was dismissed (null if not dismissed)
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -23,6 +23,11 @@ interface ShopifyProduct {
       node: {
         id: string;
         price: string;
+        inventoryItem?: {
+          unitCost?: {
+            amount: string;
+          };
+        };
         title: string;
       };
     }>;
@@ -52,12 +57,29 @@ export async function syncProductsFromShopify(session: Session): Promise<number>
     for (const edge of shopifyProducts) {
       const shopifyProduct: ShopifyProduct = edge.node;
       
-      // Extract all variants with their IDs and prices
+      // Extract all variants with their IDs, prices, and costs
       const variants = shopifyProduct.variants?.edges.map(v => ({
         id: v.node.id,
         price: v.node.price,
+        cost: v.node.inventoryItem?.unitCost?.amount,
         title: v.node.title,
       })) || [];
+      
+      // Calculate average cost and margin from variants with cost data
+      const variantsWithCost = variants.filter(v => v.cost);
+      let avgCost: string | null = null;
+      let marginPercent: string | null = null;
+      
+      if (variantsWithCost.length > 0) {
+        const totalCost = variantsWithCost.reduce((sum, v) => sum + parseFloat(v.cost!), 0);
+        avgCost = (totalCost / variantsWithCost.length).toFixed(2);
+        
+        const price = parseFloat(shopifyProduct.priceRangeV2.minVariantPrice.amount);
+        const cost = parseFloat(avgCost);
+        if (price > 0) {
+          marginPercent = (((price - cost) / price) * 100).toFixed(2);
+        }
+      }
       
       const productData: InsertProduct = {
         shopifyProductId: shopifyProduct.id,
@@ -65,7 +87,9 @@ export async function syncProductsFromShopify(session: Session): Promise<number>
         description: shopifyProduct.description || null,
         price: shopifyProduct.priceRangeV2.minVariantPrice.amount,
         compareAtPrice: null,
-        variants: variants, // Store all variant IDs and prices
+        cost: avgCost,
+        margin: marginPercent,
+        variants: variants, // Store all variant IDs, prices, and costs
         images: shopifyProduct.images.edges.map(img => img.node.url),
         rating: null,
         reviewCount: 0,
