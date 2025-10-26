@@ -30,6 +30,7 @@ interface OptimizationRecommendation {
     title: string;
     description: string;
   }>;
+  impactScore?: number; // 1-10 score for revenue impact (optional for single-product generation)
 }
 
 export async function generateOptimizationRecommendations(
@@ -209,6 +210,7 @@ Return your response as a JSON object with a "recommendations" array, sorted by 
       testType: rec.testType || "title",
       proposedChanges: rec.proposedChanges || {},
       insights: rec.insights || [],
+      impactScore: rec.impactScore || 5, // AI's 1-10 revenue impact score (default to 5 if missing)
     })).slice(0, targetCount); // Ensure we don't exceed target count
   } catch (error) {
     console.error("Error generating batch recommendations:", error);
@@ -234,6 +236,7 @@ Return your response as a JSON object with a "recommendations" array, sorted by 
           description: "Descriptive keywords improve search visibility.",
         },
       ],
+      impactScore: 5, // Default middle score for fallback recommendations
     }));
   }
 }
