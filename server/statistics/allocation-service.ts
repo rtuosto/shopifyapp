@@ -223,36 +223,27 @@ export function computeAllocationUpdate(
   // Check CVaR throttle
   const shouldThrottle = shouldThrottleVariant(controlModel, variantModel, 0.05, 2048, seed);
 
-  // Get variant floor from ramp schedule
-  const variantFloorFromRamp = getVariantFloorFromRamp(
-    probabilityVariantWins,
-    DEFAULT_RAMP_SCHEDULE,
-    bayesianState.variantStart || 0.05
-  );
-
-  // Get dynamic control floor based on confidence
-  // Always recompute from baseline (0.75) to allow floor to rise if confidence drops
-  const controlFloor = getControlFloorFromConfidence(
-    probabilityVariantWins,
-    undefined, // Use default schedule
-    0.75 // Always start from baseline - floor recomputes based on current confidence
-  );
-
   // Compute raw TTTS allocation
-  const rawAllocation = computeTTTSAllocation(
+  let rawAllocation = computeTTTSAllocation(
     controlModel,
     variantModel,
     { riskMode: bayesianState.riskMode || 'cautious' },
     seed
   );
 
-  // Apply CVaR throttle if needed
-  let variantFloor = variantFloorFromRamp;
+  // CVaR throttle: if variant shows excessive downside risk, cap at 2%
   if (shouldThrottle) {
-    variantFloor = Math.min(variantFloor, 0.02); // Throttle to 2%
+    rawAllocation = {
+      control: Math.max(0.98, rawAllocation.control),
+      variant: Math.min(0.02, rawAllocation.variant),
+    };
   }
 
-  // Apply floors (now using dynamic control floor)
+  // Apply minimal floors for statistical validity only (1% each)
+  const controlFloor = 0.01; // 1% minimum for valid statistics
+  const variantFloor = 0.01; // 1% minimum for valid statistics
+
+  // Apply minimal floors
   const allocation = applyAllocationConstraints(
     rawAllocation,
     controlFloor,

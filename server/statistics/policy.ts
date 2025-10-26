@@ -20,17 +20,19 @@ export interface AllocationResult {
 
 /**
  * Get epsilon (exploration parameter) based on risk mode
+ * Epsilon controls minimum allocation to second-best arm
+ * Reduced to 1% to allow Thompson Sampling to optimize freely
  */
 function getEpsilon(riskMode: RiskMode): number {
   switch (riskMode) {
     case 'cautious':
-      return 0.05; // 5% to second-best
+      return 0.01; // 1% to second-best (minimal floor for statistics)
     case 'balanced':
-      return 0.10; // 10% to second-best
+      return 0.01; // 1% to second-best
     case 'aggressive':
-      return 0.20; // 20% to second-best
+      return 0.01; // 1% to second-best
     default:
-      return 0.05;
+      return 0.01;
   }
 }
 
