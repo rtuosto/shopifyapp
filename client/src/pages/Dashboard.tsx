@@ -291,6 +291,17 @@ export default function Dashboard() {
     },
   });
 
+  // Fetch quota data
+  const { data: quotaData } = useQuery<{
+    quota: number;
+    used: number;
+    remaining: number;
+    planTier: string;
+    resetDate: string;
+  }>({
+    queryKey: ["/api/quota"],
+  });
+
   // Fetch products (for preview and auto-generation logic)
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["/api/products"],
@@ -626,6 +637,8 @@ export default function Dashboard() {
       <DashboardHeader 
         activeTests={activeTestsCount} 
         lastSync={getLastSyncText()}
+        quotaUsed={quotaData?.used}
+        quotaTotal={quotaData?.quota}
       />
       
       {/* All-Time Performance */}
