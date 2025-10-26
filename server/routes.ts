@@ -309,6 +309,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get evolution snapshots for a test
+  app.get("/api/tests/:id/evolution", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      const test = await storage.getTest(shop, req.params.id);
+      
+      if (!test) {
+        return res.status(404).json({ error: "Test not found" });
+      }
+      
+      const snapshots = await storage.getTestEvolutionSnapshots(req.params.id);
+      res.json(snapshots);
+    } catch (error) {
+      console.error("Error fetching test evolution snapshots:", error);
+      res.status(500).json({ error: "Failed to fetch evolution snapshots" });
+    }
+  });
+
   // Get single test with Bayesian state and metrics
   app.get("/api/tests/:id", requireShopifySessionOrDev, async (req, res) => {
     try {
@@ -1590,6 +1608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const impressionRecords = [];
       const conversionRecords = [];
+      const snapshotRecords = [];
       
       let controlImpressions = 0;
       let variantImpressions = 0;
@@ -1663,6 +1682,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const currentControlAlloc = totalImpressions > 0 ? (controlImpressions / totalImpressions) * 100 : 50;
           const currentVariantAlloc = totalImpressions > 0 ? (variantImpressions / totalImpressions) * 100 : 50;
 
+          // Save snapshot for evolution charts
+          const cumulativeImpressions = (test.impressions || 0) + (i + 1);
+          const cumulativeControlImpressions = (test.controlImpressions || 0) + controlImpressions;
+          const cumulativeVariantImpressions = (test.variantImpressions || 0) + variantImpressions;
+          const cumulativeControlConversions = (test.controlConversions || 0) + controlConversions;
+          const cumulativeVariantConversions = (test.variantConversions || 0) + variantConversions;
+          const cumulativeControlRevenue = parseFloat(test.controlRevenue || "0") + controlRevenue;
+          const cumulativeVariantRevenue = parseFloat(test.variantRevenue || "0") + variantRevenue;
+
+          snapshotRecords.push({
+            testId,
+            impressions: cumulativeImpressions,
+            controlImpressions: cumulativeControlImpressions,
+            variantImpressions: cumulativeVariantImpressions,
+            controlConversions: cumulativeControlConversions,
+            variantConversions: cumulativeVariantConversions,
+            controlRevenue: cumulativeControlRevenue.toFixed(2),
+            variantRevenue: cumulativeVariantRevenue.toFixed(2),
+            controlRPV: parseFloat(controlRPV.toFixed(2)).toString(),
+            variantRPV: parseFloat(variantRPV.toFixed(2)).toString(),
+            controlAllocation: parseFloat(currentControlAlloc.toFixed(1)).toString(),
+            variantAllocation: parseFloat(currentVariantAlloc.toFixed(1)).toString(),
+          });
+
           sendEvent('progress', {
             impressions: i + 1,
             controlImpressions,
@@ -1711,6 +1754,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.createTestImpressionsBulk(impressionRecords);
       if (conversionRecords.length > 0) {
         await storage.createTestConversionsBulk(conversionRecords);
+      }
+      if (snapshotRecords.length > 0) {
+        await storage.createTestEvolutionSnapshotsBulk(snapshotRecords);
       }
 
       const totalRevenue = controlRevenue + variantRevenue;

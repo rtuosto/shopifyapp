@@ -8,6 +8,7 @@ import {
   sessionAssignments,
   testImpressions,
   testConversions,
+  testEvolutionSnapshots,
   type Product,
   type InsertProduct,
   type Recommendation,
@@ -22,6 +23,8 @@ import {
   type InsertTestImpression,
   type TestConversion,
   type InsertTestConversion,
+  type TestEvolutionSnapshot,
+  type InsertTestEvolutionSnapshot,
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -237,6 +240,23 @@ export class DbStorage implements IStorage {
   async createTestConversionsBulk(conversions: InsertTestConversion[]): Promise<void> {
     if (conversions.length === 0) return;
     await db.insert(testConversions).values(conversions);
+  }
+
+  // Test Evolution Snapshots
+  async getTestEvolutionSnapshots(testId: string): Promise<TestEvolutionSnapshot[]> {
+    return await db.select().from(testEvolutionSnapshots)
+      .where(eq(testEvolutionSnapshots.testId, testId))
+      .orderBy(testEvolutionSnapshots.impressions);
+  }
+
+  async createTestEvolutionSnapshot(snapshot: InsertTestEvolutionSnapshot): Promise<TestEvolutionSnapshot> {
+    const [result] = await db.insert(testEvolutionSnapshots).values(snapshot).returning();
+    return result;
+  }
+
+  async createTestEvolutionSnapshotsBulk(snapshots: InsertTestEvolutionSnapshot[]): Promise<void> {
+    if (snapshots.length === 0) return;
+    await db.insert(testEvolutionSnapshots).values(snapshots);
   }
 }
 

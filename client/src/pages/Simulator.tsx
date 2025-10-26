@@ -10,7 +10,6 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Play, Zap, CheckCircle2, AlertCircle, Radio } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import type { Test, Product } from "@shared/schema";
 
 interface EnrichedTest extends Test {
@@ -94,13 +93,6 @@ export default function Simulator() {
   const [liveMode, setLiveMode] = useState(true);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamProgress, setStreamProgress] = useState(0);
-  const [streamingEvolutionData, setStreamingEvolutionData] = useState<Array<{
-    impressions: number;
-    controlRPV: number;
-    variantRPV: number;
-    controlAllocation: number;
-    variantAllocation: number;
-  }>>([]);
   
   // Store EventSource instance for cleanup
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -154,7 +146,6 @@ export default function Simulator() {
         allocationAfter: data.allocationAfter,
         variantPerformance: data.variantPerformance,
         bayesianUpdate: data.bayesianUpdate,
-        evolutionData: data.evolutionData,
       };
       setLastSimulationResult(result);
       
@@ -192,16 +183,7 @@ export default function Simulator() {
 
     setIsStreaming(true);
     setStreamProgress(0);
-    setStreamingEvolutionData([]);
     setLastSimulationResult(null);
-
-    let accumulatedEvolutionData: Array<{
-      impressions: number;
-      controlRPV: number;
-      variantRPV: number;
-      controlAllocation: number;
-      variantAllocation: number;
-    }> = [];
 
     // Build URL with query parameters (EventSource only supports GET)
     const params = new URLSearchParams({
@@ -226,15 +208,6 @@ export default function Simulator() {
       console.log('[SSE Client] Received progress event:', `${data.impressions} impressions`);
       
       setStreamProgress(parseFloat(data.percentage));
-      const newDataPoint = {
-        impressions: data.impressions,
-        controlRPV: data.controlRPV,
-        variantRPV: data.variantRPV,
-        controlAllocation: data.controlAllocation,
-        variantAllocation: data.variantAllocation,
-      };
-      accumulatedEvolutionData.push(newDataPoint);
-      setStreamingEvolutionData([...accumulatedEvolutionData]);
     });
 
     eventSource.addEventListener('complete', (event) => {
@@ -250,7 +223,6 @@ export default function Simulator() {
         allocationAfter: data.allocationAfter,
         variantPerformance: data.variantPerformance,
         bayesianUpdate: data.bayesianUpdate,
-        evolutionData: accumulatedEvolutionData,
       };
       setLastSimulationResult(result);
 
@@ -372,8 +344,8 @@ export default function Simulator() {
                     <span className="text-sm font-medium" data-testid="text-current-conversions">{selectedTest.conversions || 0}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Current ARPU:</span>
-                    <span className="text-sm font-medium" data-testid="text-current-arpu">${selectedTest.arpu || "0.00"}</span>
+                    <span className="text-sm text-muted-foreground">Current RPV:</span>
+                    <span className="text-sm font-medium" data-testid="text-current-rpv">${selectedTest.arpu || "0.00"}</span>
                   </div>
                 </div>
               )}
@@ -388,7 +360,7 @@ export default function Simulator() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Latest Simulation Results</CardTitle>
+                <CardTitle>Simulation Complete</CardTitle>
                 <CardDescription>
                   {lastSimulationResult.type.charAt(0).toUpperCase() + lastSimulationResult.type.slice(1)} simulation at {lastSimulationResult.timestamp}
                 </CardDescription>
@@ -398,6 +370,23 @@ export default function Simulator() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {/* Summary */}
+              {lastSimulationResult.type === "batch" && lastSimulationResult.variantPerformance && (
+                <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg space-y-2">
+                  <div className="text-sm font-medium text-blue-900 dark:text-blue-100">Data Generation Summary</div>
+                  <div className="space-y-1">
+                    <div className="text-sm text-blue-700 dark:text-blue-300" data-testid="text-visitors-added">
+                      Added {lastSimulationResult.variantPerformance.control.impressions + lastSimulationResult.variantPerformance.variant.impressions} visitors to test
+                    </div>
+                    {selectedTest && (
+                      <div className="text-sm text-blue-700 dark:text-blue-300" data-testid="text-total-impressions">
+                        Test now has {selectedTest.impressions || 0} total impressions
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Test Info */}
               <div className="p-3 bg-muted rounded-lg">
                 <div className="text-sm font-medium mb-1">Test Product</div>
@@ -495,8 +484,8 @@ export default function Simulator() {
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-xs text-muted-foreground">ARPU:</span>
-                            <span className="text-sm font-medium" data-testid="text-control-arpu">
+                            <span className="text-xs text-muted-foreground">RPV:</span>
+                            <span className="text-sm font-medium" data-testid="text-control-rpv">
                               ${lastSimulationResult.variantPerformance.control.arpu}
                             </span>
                           </div>
@@ -530,8 +519,8 @@ export default function Simulator() {
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-xs text-muted-foreground">ARPU:</span>
-                            <span className="text-sm font-medium" data-testid="text-variant-arpu">
+                            <span className="text-xs text-muted-foreground">RPV:</span>
+                            <span className="text-sm font-medium" data-testid="text-variant-rpv">
                               ${lastSimulationResult.variantPerformance.variant.arpu}
                             </span>
                           </div>
@@ -547,124 +536,6 @@ export default function Simulator() {
                       <p className="text-xs text-blue-700 dark:text-blue-300" data-testid="text-bayesian-reasoning">
                         {lastSimulationResult.bayesianUpdate.reasoning}
                       </p>
-                    </div>
-                  )}
-
-                  {/* Evolution Charts */}
-                  {((lastSimulationResult.evolutionData && lastSimulationResult.evolutionData.length > 0) || streamingEvolutionData.length > 0) && (
-                    <div className="space-y-4">
-                      {/* RPV Evolution Chart */}
-                      <div className="p-4 border rounded-lg space-y-3" data-testid="chart-rpv-evolution">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-sm font-medium">RPV Evolution Over Time</div>
-                            <p className="text-xs text-muted-foreground">
-                              Revenue Per Visitor tracked at 100-impression intervals
-                            </p>
-                          </div>
-                          {isStreaming && (
-                            <div className="flex items-center gap-1 text-xs text-green-600">
-                              <Radio className="w-3 h-3 animate-pulse" />
-                              <span>Live</span>
-                            </div>
-                          )}
-                        </div>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <LineChart 
-                            key={`rpv-${isStreaming ? streamingEvolutionData.length : 'static'}`}
-                            data={isStreaming ? streamingEvolutionData : (lastSimulationResult.evolutionData || [])}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis 
-                              dataKey="impressions" 
-                              label={{ value: 'Impressions', position: 'insideBottom', offset: -5 }}
-                            />
-                            <YAxis 
-                              label={{ value: 'RPV ($)', angle: -90, position: 'insideLeft' }}
-                            />
-                            <Tooltip 
-                              formatter={(value: number) => `$${value.toFixed(2)}`}
-                              labelFormatter={(label) => `${label} impressions`}
-                            />
-                            <Legend />
-                            <Line 
-                              type="monotone" 
-                              dataKey="controlRPV" 
-                              stroke="#8884d8" 
-                              name="Control RPV"
-                              strokeWidth={2}
-                              dot={{ r: 3 }}
-                              isAnimationActive={isStreaming}
-                            />
-                            <Line 
-                              type="monotone" 
-                              dataKey="variantRPV" 
-                              stroke="#82ca9d" 
-                              name="Variant RPV"
-                              strokeWidth={2}
-                              dot={{ r: 3 }}
-                              isAnimationActive={isStreaming}
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
-
-                      {/* Allocation Evolution Chart */}
-                      <div className="p-4 border rounded-lg space-y-3" data-testid="chart-allocation-evolution">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-sm font-medium">Traffic Allocation Evolution</div>
-                            <p className="text-xs text-muted-foreground">
-                              Bayesian allocation adjustments tracked at 100-impression intervals
-                            </p>
-                          </div>
-                          {isStreaming && (
-                            <div className="flex items-center gap-1 text-xs text-green-600">
-                              <Radio className="w-3 h-3 animate-pulse" />
-                              <span>Live</span>
-                            </div>
-                          )}
-                        </div>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <LineChart 
-                            key={`allocation-${isStreaming ? streamingEvolutionData.length : 'static'}`}
-                            data={isStreaming ? streamingEvolutionData : (lastSimulationResult.evolutionData || [])}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis 
-                              dataKey="impressions" 
-                              label={{ value: 'Impressions', position: 'insideBottom', offset: -5 }}
-                            />
-                            <YAxis 
-                              label={{ value: 'Allocation (%)', angle: -90, position: 'insideLeft' }}
-                              domain={[0, 100]}
-                            />
-                            <Tooltip 
-                              formatter={(value: number) => `${value.toFixed(1)}%`}
-                              labelFormatter={(label) => `${label} impressions`}
-                            />
-                            <Legend />
-                            <Line 
-                              type="monotone" 
-                              dataKey="controlAllocation" 
-                              stroke="#8884d8" 
-                              name="Control %"
-                              strokeWidth={2}
-                              dot={{ r: 3 }}
-                              isAnimationActive={isStreaming}
-                            />
-                            <Line 
-                              type="monotone" 
-                              dataKey="variantAllocation" 
-                              stroke="#82ca9d" 
-                              name="Variant %"
-                              strokeWidth={2}
-                              dot={{ r: 3 }}
-                              isAnimationActive={isStreaming}
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
                     </div>
                   )}
                 </div>
@@ -775,8 +646,8 @@ export default function Simulator() {
                           </div>
                         </div>
                         <div className="space-y-1">
-                          <div className="text-xs text-muted-foreground">ARPU</div>
-                          <div className="text-lg font-bold" data-testid="text-result-arpu">
+                          <div className="text-xs text-muted-foreground">RPV</div>
+                          <div className="text-lg font-bold" data-testid="text-result-rpv">
                             ${lastSimulationResult.metrics.arpu}
                           </div>
                         </div>

@@ -222,3 +222,29 @@ export const insertTestConversionSchema = createInsertSchema(testConversions).om
 
 export type InsertTestConversion = z.infer<typeof insertTestConversionSchema>;
 export type TestConversion = typeof testConversions.$inferSelect;
+
+// Test Evolution Snapshots - Stores periodic metric snapshots for evolution charts (multi-tenant)
+export const testEvolutionSnapshots = pgTable("test_evolution_snapshots", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  testId: varchar("test_id").notNull().references(() => tests.id, { onDelete: "cascade" }),
+  impressions: bigint("impressions", { mode: "number" }).notNull(), // Cumulative impressions at this snapshot
+  controlImpressions: bigint("control_impressions", { mode: "number" }).notNull(),
+  variantImpressions: bigint("variant_impressions", { mode: "number" }).notNull(),
+  controlConversions: bigint("control_conversions", { mode: "number" }).notNull(),
+  variantConversions: bigint("variant_conversions", { mode: "number" }).notNull(),
+  controlRevenue: decimal("control_revenue", { precision: 10, scale: 2 }).notNull(),
+  variantRevenue: decimal("variant_revenue", { precision: 10, scale: 2 }).notNull(),
+  controlRPV: decimal("control_rpv", { precision: 10, scale: 2 }).notNull(), // Revenue Per Visitor
+  variantRPV: decimal("variant_rpv", { precision: 10, scale: 2 }).notNull(),
+  controlAllocation: decimal("control_allocation", { precision: 5, scale: 2 }).notNull(), // Percentage
+  variantAllocation: decimal("variant_allocation", { precision: 5, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTestEvolutionSnapshotSchema = createInsertSchema(testEvolutionSnapshots).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertTestEvolutionSnapshot = z.infer<typeof insertTestEvolutionSnapshotSchema>;
+export type TestEvolutionSnapshot = typeof testEvolutionSnapshots.$inferSelect;

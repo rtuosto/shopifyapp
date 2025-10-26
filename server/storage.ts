@@ -13,6 +13,8 @@ import {
   type InsertTestImpression,
   type TestConversion,
   type InsertTestConversion,
+  type TestEvolutionSnapshot,
+  type InsertTestEvolutionSnapshot,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -58,6 +60,11 @@ export interface IStorage {
   // Test Conversions (tracking individual conversion events)
   createTestConversion(conversion: InsertTestConversion): Promise<TestConversion>;
   createTestConversionsBulk(conversions: InsertTestConversion[]): Promise<void>;
+  
+  // Test Evolution Snapshots (periodic metric snapshots for charts)
+  getTestEvolutionSnapshots(testId: string): Promise<TestEvolutionSnapshot[]>;
+  createTestEvolutionSnapshot(snapshot: InsertTestEvolutionSnapshot): Promise<TestEvolutionSnapshot>;
+  createTestEvolutionSnapshotsBulk(snapshots: InsertTestEvolutionSnapshot[]): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -499,6 +506,25 @@ export class MemStorage implements IStorage {
 
   async createTestConversionsBulk(conversions: InsertTestConversion[]): Promise<void> {
     console.warn(`[MemStorage] ${conversions.length} test conversions not persisted in memory - upgrade to DbStorage`);
+  }
+
+  // Test Evolution Snapshots (not persisted in MemStorage - for dev only)
+  async getTestEvolutionSnapshots(testId: string): Promise<TestEvolutionSnapshot[]> {
+    console.warn("[MemStorage] Test evolution snapshots not persisted in memory - upgrade to DbStorage");
+    return [];
+  }
+
+  async createTestEvolutionSnapshot(snapshot: InsertTestEvolutionSnapshot): Promise<TestEvolutionSnapshot> {
+    console.warn("[MemStorage] Test evolution snapshots not persisted in memory - upgrade to DbStorage");
+    return {
+      ...snapshot,
+      id: randomUUID(),
+      createdAt: new Date(),
+    };
+  }
+
+  async createTestEvolutionSnapshotsBulk(snapshots: InsertTestEvolutionSnapshot[]): Promise<void> {
+    console.warn(`[MemStorage] ${snapshots.length} test evolution snapshots not persisted in memory - upgrade to DbStorage`);
   }
 }
 

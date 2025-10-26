@@ -6,10 +6,142 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { StopCircle, TrendingUp, Eye, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import type { Test, Product } from "@shared/schema";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import type { Test, Product, TestEvolutionSnapshot } from "@shared/schema";
 
 interface EnrichedTest extends Test {
   productName: string;
+}
+
+interface TestEvolutionChartsProps {
+  testId: string;
+}
+
+function TestEvolutionCharts({ testId }: TestEvolutionChartsProps) {
+  const { data: snapshots = [], isLoading } = useQuery<TestEvolutionSnapshot[]>({
+    queryKey: ["/api/tests", testId, "evolution"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tests/${testId}/evolution`);
+      if (!res.ok) throw new Error("Failed to fetch evolution data");
+      return res.json();
+    },
+  });
+
+  // Transform snapshots for chart display
+  const chartData = snapshots.map((snapshot) => ({
+    impressions: snapshot.impressions,
+    controlRPV: parseFloat(snapshot.controlRPV),
+    variantRPV: parseFloat(snapshot.variantRPV),
+    controlAllocation: parseFloat(snapshot.controlAllocation),
+    variantAllocation: parseFloat(snapshot.variantAllocation),
+  }));
+
+  if (isLoading) {
+    return (
+      <div className="mt-6 pt-6 border-t">
+        <div className="text-sm text-muted-foreground text-center py-4">
+          Loading evolution data...
+        </div>
+      </div>
+    );
+  }
+
+  if (chartData.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-6 pt-6 border-t space-y-4">
+      <h3 className="font-semibold text-sm">Performance Evolution</h3>
+      
+      {/* RPV Evolution Chart */}
+      <div className="p-4 border rounded-lg space-y-3" data-testid={`chart-rpv-evolution-${testId}`}>
+        <div>
+          <div className="text-sm font-medium">RPV Evolution Over Time</div>
+          <p className="text-xs text-muted-foreground">
+            Revenue Per Visitor tracked at 100-impression intervals
+          </p>
+        </div>
+        <ResponsiveContainer width="100%" height={200}>
+          <LineChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis 
+              dataKey="impressions" 
+              label={{ value: 'Impressions', position: 'insideBottom', offset: -5 }}
+            />
+            <YAxis 
+              label={{ value: 'RPV ($)', angle: -90, position: 'insideLeft' }}
+            />
+            <Tooltip 
+              formatter={(value: number) => `$${value.toFixed(2)}`}
+              labelFormatter={(label) => `${label} impressions`}
+            />
+            <Legend />
+            <Line 
+              type="monotone" 
+              dataKey="controlRPV" 
+              stroke="#8884d8" 
+              name="Control RPV"
+              strokeWidth={2}
+              dot={{ r: 3 }}
+            />
+            <Line 
+              type="monotone" 
+              dataKey="variantRPV" 
+              stroke="#82ca9d" 
+              name="Variant RPV"
+              strokeWidth={2}
+              dot={{ r: 3 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Allocation Evolution Chart */}
+      <div className="p-4 border rounded-lg space-y-3" data-testid={`chart-allocation-evolution-${testId}`}>
+        <div>
+          <div className="text-sm font-medium">Traffic Allocation Evolution</div>
+          <p className="text-xs text-muted-foreground">
+            Bayesian allocation adjustments tracked at 100-impression intervals
+          </p>
+        </div>
+        <ResponsiveContainer width="100%" height={200}>
+          <LineChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis 
+              dataKey="impressions" 
+              label={{ value: 'Impressions', position: 'insideBottom', offset: -5 }}
+            />
+            <YAxis 
+              label={{ value: 'Allocation (%)', angle: -90, position: 'insideLeft' }}
+              domain={[0, 100]}
+            />
+            <Tooltip 
+              formatter={(value: number) => `${value.toFixed(1)}%`}
+              labelFormatter={(label) => `${label} impressions`}
+            />
+            <Legend />
+            <Line 
+              type="monotone" 
+              dataKey="controlAllocation" 
+              stroke="#8884d8" 
+              name="Control %"
+              strokeWidth={2}
+              dot={{ r: 3 }}
+            />
+            <Line 
+              type="monotone" 
+              dataKey="variantAllocation" 
+              stroke="#82ca9d" 
+              name="Variant %"
+              strokeWidth={2}
+              dot={{ r: 3 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
 }
 
 export default function ActiveTests() {
@@ -469,6 +601,9 @@ export default function ActiveTests() {
                           );
                         })()}
                       </div>
+
+                    {/* Evolution Charts */}
+                    <TestEvolutionCharts testId={test.id} />
 
                     {/* Start Date and Status Badge */}
                     <div className="mt-6 pt-4 border-t flex items-center justify-between">
