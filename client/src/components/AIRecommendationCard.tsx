@@ -1,30 +1,41 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Sparkles, CheckCircle2, XCircle, Eye } from "lucide-react";
-import { useState } from "react";
+import { CheckCircle2, XCircle, Eye } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { formatTestType } from "@/lib/testTypeFormatter";
 
 interface AIRecommendationCardProps {
+  id: string;
   title: string;
   description: string;
   productName: string;
-  testType: string; // "title", "description", "price", etc.
-  impactScore?: number; // 1-10 AI confidence score
+  productImage?: string;
+  testType: string;
+  impactScore?: number;
   onAccept?: () => void;
   onReject?: () => void;
   onPreview?: () => void;
+  headerBadge?: ReactNode;
+  customActions?: ReactNode;
+  borderColor?: string;
+  imageOpacity?: string;
 }
 
 export default function AIRecommendationCard({
+  id,
   title,
   description,
   productName,
+  productImage,
   testType,
   impactScore = 5,
   onAccept,
   onReject,
   onPreview,
+  headerBadge,
+  customActions,
+  borderColor = "border-l-chart-3",
+  imageOpacity = "",
 }: AIRecommendationCardProps) {
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -33,7 +44,6 @@ export default function AIRecommendationCard({
     try {
       await onAccept?.();
     } finally {
-      // Always reset processing state whether success or error
       setIsProcessing(false);
     }
   };
@@ -43,7 +53,6 @@ export default function AIRecommendationCard({
     try {
       await onReject?.();
     } finally {
-      // Always reset processing state whether success or error
       setIsProcessing(false);
     }
   };
@@ -52,83 +61,85 @@ export default function AIRecommendationCard({
     onPreview?.();
   };
 
-  const titleSlug = title ? title.toLowerCase().replace(/\s+/g, '-') : 'unknown';
-
   return (
-    <Card className="p-6 border-l-4 border-l-chart-3" data-testid={`card-recommendation-${titleSlug}`}>
-      <div className="space-y-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 space-y-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="secondary" className="gap-1" data-testid="badge-ai-recommended">
-                <Sparkles className="w-3 h-3" />
-                AI Recommended
-              </Badge>
-              <Badge 
-                variant={impactScore >= 8 ? "default" : impactScore >= 5 ? "outline" : "secondary"} 
-                className="gap-1"
-                data-testid="badge-impact-score"
-              >
-                Impact: {impactScore}/10
-              </Badge>
+    <Card className={`p-4 border-l-4 ${borderColor}`} data-testid={`card-recommendation-${id}`}>
+      <div className="space-y-3">
+        <div className="flex gap-3">
+          {productImage && (
+            <div className="shrink-0">
+              <img 
+                src={productImage} 
+                alt={productName}
+                className={`w-16 h-16 object-cover rounded-md ${imageOpacity}`}
+                data-testid={`img-product-${id}`}
+              />
             </div>
-            <h3 className="text-base font-semibold" data-testid="text-recommendation-title">
+          )}
+          <div className="flex-1 min-w-0">
+            {headerBadge && (
+              <div className="mb-1">
+                {headerBadge}
+              </div>
+            )}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+              <span data-testid={`text-product-name-${id}`} className="font-medium truncate">{productName}</span>
+              <span>•</span>
+              <span data-testid={`text-test-type-${id}`}>{formatTestType(testType)}</span>
+            </div>
+            <h3 className="text-sm font-semibold mb-1" data-testid={`text-recommendation-title-${id}`}>
               {title}
             </h3>
-            <p className="text-sm text-muted-foreground" data-testid="text-recommendation-description">
+            <p className="text-xs text-muted-foreground line-clamp-2" data-testid={`text-recommendation-description-${id}`}>
               {description}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-4 pt-2 border-t">
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Product</p>
-            <p className="text-sm font-medium" data-testid="text-product-name">{productName}</p>
+        {customActions ? (
+          <div className="flex gap-2">
+            {customActions}
           </div>
-          <div className="space-y-1 text-right">
-            <p className="text-xs text-muted-foreground">Test Type</p>
-            <p className="text-sm font-medium" data-testid="text-test-type">{formatTestType(testType)}</p>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <Button 
-            variant="outline"
-            onClick={handlePreview}
-            className="w-full gap-2"
-            data-testid="button-preview-test"
-            disabled={isProcessing}
-          >
-            <Eye className="w-4 h-4" />
-            Preview Changes
-          </Button>
+        ) : (
           <div className="flex gap-2">
             <Button 
-              onClick={handleAccept} 
-              className="flex-1 gap-2"
-              data-testid="button-accept-recommendation"
+              variant="outline"
+              size="sm"
+              onClick={handlePreview}
+              className="flex-1 gap-1.5"
+              data-testid={`button-preview-test-${id}`}
               disabled={isProcessing}
             >
-              <CheckCircle2 className="w-4 h-4" />
-              Accept & Launch Test
+              <Eye className="w-3.5 h-3.5" />
+              Preview
+            </Button>
+            <Button 
+              size="sm"
+              onClick={handleAccept} 
+              className="flex-1 gap-1.5"
+              data-testid={`button-accept-recommendation-${id}`}
+              disabled={isProcessing}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Accept
             </Button>
             <Button 
               variant="outline" 
+              size="sm"
               onClick={handleReject}
-              data-testid="button-reject-recommendation"
+              data-testid={`button-reject-recommendation-${id}`}
               disabled={isProcessing}
             >
-              <XCircle className="w-4 h-4" />
+              <XCircle className="w-3.5 h-3.5" />
             </Button>
           </div>
-          {isProcessing && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground justify-center">
-              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></div>
-              Processing...
-            </div>
-          )}
-        </div>
+        )}
+        
+        {isProcessing && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground justify-center">
+            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></div>
+            Processing...
+          </div>
+        )}
       </div>
     </Card>
   );

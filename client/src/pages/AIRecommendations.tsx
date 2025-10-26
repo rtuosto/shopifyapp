@@ -405,19 +405,25 @@ export default function AIRecommendations() {
             </Card>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {recommendations.map((rec) => (
-                <AIRecommendationCard
-                  key={rec.id}
-                  title={rec.title}
-                  description={rec.description}
-                  productName={products.find(p => p.id === rec.productId)?.title || 'Unknown Product'}
-                  testType={rec.testType}
-                  impactScore={rec.impactScore}
-                  onAccept={() => handleAccept(rec.id)}
-                  onReject={() => handleDismissClick(rec.id)}
-                  onPreview={() => handlePreview(rec.id)}
-                />
-              ))}
+              {recommendations.map((rec) => {
+                const product = products.find(p => p.id === rec.productId);
+                const productImage = product?.images?.[0];
+                return (
+                  <AIRecommendationCard
+                    key={rec.id}
+                    id={rec.id}
+                    title={rec.title}
+                    description={rec.description}
+                    productName={product?.title || 'Unknown Product'}
+                    productImage={productImage}
+                    testType={rec.testType}
+                    impactScore={rec.impactScore}
+                    onAccept={() => handleAccept(rec.id)}
+                    onReject={() => handleDismissClick(rec.id)}
+                    onPreview={() => handlePreview(rec.id)}
+                  />
+                );
+              })}
             </div>
           )}
         </TabsContent>
@@ -433,54 +439,52 @@ export default function AIRecommendations() {
             </Card>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {archivedRecommendations.map((rec) => (
-                <Card key={rec.id} className="p-6 border-l-4 border-l-muted" data-testid={`card-archived-${rec.id}`}>
-                  <div className="space-y-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant="outline" className="gap-1">
-                            <ArchiveIcon className="w-3 h-3" />
-                            Archived
-                          </Badge>
-                          <Badge 
-                            variant={rec.impactScore >= 8 ? "default" : rec.impactScore >= 5 ? "outline" : "secondary"} 
-                            className="gap-1"
-                            data-testid="badge-impact-score"
-                          >
-                            Impact: {rec.impactScore}/10
-                          </Badge>
-                        </div>
-                        <h3 className="text-base font-semibold">{rec.title}</h3>
-                        <p className="text-sm text-muted-foreground">{rec.description}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Product: {products.find(p => p.id === rec.productId)?.title || 'Unknown'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handlePreview(rec.id)}
-                        data-testid={`button-preview-${rec.id}`}
-                      >
-                        Preview
-                      </Button>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => handleRestore(rec.id)}
-                        disabled={restoreRecommendationMutation.isPending}
-                        data-testid={`button-restore-${rec.id}`}
-                      >
-                        <RotateCcw className="w-3 h-3 mr-1" />
-                        Restore
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              ))}
+              {archivedRecommendations.map((rec) => {
+                const product = products.find(p => p.id === rec.productId);
+                const productImage = product?.images?.[0];
+                return (
+                  <AIRecommendationCard
+                    key={rec.id}
+                    id={rec.id}
+                    title={rec.title}
+                    description={rec.description}
+                    productName={product?.title || 'Unknown Product'}
+                    productImage={productImage}
+                    testType={rec.testType}
+                    impactScore={rec.impactScore}
+                    borderColor="border-l-muted"
+                    imageOpacity="opacity-60"
+                    headerBadge={
+                      <Badge variant="outline" className="gap-1">
+                        <ArchiveIcon className="w-3 h-3" />
+                        Archived
+                      </Badge>
+                    }
+                    customActions={
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePreview(rec.id)}
+                          data-testid={`button-preview-${rec.id}`}
+                        >
+                          Preview
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleRestore(rec.id)}
+                          disabled={restoreRecommendationMutation.isPending}
+                          data-testid={`button-restore-${rec.id}`}
+                        >
+                          <RotateCcw className="w-3 h-3 mr-1" />
+                          Restore
+                        </Button>
+                      </>
+                    }
+                  />
+                );
+              })}
             </div>
           )}
         </TabsContent>
