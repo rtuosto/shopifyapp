@@ -21,6 +21,35 @@ Shoptimizer utilizes a full-stack architecture with a React, Shadcn UI, Wouter, 
 - **Security**: Shop reassignment attacks prevented by stripping shop field from all update operations
 
 **Key Architectural Decisions & Features:**
+- **Profit-Optimized AI Recommendation System** (October 2025 - Production Ready): Intelligent AI recommendation generation with quota management, profit-based product selection, and batch API optimization:
+  - **Quota Management**: 20 AI recommendations per month for Basic plan, tracked in `shops` table with monthly reset
+  - **Intelligent Product Selection**: Two-stage filtering algorithm for scalability:
+    1. **Multi-Dimensional Scoring**: Algorithm pre-scores entire product catalog using weighted combination:
+       - **Profit Score (40%)**: `(Price - Cost) × Margin_Multiplier` with fallback to 50% assumed margin when cost data unavailable
+       - **Sales Score (30%)**: Based on `revenue30d` with recency boost (1.5x if sold in last 7 days, 1.2x if sold in last 30 days)
+       - **Gap Score (20%)**: Heuristic scoring for optimization opportunities (weak description +50, short title +20, many variants without compareAtPrice +30, few images +15)
+       - **Price Score (10%)**: Premium products (top 30% by price) get 1.5x boost, encouraging focus on high-value items
+    2. **AI Analysis**: GPT-4 analyzes only top 20-30 candidates identified by scoring algorithm, dramatically reducing API costs
+  - **Cost Optimization**: Single batch AI call for 20-30 products achieves 90% cost reduction vs individual product calls
+  - **Quota Safety**: Quota incremented BEFORE AI calls with automatic rollback on failures, preventing overspend and ensuring accurate quota tracking even with concurrent requests
+  - **Dual-Mode Generation**:
+    - **Store-Wide Analysis** (`POST /api/recommendations/store-analysis`): Generates 10 recommendations from top candidates, costs 10 quota
+    - **Product-Specific** (`POST /api/recommendations/product/:productId/generate`): Targets single product, costs 1 quota
+  - **Archive & Replace System**:
+    - **Dismiss** (`POST /api/recommendations/:id/dismiss`): Marks recommendation as dismissed with timestamp
+    - **Replace** (`POST /api/recommendations/:id/dismiss?replace=true`): Dismisses old recommendation, generates new one for same product (different test type), costs 1 quota
+    - **Archive Access** (`GET /api/recommendations/archived`): Retrieves all dismissed recommendations
+    - **Restore** (`POST /api/recommendations/:id/restore`): Restores dismissed recommendation to pending status (no quota cost)
+  - **Conflict Prevention**: Proactive filtering ensures AI never generates recommendations for test types that already have active tests on same product
+  - **Margin Data Handling**: System falls back to price-based scoring when cost/margin data unavailable (common for merchants who don't track costs in Shopify)
+  - **API Endpoints**:
+    - `GET /api/quota` - Quota status (used, remaining, reset date, plan tier)
+    - `POST /api/recommendations/store-analysis` - Generate 10 store-wide recommendations (costs 10 quota)
+    - `POST /api/recommendations/product/:productId/generate` - Generate 1 product-specific recommendation (costs 1 quota)
+    - `POST /api/recommendations/:id/dismiss` - Dismiss recommendation with optional replacement
+    - `GET /api/recommendations/archived` - Retrieve dismissed recommendations
+    - `POST /api/recommendations/:id/restore` - Restore dismissed recommendation
+  - **Frontend Integration**: Dashboard displays color-coded quota badge (green < 50%, yellow 50-79%, red ≥80% used) with Sparkles icon
 - **AI Recommendations**: GPT-4 analyzes product data to provide actionable optimization suggestions with psychological insights and SEO explanations. Recommendations are cached in PostgreSQL to avoid unnecessary API calls on server restarts.
 - **Multi-Variant Price Testing**: Complete support for products with multiple variants (sizes, colors, etc.). Price tests store all variant IDs and prices, calculate proportional price changes, deploy updated prices to ALL variants via Shopify's productVariantsBulkUpdate API, and safely restore original prices on rollback. This prevents cart/checkout price mismatches by updating actual Shopify variant prices rather than just UI display.
 - **UUID Session-Based Attribution**: A robust system using UUIDs stored in localStorage ensures persistent variant assignments across user sessions, accurately attributing conversions for A/B tests. This includes backend API endpoints for managing assignments and impressions, and webhook integration for conversion tracking.

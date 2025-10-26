@@ -362,10 +362,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSold: scored.product.totalSold || undefined,
       }));
       
-      // Call batch AI service
-      console.log(`[Store Analysis] Calling batch AI with ${productsForAI.length} products`);
-      const aiRecommendations = await generateBatchRecommendations(productsForAI, 10);
-      console.log(`[Store Analysis] AI returned ${aiRecommendations.length} recommendations`);
+      // Increment quota BEFORE AI call to prevent concurrent overspend
+      await storage.incrementQuota(shop, quotaNeeded);
+      console.log(`[Store Analysis] Reserved quota: +${quotaNeeded}`);
+      
+      let aiRecommendations;
+      try {
+        // Call batch AI service
+        console.log(`[Store Analysis] Calling batch AI with ${productsForAI.length} products`);
+        aiRecommendations = await generateBatchRecommendations(productsForAI, 10);
+        console.log(`[Store Analysis] AI returned ${aiRecommendations.length} recommendations`);
+      } catch (aiError) {
+        // Rollback quota if AI fails
+        await storage.incrementQuota(shop, -quotaNeeded);
+        console.error(`[Store Analysis] AI failed, quota rolled back`);
+        throw aiError;
+      }
       
       // Store recommendations in database
       const created = await Promise.all(
@@ -380,10 +392,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })
         )
       );
-      
-      // Update quota
-      await storage.incrementQuota(shop, quotaNeeded);
-      console.log(`[Store Analysis] Updated quota: +${quotaNeeded} used`);
       
       res.json({
         recommendations: created,
@@ -427,17 +435,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const activeTests = await storage.getActiveTestsByProduct(shop, productId);
       const activeTestTypes = new Set(activeTests.map(t => t.testType));
       
-      // Generate recommendation using existing AI service
-      const aiRecommendations = await generateOptimizationRecommendations({
-        title: product.title,
-        description: product.description || "",
-        price: parseFloat(product.price),
-      });
+      // Increment quota BEFORE AI call to prevent concurrent overspend
+      await storage.incrementQuota(shop, 1);
+      
+      let aiRecommendations;
+      try {
+        // Generate recommendation using existing AI service
+        aiRecommendations = await generateOptimizationRecommendations({
+          title: product.title,
+          description: product.description || "",
+          price: parseFloat(product.price),
+        });
+      } catch (aiError) {
+        // Rollback quota if AI fails
+        await storage.incrementQuota(shop, -1);
+        throw aiError;
+      }
       
       // Filter out conflicting test types
       const availableRecommendations = aiRecommendations.filter(rec => !activeTestTypes.has(rec.testType));
       
       if (availableRecommendations.length === 0) {
+        // Rollback quota since we can't generate
+        await storage.incrementQuota(shop, -1);
         return res.status(400).json({ 
           error: "No recommendations available. This product may already have tests for all recommendation types." 
         });
@@ -449,9 +469,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         productId: product.id,
         ...recommendation,
       });
-      
-      // Update quota
-      await storage.incrementQuota(shop, 1);
       
       res.json({
         recommendation: created,
@@ -505,12 +522,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const activeTests = await storage.getActiveTestsByProduct(shop, rec.productId);
           const activeTestTypes = new Set(activeTests.map(t => t.testType));
           
-          // Generate new recommendations
-          const aiRecommendations = await generateOptimizationRecommendations({
-            title: product.title,
-            description: product.description || "",
-            price: parseFloat(product.price),
-          });
+          // Increment quota BEFORE AI call
+          await storage.incrementQuota(shop, 1);
+          quotaUsed = 1;
+          
+          let aiRecommendations;
+          try {
+            // Generate new recommendations
+            aiRecommendations = await generateOptimizationRecommendations({
+              title: product.title,
+              description: product.description || "",
+              price: parseFloat(product.price),
+            });
+          } catch (aiError) {
+            // Rollback quota if AI fails
+            await storage.incrementQuota(shop, -1);
+            quotaUsed = 0;
+            throw aiError;
+          }
           
           // Filter conflicts and already-dismissed type
           const availableRecommendations = aiRecommendations.filter(
@@ -522,8 +551,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               productId: product.id,
               ...availableRecommendations[0],
             });
-            await storage.incrementQuota(shop, 1);
-            quotaUsed = 1;
+          } else {
+            // Rollback quota if no recommendations available
+            await storage.incrementQuota(shop, -1);
+            quotaUsed = 0;
           }
         }
       }
