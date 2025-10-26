@@ -317,23 +317,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const shop = (req as any).shop;
       
-      // Check quota
+      // Get shop data (beta testing: quota enforcement disabled)
       let shopData = await storage.getShop(shop);
       if (!shopData) {
         shopData = await storage.createOrUpdateShop(shop, {});
       }
       
-      const quotaRemaining = shopData.recommendationQuota - shopData.recommendationsUsed;
       const quotaNeeded = 10; // Store-wide analysis generates 10 recommendations
       
-      if (quotaRemaining < quotaNeeded) {
-        return res.status(403).json({ 
-          error: "Insufficient quota", 
-          required: quotaNeeded,
-          available: quotaRemaining,
-          message: `You need ${quotaNeeded} AI ideas but only have ${quotaRemaining} remaining.`
-        });
-      }
+      // Beta: Unlimited usage - still tracking for analytics & future pricing
       
       // Get all products and active tests
       const products = await storage.getProducts(shop);
@@ -399,7 +391,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         recommendations: created,
         quotaUsed: quotaNeeded,
-        quotaRemaining: quotaRemaining - quotaNeeded,
       });
     } catch (error) {
       console.error("Error generating store-wide recommendations:", error);
@@ -413,20 +404,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const shop = (req as any).shop;
       const { productId } = req.params;
       
-      // Check quota
+      // Get shop data (beta testing: quota enforcement disabled)
       let shopData = await storage.getShop(shop);
       if (!shopData) {
         shopData = await storage.createOrUpdateShop(shop, {});
       }
       
-      const quotaRemaining = shopData.recommendationQuota - shopData.recommendationsUsed;
-      if (quotaRemaining < 1) {
-        return res.status(403).json({ 
-          error: "Insufficient quota", 
-          available: quotaRemaining,
-          message: "You've used all your AI ideas for this month."
-        });
-      }
+      // Beta: Unlimited usage - still tracking for analytics & future pricing
       
       // Get product
       const product = await storage.getProduct(shop, productId);
@@ -476,7 +460,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         recommendation: created,
         quotaUsed: 1,
-        quotaRemaining: quotaRemaining - 1,
       });
     } catch (error) {
       console.error("Error generating product recommendation:", error);
@@ -506,19 +489,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let replacement = null;
       let quotaUsed = 0;
       
-      // Generate replacement if requested
+      // Generate replacement if requested (beta: unlimited usage)
       if (replace) {
-        const shopData = await storage.getShop(shop);
-        const quotaRemaining = shopData ? (shopData.recommendationQuota - shopData.recommendationsUsed) : 0;
-        
-        if (quotaRemaining < 1) {
-          return res.status(403).json({ 
-            error: "Insufficient quota for replacement", 
-            dismissed: true,
-            replacement: null,
-          });
-        }
-        
         // Get product and active tests
         const product = await storage.getProduct(shop, rec.productId);
         if (product) {
