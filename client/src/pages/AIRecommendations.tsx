@@ -341,7 +341,7 @@ export default function AIRecommendations() {
       <div className="flex items-center gap-3">
         <Button
           onClick={() => setStoreIdeasDialogOpen(true)}
-          disabled={quotaRemaining < 10 || generateStoreRecommendationsMutation.isPending}
+          disabled={generateStoreRecommendationsMutation.isPending}
           data-testid="button-generate-store-ideas"
         >
           <Sparkles className="w-4 h-4 mr-2" />
@@ -366,7 +366,7 @@ export default function AIRecommendations() {
                 generateProductRecommendationMutation.mutate(selectedProductId);
               }
             }}
-            disabled={!selectedProductId || quotaRemaining < 1 || generateProductRecommendationMutation.isPending}
+            disabled={!selectedProductId || generateProductRecommendationMutation.isPending}
             variant="outline"
             data-testid="button-generate-product-idea"
           >
@@ -398,7 +398,6 @@ export default function AIRecommendations() {
               </p>
               <Button
                 onClick={() => setStoreIdeasDialogOpen(true)}
-                disabled={quotaRemaining < 10}
               >
                 <Sparkles className="w-4 h-4 mr-2" />
                 Generate Store Ideas
@@ -548,7 +547,7 @@ export default function AIRecommendations() {
                   dismissRecommendationMutation.mutate({ id: dismissingRecommendation.id, replace: true });
                 }
               }}
-              disabled={dismissRecommendationMutation.isPending || quotaRemaining < 1}
+              disabled={dismissRecommendationMutation.isPending}
               data-testid="button-dismiss-replace"
             >
               <Sparkles className="w-4 h-4 mr-2" />
