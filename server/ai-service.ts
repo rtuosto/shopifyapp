@@ -11,6 +11,14 @@ interface ProductData {
   description: string;
   price: number;
   category?: string;
+  variants?: Array<{
+    id: string;
+    price: string;
+    title?: string;
+  }>;
+  images?: string[];
+  variantCount?: number;
+  imageCount?: number;
 }
 
 interface BatchProductData extends ProductData {
@@ -40,9 +48,22 @@ export async function generateOptimizationRecommendations(
 
 Product Details:
 - Title: ${product.title}
-- Description: ${product.description || 'No description provided'}
+- Current Description: ${product.description || 'No description provided'}
 - Price: $${product.price}
 ${product.category ? `- Category: ${product.category}` : ''}
+${product.variantCount ? `- Number of Variants: ${product.variantCount}` : ''}
+${product.imageCount ? `- Number of Images: ${product.imageCount}` : ''}
+
+CRITICAL ANTI-HALLUCINATION RULES:
+1. NEVER invent product specifications (materials, dimensions, technical details, features)
+2. NEVER invent warranty, return, or shipping policies
+3. NEVER invent specific variant details (sizes, colors, SKUs) unless explicitly provided above
+4. NEVER make up customer reviews, ratings, or testimonials
+5. For description recommendations: suggest STRUCTURE, TONE, and APPROACH only - do NOT write full descriptions with invented specs
+6. For price recommendations: base suggestions on the actual price provided, not imaginary competitor data
+7. Only reference information explicitly provided in the Product Details section above
+
+If the current description is missing or weak, recommend adding GENERAL benefit-focused copy, SEO keywords, and persuasive structure - but NEVER invent specific product features or technical specifications.
 
 For each recommendation, provide:
 1. testType: What to change ("title", "price", "description", or "image")

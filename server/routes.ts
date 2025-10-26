@@ -159,6 +159,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         title: product.title,
         description: product.description || "",
         price: parseFloat(product.price),
+        variants: product.variants,
+        variantCount: product.variants?.length || 0,
+        imageCount: product.images?.length || 0,
       });
 
       console.log(`[AI] Generated ${aiRecommendations.length} recommendations:`, aiRecommendations.map(r => r.testType));
