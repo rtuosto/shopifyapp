@@ -371,7 +371,7 @@ export default function AIRecommendations() {
             data-testid="button-generate-product-idea"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Generate Idea
+            {generateProductRecommendationMutation.isPending ? "Generating..." : "Generate Idea"}
           </Button>
         </div>
       </div>
