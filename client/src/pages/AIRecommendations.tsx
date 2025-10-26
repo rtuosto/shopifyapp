@@ -383,6 +383,7 @@ export default function AIRecommendations() {
                   title={rec.title}
                   description={rec.description}
                   productName={products.find(p => p.id === rec.productId)?.title || 'Unknown Product'}
+                  impactScore={rec.impactScore}
                   onAccept={() => handleAccept(rec.id)}
                   onReject={() => handleDismissClick(rec.id)}
                   onPreview={() => handlePreview(rec.id)}
@@ -412,6 +413,13 @@ export default function AIRecommendations() {
                           <Badge variant="outline" className="gap-1">
                             <ArchiveIcon className="w-3 h-3" />
                             Archived
+                          </Badge>
+                          <Badge 
+                            variant={rec.impactScore >= 8 ? "default" : rec.impactScore >= 5 ? "outline" : "secondary"} 
+                            className="gap-1"
+                            data-testid="badge-impact-score"
+                          >
+                            Impact: {rec.impactScore}/10
                           </Badge>
                         </div>
                         <h3 className="text-base font-semibold">{rec.title}</h3>

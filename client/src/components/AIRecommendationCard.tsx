@@ -8,6 +8,7 @@ interface AIRecommendationCardProps {
   title: string;
   description: string;
   productName: string;
+  impactScore?: number; // 1-10 AI confidence score
   onAccept?: () => void;
   onReject?: () => void;
   onPreview?: () => void;
@@ -17,6 +18,7 @@ export default function AIRecommendationCard({
   title,
   description,
   productName,
+  impactScore = 5,
   onAccept,
   onReject,
   onPreview,
@@ -58,6 +60,13 @@ export default function AIRecommendationCard({
               <Badge variant="secondary" className="gap-1" data-testid="badge-ai-recommended">
                 <Sparkles className="w-3 h-3" />
                 AI Recommended
+              </Badge>
+              <Badge 
+                variant={impactScore >= 8 ? "default" : impactScore >= 5 ? "outline" : "secondary"} 
+                className="gap-1"
+                data-testid="badge-impact-score"
+              >
+                Impact: {impactScore}/10
               </Badge>
             </div>
             <h3 className="text-base font-semibold" data-testid="text-recommendation-title">
