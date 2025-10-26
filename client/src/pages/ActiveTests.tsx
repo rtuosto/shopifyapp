@@ -63,12 +63,13 @@ function TestEvolutionCharts({ testId }: TestEvolutionChartsProps) {
             Cumulative revenue per visitor tracked at 100-impression intervals
           </p>
         </div>
-        <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 50 }}>
+        <ResponsiveContainer width="100%" height={270}>
+          <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 60 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis 
               dataKey="impressions" 
-              label={{ value: 'Total Test Impressions', position: 'insideBottom', offset: 0 }}
+              label={{ value: 'Total Test Impressions', position: 'bottom', offset: 15 }}
+              height={60}
             />
             <YAxis 
               label={{ value: 'RPV ($)', angle: -90, position: 'insideLeft' }}
@@ -77,7 +78,7 @@ function TestEvolutionCharts({ testId }: TestEvolutionChartsProps) {
               formatter={(value: number) => `$${value.toFixed(2)}`}
               labelFormatter={(label) => `${label} impressions`}
             />
-            <Legend wrapperStyle={{ paddingTop: '20px' }} />
+            <Legend verticalAlign="bottom" height={36} />
             <Line 
               type="monotone" 
               dataKey="controlRPV" 
@@ -106,12 +107,13 @@ function TestEvolutionCharts({ testId }: TestEvolutionChartsProps) {
             Cumulative traffic split adjustments tracked at 100-impression intervals
           </p>
         </div>
-        <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 50 }}>
+        <ResponsiveContainer width="100%" height={270}>
+          <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 60 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis 
               dataKey="impressions" 
-              label={{ value: 'Total Test Impressions', position: 'insideBottom', offset: 0 }}
+              label={{ value: 'Total Test Impressions', position: 'bottom', offset: 15 }}
+              height={60}
             />
             <YAxis 
               label={{ value: 'Allocation (%)', angle: -90, position: 'insideLeft' }}
@@ -121,7 +123,7 @@ function TestEvolutionCharts({ testId }: TestEvolutionChartsProps) {
               formatter={(value: number) => `${value.toFixed(1)}%`}
               labelFormatter={(label) => `${label} impressions`}
             />
-            <Legend wrapperStyle={{ paddingTop: '20px' }} />
+            <Legend verticalAlign="bottom" height={36} />
             <Line 
               type="monotone" 
               dataKey="controlAllocation" 
