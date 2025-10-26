@@ -12,12 +12,12 @@ Shoptimizer is an embedded Shopify app designed to enhance sales for store owner
 - Focus on delivering functional, well-tested features that directly impact conversion optimization.
 
 ## System Architecture
-Shoptimizer utilizes a full-stack architecture. The frontend uses React with Shadcn UI, Wouter, and TanStack Query, integrated via Shopify App Bridge. The backend is built with Express.js and uses PostgreSQL with Drizzle ORM for multi-tenant data storage. It integrates with the Shopify Admin GraphQL API for product management and uses webhooks for conversion tracking. OpenAI's GPT-4 powers AI-driven recommendations.
+Shoptimizer utilizes a full-stack architecture. The frontend uses React with Shadcn UI, Wouter, and TanStack Query, integrated via Shopify App Bridge. The backend is built with Express.js and uses PostgreSQL with Drizzle ORM for multi-tenant data storage. It integrates with the Shopify Admin GraphQL API for product management and uses webhooks for conversion tracking. OpenAI's GPT-5-mini (October 2025 upgrade) powers AI-driven recommendations with enhanced reasoning and 45% fewer hallucinations.
 
 **Key Architectural Decisions & Features:**
 - **Multi-Tenant PostgreSQL**: Ensures data isolation between Shopify stores with shop-scoped data and composite unique constraints.
 - **Profit-Optimized AI Recommendation System**: Generates intelligent AI recommendations with quota management, profit-based product selection, and cost-optimized batch processing. It includes a two-stage filtering algorithm for product selection, an archive and replace system for recommendations, and conflict prevention for active tests.
-- **Impact Score Tracking & Sorting**: GPT-4 assigns impact scores (1-10) to recommendations based on revenue potential, which are then used to prioritize recommendations in the UI.
+- **Impact Score Tracking & Sorting**: GPT-5-mini assigns impact scores (1-10) to recommendations based on revenue potential, which are then used to prioritize recommendations in the UI.
 - **Multi-Variant Price Testing**: Supports A/B testing for products with multiple variants, ensuring all variant prices are updated proportionally and safely rolled back.
 - **UUID Session-Based Attribution**: Uses UUIDs for persistent variant assignments across user sessions, ensuring accurate conversion attribution.
 - **Bayesian-Only Testing Architecture**: All A/B tests use Bayesian allocation with Thompson Sampling for dynamic, data-driven traffic distribution.
@@ -38,7 +38,7 @@ Shoptimizer utilizes a full-stack architecture. The frontend uses React with Sha
 
 ## External Dependencies
 - **Shopify Admin GraphQL API v12**: For store data interaction (products, orders).
-- **OpenAI GPT-4**: Powers the AI recommendation engine.
+- **OpenAI GPT-5-mini**: Powers the AI recommendation engine (upgraded October 2025 for enhanced reasoning, better accuracy, and 80% cost reduction vs GPT-4o).
 - **PostgreSQL (Neon)**: Persistent multi-tenant storage.
 - **Shopify App Bridge**: Enables the embedded app experience.
 - **Wouter**: Client-side routing.

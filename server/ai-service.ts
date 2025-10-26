@@ -69,7 +69,7 @@ Return your response as a JSON object with a "recommendations" array.`;
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-5-mini",
       messages: [
         {
           role: "system",
@@ -180,7 +180,7 @@ Return your response as a JSON object with a "recommendations" array, sorted by 
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-5-mini",
       messages: [
         {
           role: "system",
