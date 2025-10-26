@@ -50,8 +50,11 @@ For each recommendation, provide:
 3. description: Why this change will work
 4. proposedChanges: An object containing the ACTUAL new values (e.g., {"title": "new title here"} or {"price": 99.99} or {"description": "new description"})
 5. insights: Array of objects with type, title, and description explaining the psychology/SEO/competitive reasoning
+6. impactScore: A 1-10 score representing expected revenue impact (1=low impact, 10=transformative)
 
-CRITICAL: The proposedChanges object MUST contain the actual new value(s), not instructions or descriptions.
+CRITICAL: 
+- The proposedChanges object MUST contain the actual new value(s), not instructions or descriptions
+- Always include impactScore based on expected conversion lift and revenue impact
 
 Examples:
 - For title change: {"title": "Premium Snowboard - Professional Quality"}
@@ -94,12 +97,16 @@ Return your response as a JSON object with a "recommendations" array.`;
     // Handle both array and object responses
     const recommendations = Array.isArray(parsed) ? parsed : (parsed.recommendations || []);
 
+    // Log GPT response for debugging impact scores
+    console.log("[AI Service] Single-product recommendations received:", JSON.stringify(recommendations, null, 2));
+
     return recommendations.map((rec: any) => ({
       title: rec.title,
       description: rec.description,
       testType: rec.testType || "title",
       proposedChanges: rec.proposedChanges || {},
       insights: rec.insights || [],
+      impactScore: rec.impactScore || 5, // Extract impact score from GPT response
     }));
   } catch (error) {
     console.error("Error generating recommendations:", error);
@@ -125,6 +132,7 @@ Return your response as a JSON object with a "recommendations" array.`;
             description: "Words like 'Premium' and 'Professional' create perceived value and quality.",
           },
         ],
+        impactScore: 5, // Default fallback score
       },
     ];
   }
@@ -202,6 +210,12 @@ Return your response as a JSON object with a "recommendations" array, sorted by 
 
     const parsed = JSON.parse(content);
     const recommendations = Array.isArray(parsed) ? parsed : (parsed.recommendations || []);
+
+    // Log GPT response for debugging impact scores
+    console.log("[AI Service] Batch recommendations received:", JSON.stringify({
+      count: recommendations.length,
+      impactScores: recommendations.map((r: any) => ({ title: r.title, impactScore: r.impactScore }))
+    }, null, 2));
 
     return recommendations.map((rec: any) => ({
       productId: rec.productId,
