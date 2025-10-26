@@ -1103,9 +1103,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[Simulate Traffic] Created ${variantImpressions} variant impression records`);
 
       // Update test with new aggregate impressions
-      const newControlImpressions = (test.controlImpressions || 0) + controlImpressions;
-      const newVariantImpressions = (test.variantImpressions || 0) + variantImpressions;
-      const newImpressions = (test.impressions || 0) + impressions;
+      // Parse bigint fields as numbers (they come from DB as strings)
+      const newControlImpressions = (Number(test.controlImpressions) || 0) + controlImpressions;
+      const newVariantImpressions = (Number(test.variantImpressions) || 0) + variantImpressions;
+      const newImpressions = (Number(test.impressions) || 0) + impressions;
       
       await storage.updateTest(shop, testId, {
         impressions: newImpressions,
@@ -1420,15 +1421,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalConversions = controlConversions + variantConversions;
 
       // Update test metrics
-      const newControlImpressions = (test.controlImpressions || 0) + controlImpressions;
-      const newVariantImpressions = (test.variantImpressions || 0) + variantImpressions;
-      const newControlConversions = (test.controlConversions || 0) + controlConversions;
-      const newVariantConversions = (test.variantConversions || 0) + variantConversions;
+      // Parse bigint fields as numbers (they come from DB as strings)
+      const newControlImpressions = (Number(test.controlImpressions) || 0) + controlImpressions;
+      const newVariantImpressions = (Number(test.variantImpressions) || 0) + variantImpressions;
+      const newControlConversions = (Number(test.controlConversions) || 0) + controlConversions;
+      const newVariantConversions = (Number(test.variantConversions) || 0) + variantConversions;
       const newControlRevenue = parseFloat(test.controlRevenue || "0") + controlRevenue;
       const newVariantRevenue = parseFloat(test.variantRevenue || "0") + variantRevenue;
       
-      const newImpressions = (test.impressions || 0) + visitors;
-      const newConversions = (test.conversions || 0) + totalConversions;
+      const newImpressions = (Number(test.impressions) || 0) + visitors;
+      const newConversions = (Number(test.conversions) || 0) + totalConversions;
       const newRevenue = parseFloat(test.revenue || "0") + totalRevenue;
       const arpu = newConversions > 0 ? newRevenue / newConversions : 0;
 
@@ -1762,15 +1764,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalRevenue = controlRevenue + variantRevenue;
       const totalConversions = controlConversions + variantConversions;
 
-      const newControlImpressions = (test.controlImpressions || 0) + controlImpressions;
-      const newVariantImpressions = (test.variantImpressions || 0) + variantImpressions;
-      const newControlConversions = (test.controlConversions || 0) + controlConversions;
-      const newVariantConversions = (test.variantConversions || 0) + variantConversions;
+      // Parse bigint fields as numbers (they come from DB as strings)
+      const newControlImpressions = (Number(test.controlImpressions) || 0) + controlImpressions;
+      const newVariantImpressions = (Number(test.variantImpressions) || 0) + variantImpressions;
+      const newControlConversions = (Number(test.controlConversions) || 0) + controlConversions;
+      const newVariantConversions = (Number(test.variantConversions) || 0) + variantConversions;
       const newControlRevenue = parseFloat(test.controlRevenue || "0") + controlRevenue;
       const newVariantRevenue = parseFloat(test.variantRevenue || "0") + variantRevenue;
       
-      const newImpressions = (test.impressions || 0) + visitors;
-      const newConversions = (test.conversions || 0) + totalConversions;
+      const newImpressions = (Number(test.impressions) || 0) + visitors;
+      const newConversions = (Number(test.conversions) || 0) + totalConversions;
       const newRevenue = parseFloat(test.revenue || "0") + totalRevenue;
       const arpu = newConversions > 0 ? newRevenue / newConversions : 0;
 
@@ -2033,14 +2036,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Increment the appropriate impression counter
+      // Parse bigint fields as numbers (they come from DB as strings)
       const updates: any = {
-        impressions: (test.impressions || 0) + 1,
+        impressions: (Number(test.impressions) || 0) + 1,
       };
       
       if (variant === "control") {
-        updates.controlImpressions = (test.controlImpressions || 0) + 1;
+        updates.controlImpressions = (Number(test.controlImpressions) || 0) + 1;
       } else {
-        updates.variantImpressions = (test.variantImpressions || 0) + 1;
+        updates.variantImpressions = (Number(test.variantImpressions) || 0) + 1;
       }
       
       await storage.updateTest(shop, testId, updates);
