@@ -142,28 +142,42 @@ export class MemStorage implements IStorage {
     // Sample products
     const product1: Product = {
       id: randomUUID(),
+      shop,
       shopifyProductId: "shopify-123",
       title: "Wireless Bluetooth Speaker",
       description: "High-quality portable speaker with 12-hour battery life. Perfect for outdoor adventures and home use.",
       price: "49.99",
       compareAtPrice: "79.99",
+      cost: null,
+      margin: null,
+      variants: [],
       images: ["https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=800&h=800&fit=crop"],
       rating: "4.5",
       reviewCount: 328,
+      totalSold: 0,
+      revenue30d: "0",
+      lastSaleDate: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
     const product2: Product = {
       id: randomUUID(),
+      shop,
       shopifyProductId: "shopify-124",
       title: "Smart Fitness Tracker",
       description: "Track your fitness goals with advanced heart rate monitoring and sleep tracking. Water-resistant design for all activities.",
       price: "49.99",
       compareAtPrice: null,
+      cost: null,
+      margin: null,
+      variants: [],
       images: ["https://images.unsplash.com/photo-1575311373937-040b8e1fd5b6?w=800&h=800&fit=crop"],
       rating: "4.7",
       reviewCount: 512,
+      totalSold: 0,
+      revenue30d: "0",
+      lastSaleDate: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -174,13 +188,12 @@ export class MemStorage implements IStorage {
     // Sample recommendations
     const rec1: Recommendation = {
       id: randomUUID(),
+      shop,
       productId: product1.id,
       title: "Optimize Product Title for SEO",
       description: "Add power words like 'Premium' and 'Professional' to increase click-through rate by emphasizing quality and value proposition.",
       testType: "title",
-      confidence: 87,
-      estimatedImpact: "+15% CTR",
-      riskLevel: "low",
+      impactScore: 8,
       proposedChanges: {
         title: "Premium Wireless Bluetooth Speaker - Professional Sound Quality",
         description: "Experience premium audio with our professional-grade portable speaker. Featuring 12-hour extended battery life and premium bass enhancement. Perfect for outdoor adventures, parties, and home entertainment.",
@@ -203,18 +216,18 @@ export class MemStorage implements IStorage {
         },
       ],
       status: "pending",
+      dismissedAt: null,
       createdAt: new Date(),
     };
 
     const rec2: Recommendation = {
       id: randomUUID(),
+      shop,
       productId: product2.id,
       title: "Test Price Point Optimization",
       description: "Reduce price from $49.99 to $44.99 to hit psychological pricing sweet spot. Competitor analysis shows this range performs better.",
       testType: "price",
-      confidence: 92,
-      estimatedImpact: "+22% conversions",
-      riskLevel: "low",
+      impactScore: 9,
       proposedChanges: {
         price: "44.99",
       },
@@ -236,6 +249,7 @@ export class MemStorage implements IStorage {
         },
       ],
       status: "pending",
+      dismissedAt: null,
       createdAt: new Date(),
     };
 
