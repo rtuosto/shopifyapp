@@ -23,6 +23,7 @@ Shoptimizer utilizes a full-stack architecture. The frontend uses React with Sha
 - **Bayesian-Only Testing Architecture**: All A/B tests use Bayesian allocation with Thompson Sampling for dynamic, data-driven traffic distribution.
 - **Bayesian A/B Testing Engine**: Implements Top-Two Thompson Sampling (TTTS) for intelligent traffic allocation, incorporating statistical rigor, risk controls, and auto-promotion criteria for tests.
 - **Test Preview System**: Offers a side-by-side comparison of control vs. variant with multi-device views.
+- **Auto-Activation Flow**: When users accept an AI recommendation, the test is automatically created AND activated in one action, going live immediately with 75/5 allocation instead of requiring manual activation from draft mode.
 - **Dashboard & Active Tests Page**: Provides real-time metrics, performance charts, AI recommendations, and monitors live tests with ARPU lift tracking.
 - **Product Sync System**: Automates and manually synchronizes Shopify product data, including variant details, with the database.
 - **Smart Automation System**: Includes features like auto-sync, AI recommendation generation, and dismissal with replacement.
