@@ -330,9 +330,9 @@ export default function AIRecommendations() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant={quotaUsed < quotaTotal * 0.5 ? "secondary" : quotaUsed < quotaTotal * 0.8 ? "default" : "destructive"} className="gap-1">
+          <Badge variant="secondary" className="gap-1">
             <Sparkles className="w-3 h-3" />
-            {quotaUsed} of {quotaTotal} AI Ideas
+            {quotaUsed} AI Ideas Used · Beta: Unlimited
           </Badge>
         </div>
       </div>
@@ -524,7 +524,7 @@ export default function AIRecommendations() {
               <strong>Just Dismiss:</strong> Archive this recommendation
             </p>
             <p className="text-sm">
-              <strong>Dismiss & Replace:</strong> Archive this and generate a different recommendation for the same product (costs 1 AI Idea)
+              <strong>Dismiss & Replace:</strong> Archive this and generate a different recommendation for the same product
             </p>
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-2">
@@ -551,7 +551,7 @@ export default function AIRecommendations() {
               data-testid="button-dismiss-replace"
             >
               <Sparkles className="w-4 h-4 mr-2" />
-              Dismiss & Replace (1 Idea)
+              Dismiss & Replace
             </Button>
           </DialogFooter>
         </DialogContent>

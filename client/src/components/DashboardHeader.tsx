@@ -14,15 +14,7 @@ export default function DashboardHeader({
   quotaUsed = 0,
   quotaTotal = 20
 }: DashboardHeaderProps) {
-  const quotaPercentage = (quotaUsed / quotaTotal) * 100;
-  
-  // Color code based on usage level
-  let quotaVariant: "default" | "secondary" | "destructive" = "secondary";
-  if (quotaPercentage >= 80) {
-    quotaVariant = "destructive"; // 80%+ used (red)
-  } else if (quotaPercentage >= 50) {
-    quotaVariant = "default"; // 50-79% used (yellow/warning)
-  }
+  // Beta testing: Always show secondary variant (unlimited usage)
   
   return (
     <div className="mb-6">
@@ -31,9 +23,9 @@ export default function DashboardHeader({
         <Badge variant="secondary" data-testid="badge-active-tests">
           {activeTests} Active Tests
         </Badge>
-        <Badge variant={quotaVariant} className="gap-1" data-testid="badge-quota">
+        <Badge variant="secondary" className="gap-1" data-testid="badge-quota">
           <Sparkles className="w-3 h-3" />
-          {quotaUsed} of {quotaTotal} AI Ideas
+          {quotaUsed} AI Ideas Used · Beta: Unlimited
         </Badge>
         <span className="text-sm text-muted-foreground" data-testid="text-last-sync">
           Last synced {lastSync}
