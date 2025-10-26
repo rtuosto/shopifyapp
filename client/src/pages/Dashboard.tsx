@@ -555,9 +555,9 @@ export default function Dashboard() {
                   You have {activeTestsCount} test{activeTestsCount === 1 ? '' : 's'} running live in your store
                 </p>
               </div>
-              <Link href="/active-tests">
-                <Button variant="outline" data-testid="button-view-active-tests">
-                  View All Active Tests
+              <Link href="/tests">
+                <Button variant="outline" data-testid="button-view-tests">
+                  View All Tests
                 </Button>
               </Link>
             </div>

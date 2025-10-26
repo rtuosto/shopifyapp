@@ -256,7 +256,7 @@ export default function AIRecommendations() {
       // Do NOT update recommendation status - keep it as "pending"
       toast({
         title: "Draft Saved",
-        description: "Test saved as draft. Activate it from the Active Tests page when ready.",
+        description: "Test saved as draft. Activate it from the Tests page when ready.",
       });
       
       queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
