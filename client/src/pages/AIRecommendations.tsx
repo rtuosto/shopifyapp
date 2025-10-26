@@ -189,7 +189,7 @@ export default function AIRecommendations() {
     },
   });
 
-  // Create test from recommendation
+  // Create and activate test from recommendation
   const createTestMutation = useMutation({
     mutationFn: async ({ recommendationId, editedChanges }: { recommendationId: string; editedChanges?: Record<string, any> }) => {
       const recommendation = recommendations.find(r => r.id === recommendationId);
@@ -241,15 +241,22 @@ export default function AIRecommendations() {
         revenue: "0",
       };
 
-      const res = await apiRequest("POST", "/api/tests", testData);
-      return res.json();
+      // Create the test
+      const createRes = await apiRequest("POST", "/api/tests", testData);
+      const createdTest = await createRes.json();
+
+      // Immediately activate the test
+      const activateRes = await apiRequest("POST", `/api/tests/${createdTest.id}/activate`);
+      const activatedTest = await activateRes.json();
+
+      return { test: activatedTest, recommendationId };
     },
-    onSuccess: async (data, variables) => {
-      await apiRequest("PATCH", `/api/recommendations/${variables.recommendationId}`, { status: "testing" });
+    onSuccess: async (data) => {
+      await apiRequest("PATCH", `/api/recommendations/${data.recommendationId}`, { status: "testing" });
       
       toast({
-        title: "Test Created",
-        description: "Your A/B test has been created successfully",
+        title: "Test Launched",
+        description: "Your A/B test is now live and collecting data",
       });
       
       queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
@@ -257,8 +264,8 @@ export default function AIRecommendations() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Failed to Create Test",
-        description: error.message || "Could not create test from recommendation",
+        title: "Failed to Launch Test",
+        description: error.message || "Could not create and activate test from recommendation",
         variant: "destructive",
       });
     },
