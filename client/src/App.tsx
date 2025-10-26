@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import ThemeToggle from "@/components/ThemeToggle";
 import Dashboard from "@/pages/Dashboard";
 import ActiveTests from "@/pages/ActiveTests";
+import AIRecommendations from "@/pages/AIRecommendations";
 import Simulator from "@/pages/Simulator";
 import Settings from "@/pages/Settings";
 import NotFound from "@/pages/NotFound";
@@ -17,6 +18,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/active-tests" component={ActiveTests} />
+      <Route path="/recommendations" component={AIRecommendations} />
       <Route path="/simulator" component={Simulator} />
       <Route path="/settings" component={Settings} />
       <Route component={NotFound} />

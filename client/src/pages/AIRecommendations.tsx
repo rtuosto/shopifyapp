@@ -522,12 +522,34 @@ export default function AIRecommendations() {
       </Dialog>
 
       {/* Preview Modal */}
-      {selectedRecommendation && (
+      {selectedRecommendation && selectedProduct && (
         <TestPreviewModal
           open={previewOpen}
           onOpenChange={setPreviewOpen}
-          recommendation={selectedRecommendation}
-          product={selectedProduct}
+          testTitle={selectedRecommendation.title}
+          control={{
+            title: selectedProduct.title,
+            price: parseFloat(selectedProduct.price),
+            compareAtPrice: selectedProduct.compareAtPrice ? parseFloat(selectedProduct.compareAtPrice) : undefined,
+            description: selectedProduct.description ?? "",
+            images: selectedProduct.images,
+            rating: selectedProduct.rating ? parseFloat(selectedProduct.rating) : undefined,
+            reviewCount: selectedProduct.reviewCount ?? undefined,
+          }}
+          variant={{
+            title: (selectedRecommendation.proposedChanges.title as string | undefined) ?? selectedProduct.title,
+            price: selectedRecommendation.proposedChanges.price 
+              ? parseFloat(selectedRecommendation.proposedChanges.price as string)
+              : parseFloat(selectedProduct.price),
+            compareAtPrice: selectedProduct.compareAtPrice ? parseFloat(selectedProduct.compareAtPrice) : undefined,
+            description: (selectedRecommendation.proposedChanges.description as string | undefined) ?? selectedProduct.description ?? "",
+            images: selectedProduct.images,
+            rating: selectedProduct.rating ? parseFloat(selectedProduct.rating) : undefined,
+            reviewCount: selectedProduct.reviewCount ?? undefined,
+          }}
+          changes={Object.keys(selectedRecommendation.proposedChanges)}
+          insights={selectedRecommendation.insights}
+          onApprove={() => handleAccept(selectedRecommendation.id)}
         />
       )}
     </div>
