@@ -137,17 +137,17 @@ export class DbStorage implements IStorage {
     if (status) {
       return await db.select().from(recommendations)
         .where(and(eq(recommendations.shop, shop), eq(recommendations.status, status)))
-        .orderBy(desc(recommendations.createdAt));
+        .orderBy(desc(recommendations.impactScore)); // Sort by impact score (highest first)
     }
     return await db.select().from(recommendations)
       .where(eq(recommendations.shop, shop))
-      .orderBy(desc(recommendations.createdAt));
+      .orderBy(desc(recommendations.impactScore)); // Sort by impact score (highest first)
   }
 
   async getRecommendationsByProduct(shop: string, productId: string): Promise<Recommendation[]> {
     return await db.select().from(recommendations)
       .where(and(eq(recommendations.shop, shop), eq(recommendations.productId, productId)))
-      .orderBy(desc(recommendations.createdAt));
+      .orderBy(desc(recommendations.impactScore)); // Sort by impact score (highest first)
   }
 
   async createRecommendation(shop: string, recommendation: InsertRecommendation): Promise<Recommendation> {
