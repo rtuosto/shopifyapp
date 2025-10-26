@@ -21,7 +21,7 @@ Shoptimizer utilizes a full-stack architecture. The frontend uses React with Sha
 - **Multi-Variant Price Testing**: Supports A/B testing for products with multiple variants, ensuring all variant prices are updated proportionally and safely rolled back.
 - **UUID Session-Based Attribution**: Uses UUIDs for persistent variant assignments across user sessions, ensuring accurate conversion attribution.
 - **Bayesian-Only Testing Architecture**: All A/B tests use Bayesian allocation with Thompson Sampling for dynamic, data-driven traffic distribution.
-- **Bayesian A/B Testing Engine**: Implements Top-Two Thompson Sampling (TTTS) for intelligent traffic allocation, incorporating statistical rigor, risk controls, and auto-promotion criteria for tests.
+- **Bayesian A/B Testing Engine**: Implements Top-Two Thompson Sampling (TTTS) for intelligent traffic allocation with minimal constraints (1% floors), allowing optimization up to 99/1 splits while maintaining CVaR downside protection (2% cap on risky variants) and safety budget cost controls.
 - **Test Preview System**: Offers a side-by-side comparison of control vs. variant with multi-device views.
 - **Auto-Activation Flow**: When users accept an AI recommendation, the test is automatically created AND activated in one action, going live immediately with 50/50 balanced allocation for faster learning instead of requiring manual activation from draft mode.
 - **Dashboard & Active Tests Page**: Provides real-time metrics, performance charts, AI recommendations, and monitors live tests with ARPU lift tracking.
