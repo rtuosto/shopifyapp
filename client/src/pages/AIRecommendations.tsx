@@ -411,6 +411,7 @@ export default function AIRecommendations() {
                   title={rec.title}
                   description={rec.description}
                   productName={products.find(p => p.id === rec.productId)?.title || 'Unknown Product'}
+                  testType={rec.testType}
                   impactScore={rec.impactScore}
                   onAccept={() => handleAccept(rec.id)}
                   onReject={() => handleDismissClick(rec.id)}

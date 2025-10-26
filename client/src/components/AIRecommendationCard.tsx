@@ -3,11 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, CheckCircle2, XCircle, Eye } from "lucide-react";
 import { useState } from "react";
+import { formatTestType } from "@/lib/testTypeFormatter";
 
 interface AIRecommendationCardProps {
   title: string;
   description: string;
   productName: string;
+  testType: string; // "title", "description", "price", etc.
   impactScore?: number; // 1-10 AI confidence score
   onAccept?: () => void;
   onReject?: () => void;
@@ -18,6 +20,7 @@ export default function AIRecommendationCard({
   title,
   description,
   productName,
+  testType,
   impactScore = 5,
   onAccept,
   onReject,
@@ -82,6 +85,10 @@ export default function AIRecommendationCard({
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">Product</p>
             <p className="text-sm font-medium" data-testid="text-product-name">{productName}</p>
+          </div>
+          <div className="space-y-1 text-right">
+            <p className="text-xs text-muted-foreground">Test Type</p>
+            <p className="text-sm font-medium" data-testid="text-test-type">{formatTestType(testType)}</p>
           </div>
         </div>
 
