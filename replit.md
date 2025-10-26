@@ -51,8 +51,15 @@ Shoptimizer utilizes a full-stack architecture with a React, Shadcn UI, Wouter, 
     - **Server Validation**: Validates numeric inputs (visitors > 0, conversion rates 0-1) before setting SSE headers to return proper 400 errors for invalid parameters
     - **Client Management**: useRef stores EventSource instance with useEffect cleanup on component unmount, prevents multiple connections
     - **Error Handling**: Distinguishes between reconnectable (CONNECTING) and terminal (CLOSED) EventSource states for proper error messaging
-    - **Progressive Updates**: Streams `start`, `progress` (every 100 impressions), and `complete` events with live chart updates
-    - **Visual Experience**: Live progress indicators, streaming evolution charts with "Live" badges for immersive educational experience
+    - **Progressive Updates**: Streams `start`, `progress` (every 100 impressions), and `complete` events with live progress indicators
+    - **Simplified Results**: Shows "Added X visitors" summary with allocation before/after, variant performance, and Bayesian update (no charts on Simulator page)
+- **Test Evolution Charts**: Persistent visualization of test performance on Active Tests page, powered by `test_evolution_snapshots` table:
+  - **Database Storage**: Evolution snapshots stored every 100 impressions with cumulative metrics (impressions, conversions, revenue, RPV, allocation percentages)
+  - **RPV Evolution Chart**: Line chart showing Control RPV vs Variant RPV over impressions, visualizing revenue performance over time
+  - **Allocation Evolution Chart**: Line chart showing Control % vs Variant % over impressions, visualizing Thompson Sampling adaptation
+  - **Architecture**: TestEvolutionCharts component per test card fetches snapshots via GET `/api/tests/:id/evolution`, transforms decimal strings to numbers, renders Recharts LineCharts
+  - **Data Integrity**: Bigint fields for impressions/conversions prevent integer overflow during long-running tests or simulations
+  - **Performance**: Charts only render when snapshots exist, with loading states and proper error handling
 - **Collection Page Variant Support**: Ensures consistent variant display on collection pages, homepages, and search results to prevent test contamination. Uses DOM manipulation and MutationObserver for dynamic content with intelligent infinite loop prevention (isProcessing guard + needsRecheck pattern) to avoid redundant processing while catching lazy-loaded cards.
 - **Auto-Configuration**: The SDK automatically detects the backend URL from `REPLIT_DOMAINS` for simplified one-line installation and deployment.
 - **CORS Configuration**: Public SDK endpoints are configured with CORS headers (`Access-Control-Allow-Origin: *`) to enable seamless cross-origin requests from Shopify stores.
