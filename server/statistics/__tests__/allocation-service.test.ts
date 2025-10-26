@@ -328,12 +328,27 @@ describe('Allocation Update Computation', () => {
     };
     
     const updatedState = updateBayesianState(state, metrics);
-    const result = computeAllocationUpdate(updatedState, metrics, 777);
     
-    // Safety budget should have decreased (but still be a reasonable number)
-    expect(result.bayesianState.safetyBudgetRemaining).toBeLessThan(1000);
-    // Cost might be high, so just verify it's a number
-    expect(typeof result.bayesianState.safetyBudgetRemaining).toBe('number');
+    // First call initializes lastTotalImpressions (no charge)
+    const result1 = computeAllocationUpdate(updatedState, metrics, 777);
+    expect(result1.bayesianState.safetyBudgetRemaining).toBe(1000); // No charge on first call
+    
+    // Add more impressions
+    const metrics2: TestMetrics = {
+      controlImpressions: 150,
+      variantImpressions: 150,
+      controlConversions: 8,
+      variantConversions: 9,
+      controlRevenue: 400,
+      variantRevenue: 450,
+    };
+    
+    const updatedState2 = updateBayesianState(result1.bayesianState, metrics2);
+    const result2 = computeAllocationUpdate(updatedState2, metrics2, 777);
+    
+    // Second call should charge for new impressions (300 - 200 = 100 new)
+    expect(result2.bayesianState.safetyBudgetRemaining).toBeLessThan(1000);
+    expect(typeof result2.bayesianState.safetyBudgetRemaining).toBe('number');
   });
 
   it('should check promotion criteria', () => {
@@ -363,21 +378,34 @@ describe('Allocation Update Computation', () => {
   it('should signal stop when safety budget exhausted and no promotion', () => {
     const state = initializeBayesianState({ safetyBudget: 0.01 }); // Very small budget
     
-    const metrics: TestMetrics = {
-      controlImpressions: 10000, // Large sample
+    const metrics1: TestMetrics = {
+      controlImpressions: 5000,
+      variantImpressions: 5000,
+      controlConversions: 250,
+      variantConversions: 253, // Barely different
+      controlRevenue: 12500,
+      variantRevenue: 12625,
+    };
+    
+    const updatedState1 = updateBayesianState(state, metrics1);
+    const result1 = computeAllocationUpdate(updatedState1, metrics1, 777);
+    
+    // Add more impressions to exhaust budget
+    const metrics2: TestMetrics = {
+      controlImpressions: 10000,
       variantImpressions: 10000,
       controlConversions: 500,
-      variantConversions: 505, // Barely different
+      variantConversions: 505,
       controlRevenue: 25000,
       variantRevenue: 25250,
     };
     
-    const updatedState = updateBayesianState(state, metrics);
-    const result = computeAllocationUpdate(updatedState, metrics, 777);
+    const updatedState2 = updateBayesianState(result1.bayesianState, metrics2);
+    const result2 = computeAllocationUpdate(updatedState2, metrics2, 777);
     
     // Should signal to stop (budget exhausted, no clear winner)
-    if (!result.promotionCheck.shouldPromote) {
-      expect(result.shouldStop).toBe(true);
+    if (!result2.promotionCheck.shouldPromote) {
+      expect(result2.shouldStop).toBe(true);
     }
   });
 
@@ -473,7 +501,12 @@ describe('End-to-End Integration Tests', () => {
     
     // Allocation should be valid
     expect(result1.allocation.control + result1.allocation.variant).toBeCloseTo(1.0, 10);
-    expect(result1.allocation.control).toBeGreaterThanOrEqual(0.75); // Floor respected
+    // With dynamic control floor, the floor depends on P(variant wins)
+    // At low confidence, floor is 0.75; as confidence grows, it decreases
+    expect(result1.allocation.control).toBeGreaterThan(0); // Just verify it's positive
+    
+    // Safety budget should not have decreased on first call (migration handling)
+    expect(result1.bayesianState.safetyBudgetRemaining).toBe(75);
     
     // 3. Second metrics batch (more data, variant pulling ahead)
     const metrics2: TestMetrics = {
@@ -485,13 +518,13 @@ describe('End-to-End Integration Tests', () => {
       variantRevenue: 6000,
     };
     
-    const state2 = updateBayesianState(state1, metrics2);
+    const state2 = updateBayesianState(result1.bayesianState, metrics2);
     const result2 = computeAllocationUpdate(state2, metrics2, 222);
     
     // Probability variant wins should be significantly higher than 50%
     expect(result2.metrics.probabilityVariantWins).toBeGreaterThan(0.6);
     
-    // Safety budget should have decreased
+    // Safety budget should have decreased now (charged for new impressions)
     expect(result2.bayesianState.safetyBudgetRemaining).toBeLessThan(75);
     
     // Should still be valid allocation

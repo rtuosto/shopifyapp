@@ -102,6 +102,50 @@ export function getVariantFloorFromRamp(
 }
 
 /**
+ * Control floor schedule: decreases as confidence grows
+ */
+export interface ControlFloorStep {
+  probabilityThreshold: number; // e.g., 0.60
+  controlFloor: number;         // e.g., 0.65
+}
+
+/**
+ * Default control floor schedule - decreases as variant proves itself
+ * Complements the variant ramp schedule to allow winning variants to scale up
+ */
+export const DEFAULT_CONTROL_FLOOR_SCHEDULE: ControlFloorStep[] = [
+  { probabilityThreshold: 0.60, controlFloor: 0.65 }, // 60% confidence → allow up to 35% variant
+  { probabilityThreshold: 0.80, controlFloor: 0.60 }, // 80% confidence → allow up to 40% variant
+  { probabilityThreshold: 0.90, controlFloor: 0.55 }, // 90% confidence → allow up to 45% variant
+  { probabilityThreshold: 0.95, controlFloor: 0.50 }, // 95% confidence → allow up to 50% variant
+];
+
+/**
+ * Determine control floor based on confidence in variant
+ * As P(variant > control) increases, control floor decreases to allow variant to scale
+ * @param probabilityVariantWins P(variant > control)
+ * @param controlFloorSchedule Control floor schedule (default: DEFAULT_CONTROL_FLOOR_SCHEDULE)
+ * @param controlStart Starting control floor (default 0.75)
+ * @returns Control floor based on probability
+ */
+export function getControlFloorFromConfidence(
+  probabilityVariantWins: number,
+  controlFloorSchedule: ControlFloorStep[] = DEFAULT_CONTROL_FLOOR_SCHEDULE,
+  controlStart: number = 0.75
+): number {
+  let floor = controlStart;
+
+  // Find the lowest control floor for which we've met the threshold
+  for (const step of controlFloorSchedule) {
+    if (probabilityVariantWins >= step.probabilityThreshold) {
+      floor = Math.min(floor, step.controlFloor);
+    }
+  }
+
+  return floor;
+}
+
+/**
  * Calculate Expected Opportunity Cost (EOC) per 1,000 sessions
  * This represents the "lock-in risk" - expected revenue loss if we promote the wrong arm
  * @param controlModel Control arm model

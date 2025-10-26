@@ -15,6 +15,7 @@ import { computeTTTSAllocation, applyAllocationConstraints, AllocationResult } f
 import {
   shouldThrottleVariant,
   getVariantFloorFromRamp,
+  getControlFloorFromConfidence,
   calculateEOC,
   calculateCostOfWaiting,
   checkPromotionCriteria,
@@ -229,6 +230,14 @@ export function computeAllocationUpdate(
     bayesianState.variantStart || 0.05
   );
 
+  // Get dynamic control floor based on confidence
+  // Always recompute from baseline (0.75) to allow floor to rise if confidence drops
+  const controlFloor = getControlFloorFromConfidence(
+    probabilityVariantWins,
+    undefined, // Use default schedule
+    0.75 // Always start from baseline - floor recomputes based on current confidence
+  );
+
   // Compute raw TTTS allocation
   const rawAllocation = computeTTTSAllocation(
     controlModel,
@@ -243,10 +252,10 @@ export function computeAllocationUpdate(
     variantFloor = Math.min(variantFloor, 0.02); // Throttle to 2%
   }
 
-  // Apply floors
+  // Apply floors (now using dynamic control floor)
   const allocation = applyAllocationConstraints(
     rawAllocation,
-    bayesianState.controlFloor || 0.75,
+    controlFloor,
     variantFloor
   );
 
@@ -313,7 +322,8 @@ export function computeAllocationUpdate(
 
   // Build reasoning
   let reasoning = `P(variant wins) = ${(probabilityVariantWins * 100).toFixed(1)}%. `;
-  reasoning += `Variant floor = ${(variantFloor * 100).toFixed(1)}% (from ramp). `;
+  reasoning += `Control floor = ${(controlFloor * 100).toFixed(1)}%, `;
+  reasoning += `Variant floor = ${(variantFloor * 100).toFixed(1)}%. `;
   if (shouldThrottle) {
     reasoning += `CVaR throttle active (downside risk). `;
   }
@@ -328,6 +338,7 @@ export function computeAllocationUpdate(
     allocation,
     bayesianState: {
       ...bayesianState,
+      controlFloor, // Store the calculated dynamic control floor
       safetyBudgetRemaining,
       promotionCheckCount: (bayesianState.promotionCheckCount || 0) + 1,
       lastTotalImpressions: currentTotalImpressions,
