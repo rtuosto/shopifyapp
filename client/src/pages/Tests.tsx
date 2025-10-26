@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Card,
@@ -11,6 +12,14 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import {
   StopCircle,
   TrendingUp,
   Eye,
@@ -21,6 +30,8 @@ import {
   ArrowRight,
   Calendar,
   X,
+  Search,
+  Filter,
 } from "lucide-react";
 import {
   LineChart,
@@ -205,8 +216,13 @@ function TestEvolutionCharts({ testId }: TestEvolutionChartsProps) {
   );
 }
 
-export default function ActiveTests() {
+export default function Tests() {
   const { toast } = useToast();
+
+  // Filter state
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [productSearch, setProductSearch] = useState<string>("");
 
   // Fetch all tests with auto-refresh using refetchInterval
   const { data: tests = [], isLoading: testsLoading } = useQuery<Test[]>({
@@ -219,15 +235,36 @@ export default function ActiveTests() {
     queryKey: ["/api/products"],
   });
 
-  // Filter active, paused, and draft tests and enrich with product names
-  const activeAndDraftTests: EnrichedTest[] = tests
-    .filter((t: Test) => t.status === "active" || t.status === "paused" || t.status === "draft")
-    .map((test: Test) => ({
-      ...test,
-      productName:
-        products.find((p: Product) => p.id === test.productId)?.title ||
-        "Unknown Product",
-    }));
+  // Enrich all tests with product names
+  const allTestsWithNames: EnrichedTest[] = tests.map((test: Test) => ({
+    ...test,
+    productName:
+      products.find((p: Product) => p.id === test.productId)?.title ||
+      "Unknown Product",
+  }));
+
+  // Apply filters
+  const filteredTests = allTestsWithNames.filter((test) => {
+    // Status filter
+    if (statusFilter !== "all" && test.status !== statusFilter) {
+      return false;
+    }
+
+    // Type filter
+    if (typeFilter !== "all" && test.testType !== typeFilter) {
+      return false;
+    }
+
+    // Product search
+    if (productSearch && !test.productName.toLowerCase().includes(productSearch.toLowerCase())) {
+      return false;
+    }
+
+    return true;
+  });
+
+  // For displaying - show all filtered tests
+  const activeAndDraftTests = filteredTests;
 
   // Filter only truly active tests for metrics (exclude drafts and paused)
   const trulyActiveTests = activeAndDraftTests.filter(
@@ -365,15 +402,94 @@ export default function ActiveTests() {
     <div className="container mx-auto p-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold" data-testid="text-page-title">
-          Active Tests
+          Tests
         </h1>
         <p
           className="text-muted-foreground"
           data-testid="text-page-description"
         >
-          Activate draft tests and monitor live A/B test performance
+          Manage all your A/B tests - draft, active, paused, and completed
         </p>
       </div>
+
+      {/* Filter Controls */}
+      <Card data-testid="card-filters">
+        <CardContent className="pt-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Filters:</span>
+            </div>
+            
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Status Filter */}
+              <div className="space-y-2">
+                <label className="text-xs text-muted-foreground">Status</label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger data-testid="select-status-filter">
+                    <SelectValue placeholder="All statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="active">Live</SelectItem>
+                    <SelectItem value="paused">Paused</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Type Filter */}
+              <div className="space-y-2">
+                <label className="text-xs text-muted-foreground">Test Type</label>
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger data-testid="select-type-filter">
+                    <SelectValue placeholder="All types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="price">Price</SelectItem>
+                    <SelectItem value="title">Title</SelectItem>
+                    <SelectItem value="description">Description</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Product Search */}
+              <div className="space-y-2">
+                <label className="text-xs text-muted-foreground">Product</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search products..."
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    className="pl-9"
+                    data-testid="input-product-search"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Clear Filters Button */}
+            {(statusFilter !== "all" || typeFilter !== "all" || productSearch) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setStatusFilter("all");
+                  setTypeFilter("all");
+                  setProductSearch("");
+                }}
+                data-testid="button-clear-filters"
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Summary Metrics */}
       {trulyActiveTests.length > 0 && (
@@ -883,12 +999,13 @@ export default function ActiveTests() {
       {/* Info Card */}
       <Card data-testid="card-info">
         <CardHeader>
-          <CardTitle>About Active Tests</CardTitle>
+          <CardTitle>About Tests</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
-            This page shows all live A/B tests currently running in your Shopify
-            store. Metrics update automatically every 2 seconds.
+            This page shows all your A/B tests across all statuses - drafts waiting to be activated,
+            live tests collecting data, paused tests, and completed experiments. Use the filters above
+            to find specific tests. Metrics update automatically every 2 seconds.
           </p>
           <p>
             <strong>Control vs Variant:</strong> Each test shows side-by-side
