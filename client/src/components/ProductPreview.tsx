@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Star } from "lucide-react";
 import type { DeviceType } from "./DeviceToggle";
@@ -25,6 +26,17 @@ export default function ProductPreview({
   isVariant = false,
   highlights = []
 }: ProductPreviewProps) {
+  const [imageError, setImageError] = useState(false);
+  const [imageRetryKey, setImageRetryKey] = useState(0);
+
+  // Reset error state whenever product data changes
+  // Depends on product object reference to trigger on refetches (even if values are identical)
+  // This allows recovery from transient CDN failures
+  useEffect(() => {
+    setImageError(false);
+    setImageRetryKey(prev => prev + 1);
+  }, [product]);
+
   const getDeviceWidth = () => {
     switch (device) {
       case "mobile":
@@ -37,6 +49,8 @@ export default function ProductPreview({
   };
 
   const isHighlighted = (field: string) => highlights.includes(field);
+  
+  const hasValidImage = product.images && product.images.length > 0 && product.images[0] && !imageError;
 
   return (
     <div 
@@ -45,11 +59,23 @@ export default function ProductPreview({
       data-testid={`preview-${isVariant ? 'variant' : 'control'}`}
     >
       <div className="aspect-square bg-muted relative">
-        <img 
-          src={product.images[0]} 
-          alt={product.title}
-          className="w-full h-full object-cover"
-        />
+        {hasValidImage ? (
+          <img 
+            key={`img-${imageRetryKey}`}
+            src={product.images[0]} 
+            alt={product.title}
+            className="w-full h-full object-cover"
+            onError={() => setImageError(true)}
+            data-testid="img-product"
+          />
+        ) : (
+          <div 
+            className="w-full h-full flex items-center justify-center text-muted-foreground"
+            data-testid="placeholder-no-image"
+          >
+            <span>No Image</span>
+          </div>
+        )}
         {product.compareAtPrice && (
           <Badge className="absolute top-3 right-3 bg-destructive text-destructive-foreground">
             Sale
