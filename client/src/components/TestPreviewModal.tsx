@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -35,7 +35,7 @@ interface TestPreviewModalProps {
     title: string;
     description: string;
   }>;
-  onApprove?: () => void;
+  onApprove?: (editedVariant?: ProductData) => void;
 }
 
 export default function TestPreviewModal({
@@ -50,9 +50,22 @@ export default function TestPreviewModal({
 }: TestPreviewModalProps) {
   const [device, setDevice] = useState<DeviceType>("desktop");
   const [viewMode, setViewMode] = useState<"side-by-side" | "single">("side-by-side");
+  const [editedVariant, setEditedVariant] = useState<ProductData>(variant);
+
+  // Reset edited variant when modal opens or variant changes
+  useEffect(() => {
+    setEditedVariant(variant);
+  }, [variant, open]);
+
+  const handleFieldEdit = (field: keyof ProductData, value: string | number) => {
+    setEditedVariant(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
 
   const handleApprove = () => {
-    onApprove?.();
+    onApprove?.(editedVariant);
     console.log("Test approved:", testTitle);
     onOpenChange(false);
   };
@@ -113,15 +126,17 @@ export default function TestPreviewModal({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-semibold text-primary" data-testid="text-variant-label">
-                    VARIANT (Proposed)
+                    VARIANT (Proposed) — Click highlighted changes to edit
                   </h4>
                 </div>
                 <div className="flex justify-center">
                   <ProductPreview 
-                    product={variant} 
+                    product={editedVariant} 
                     device={device}
                     isVariant={true}
                     highlights={changes}
+                    editable={true}
+                    onFieldEdit={handleFieldEdit}
                   />
                 </div>
               </div>
@@ -145,10 +160,12 @@ export default function TestPreviewModal({
               </TabsContent>
               <TabsContent value="variant" className="flex justify-center py-4">
                 <ProductPreview 
-                  product={variant} 
+                  product={editedVariant} 
                   device={device}
                   isVariant={true}
                   highlights={changes}
+                  editable={true}
+                  onFieldEdit={handleFieldEdit}
                 />
               </TabsContent>
             </Tabs>

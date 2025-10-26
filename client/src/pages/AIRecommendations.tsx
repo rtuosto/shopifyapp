@@ -191,7 +191,7 @@ export default function AIRecommendations() {
 
   // Create test from recommendation
   const createTestMutation = useMutation({
-    mutationFn: async ({ recommendationId }: { recommendationId: string }) => {
+    mutationFn: async ({ recommendationId, editedChanges }: { recommendationId: string; editedChanges?: Record<string, any> }) => {
       const recommendation = recommendations.find(r => r.id === recommendationId);
       if (!recommendation) throw new Error("Recommendation not found");
 
@@ -211,9 +211,12 @@ export default function AIRecommendations() {
         }));
       }
 
+      // Use edited changes if provided, otherwise use recommendation's proposed changes
+      const proposedChanges = editedChanges || recommendation.proposedChanges;
+
       const variantData: Record<string, any> = {
         ...controlData,
-        ...recommendation.proposedChanges,
+        ...proposedChanges,
       };
 
       if (recommendation.testType === "price" && controlData.variantPrices) {
@@ -271,8 +274,34 @@ export default function AIRecommendations() {
     setPreviewOpen(true);
   };
 
-  const handleAccept = (id: string) => {
-    createTestMutation.mutate({ recommendationId: id });
+  const handleAccept = (id: string, editedVariant?: any) => {
+    if (!editedVariant) {
+      createTestMutation.mutate({ recommendationId: id });
+      return;
+    }
+
+    // Only extract fields that were actually changed in the recommendation
+    const rec = recommendations.find(r => r.id === id);
+    if (!rec) {
+      createTestMutation.mutate({ recommendationId: id });
+      return;
+    }
+
+    const editedChanges: Record<string, any> = {};
+    
+    // Only include fields that were in the original proposed changes
+    if ('title' in rec.proposedChanges) {
+      editedChanges.title = editedVariant.title;
+    }
+    if ('price' in rec.proposedChanges) {
+      // Keep price as number for variant pricing multiplier to work correctly
+      editedChanges.price = editedVariant.price;
+    }
+    if ('description' in rec.proposedChanges) {
+      editedChanges.description = editedVariant.description;
+    }
+    
+    createTestMutation.mutate({ recommendationId: id, editedChanges });
   };
 
   const handleDismissClick = (id: string) => {
@@ -557,7 +586,7 @@ export default function AIRecommendations() {
           }}
           changes={Object.keys(selectedRecommendation.proposedChanges)}
           insights={selectedRecommendation.insights}
-          onApprove={() => handleAccept(selectedRecommendation.id)}
+          onApprove={(editedVariant) => handleAccept(selectedRecommendation.id, editedVariant)}
         />
       )}
     </div>
