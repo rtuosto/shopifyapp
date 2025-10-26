@@ -189,57 +189,91 @@ export default function AIRecommendations() {
     },
   });
 
+  // Helper function to build test payload (shared between draft and activate flows)
+  const buildTestPayload = (recommendationId: string, editedChanges?: Record<string, any>) => {
+    const recommendation = recommendations.find(r => r.id === recommendationId);
+    if (!recommendation) throw new Error("Recommendation not found");
+
+    const product = products.find(p => p.id === recommendation.productId);
+    if (!product) throw new Error("Product not found");
+
+    const controlData: Record<string, any> = {
+      title: product.title,
+      description: product.description || "",
+      price: product.price,
+    };
+
+    if (recommendation.testType === "price") {
+      controlData.variantPrices = product.variants.map((v: any) => ({
+        id: v.id,
+        price: v.price,
+      }));
+    }
+
+    // Use edited changes if provided, otherwise use recommendation's proposed changes
+    const proposedChanges = editedChanges || recommendation.proposedChanges;
+
+    const variantData: Record<string, any> = {
+      ...controlData,
+      ...proposedChanges,
+    };
+
+    if (recommendation.testType === "price" && controlData.variantPrices) {
+      const priceMultiplier = variantData.price / controlData.price;
+      variantData.variantPrices = controlData.variantPrices.map((v: any) => ({
+        id: v.id,
+        price: (parseFloat(v.price) * priceMultiplier).toFixed(2),
+      }));
+    }
+
+    return {
+      productId: product.id,
+      recommendationId: recommendation.id,
+      testType: recommendation.testType,
+      status: "draft",
+      controlData,
+      variantData,
+      arpu: "0",
+      arpuLift: "0",
+      impressions: 0,
+      conversions: 0,
+      revenue: "0",
+    };
+  };
+
+  // Save test as draft (without activating)
+  const saveDraftMutation = useMutation({
+    mutationFn: async ({ recommendationId, editedChanges }: { recommendationId: string; editedChanges?: Record<string, any> }) => {
+      const testData = buildTestPayload(recommendationId, editedChanges);
+
+      // Create the test as draft (without activating)
+      const createRes = await apiRequest("POST", "/api/tests", testData);
+      const createdTest = await createRes.json();
+
+      return { test: createdTest, recommendationId };
+    },
+    onSuccess: async (data) => {
+      // Do NOT update recommendation status - keep it as "pending"
+      toast({
+        title: "Draft Saved",
+        description: "Test saved as draft. Activate it from the Active Tests page when ready.",
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to Save Draft",
+        description: error.message || "Could not save test as draft",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Create and activate test from recommendation
   const createTestMutation = useMutation({
     mutationFn: async ({ recommendationId, editedChanges }: { recommendationId: string; editedChanges?: Record<string, any> }) => {
-      const recommendation = recommendations.find(r => r.id === recommendationId);
-      if (!recommendation) throw new Error("Recommendation not found");
-
-      const product = products.find(p => p.id === recommendation.productId);
-      if (!product) throw new Error("Product not found");
-
-      const controlData: Record<string, any> = {
-        title: product.title,
-        description: product.description || "",
-        price: product.price,
-      };
-
-      if (recommendation.testType === "price") {
-        controlData.variantPrices = product.variants.map((v: any) => ({
-          id: v.id,
-          price: v.price,
-        }));
-      }
-
-      // Use edited changes if provided, otherwise use recommendation's proposed changes
-      const proposedChanges = editedChanges || recommendation.proposedChanges;
-
-      const variantData: Record<string, any> = {
-        ...controlData,
-        ...proposedChanges,
-      };
-
-      if (recommendation.testType === "price" && controlData.variantPrices) {
-        const priceMultiplier = variantData.price / controlData.price;
-        variantData.variantPrices = controlData.variantPrices.map((v: any) => ({
-          id: v.id,
-          price: (parseFloat(v.price) * priceMultiplier).toFixed(2),
-        }));
-      }
-
-      const testData = {
-        productId: product.id,
-        recommendationId: recommendation.id,
-        testType: recommendation.testType,
-        status: "draft",
-        controlData,
-        variantData,
-        arpu: "0",
-        arpuLift: "0",
-        impressions: 0,
-        conversions: 0,
-        revenue: "0",
-      };
+      const testData = buildTestPayload(recommendationId, editedChanges);
 
       // Create the test
       const createRes = await apiRequest("POST", "/api/tests", testData);
@@ -309,6 +343,36 @@ export default function AIRecommendations() {
     }
     
     createTestMutation.mutate({ recommendationId: id, editedChanges });
+  };
+
+  const handleSaveDraft = (id: string, editedVariant?: any) => {
+    if (!editedVariant) {
+      saveDraftMutation.mutate({ recommendationId: id });
+      return;
+    }
+
+    // Only extract fields that were actually changed in the recommendation
+    const rec = recommendations.find(r => r.id === id);
+    if (!rec) {
+      saveDraftMutation.mutate({ recommendationId: id });
+      return;
+    }
+
+    const editedChanges: Record<string, any> = {};
+    
+    // Only include fields that were in the original proposed changes
+    if ('title' in rec.proposedChanges) {
+      editedChanges.title = editedVariant.title;
+    }
+    if ('price' in rec.proposedChanges) {
+      // Keep price as number for variant pricing multiplier to work correctly
+      editedChanges.price = editedVariant.price;
+    }
+    if ('description' in rec.proposedChanges) {
+      editedChanges.description = editedVariant.description;
+    }
+    
+    saveDraftMutation.mutate({ recommendationId: id, editedChanges });
   };
 
   const handleDismissClick = (id: string) => {
@@ -598,6 +662,7 @@ export default function AIRecommendations() {
           changes={Object.keys(selectedRecommendation.proposedChanges)}
           insights={selectedRecommendation.insights}
           onApprove={(editedVariant) => handleAccept(selectedRecommendation.id, editedVariant)}
+          onSaveDraft={(editedVariant) => handleSaveDraft(selectedRecommendation.id, editedVariant)}
         />
       )}
     </div>

@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DeviceToggle, { type DeviceType } from "./DeviceToggle";
 import ProductPreview from "./ProductPreview";
 import AIInsightsPanel from "./AIInsightsPanel";
-import { ArrowLeftRight, CheckCircle2 } from "lucide-react";
+import { ArrowLeftRight, CheckCircle2, FileText } from "lucide-react";
 
 interface ProductData {
   title: string;
@@ -36,6 +36,7 @@ interface TestPreviewModalProps {
     description: string;
   }>;
   onApprove?: (editedVariant?: ProductData) => void;
+  onSaveDraft?: (editedVariant?: ProductData) => void;
 }
 
 export default function TestPreviewModal({
@@ -47,6 +48,7 @@ export default function TestPreviewModal({
   changes,
   insights,
   onApprove,
+  onSaveDraft,
 }: TestPreviewModalProps) {
   const [device, setDevice] = useState<DeviceType>("desktop");
   const [viewMode, setViewMode] = useState<"side-by-side" | "single">("side-by-side");
@@ -67,6 +69,12 @@ export default function TestPreviewModal({
   const handleApprove = () => {
     onApprove?.(editedVariant);
     console.log("Test approved:", testTitle);
+    onOpenChange(false);
+  };
+
+  const handleSaveDraft = () => {
+    onSaveDraft?.(editedVariant);
+    console.log("Test saved as draft:", testTitle);
     onOpenChange(false);
   };
 
@@ -182,6 +190,15 @@ export default function TestPreviewModal({
               data-testid="button-cancel-preview"
             >
               Cancel
+            </Button>
+            <Button 
+              variant="secondary"
+              onClick={handleSaveDraft}
+              className="gap-2"
+              data-testid="button-save-draft"
+            >
+              <FileText className="w-4 h-4" />
+              Save as Draft
             </Button>
             <Button 
               onClick={handleApprove}

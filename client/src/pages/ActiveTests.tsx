@@ -248,9 +248,18 @@ export default function ActiveTests() {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
     },
     onError: (error: Error) => {
+      // Provide more helpful error messages
+      let title = "Activation Failed";
+      let description = error.message || "Failed to activate test";
+      
+      // Handle specific error cases
+      if (description.includes("active") && description.includes("test")) {
+        title = "Conflicting Test Active";
+      }
+      
       toast({
-        title: "Error",
-        description: error.message || "Failed to activate test",
+        title,
+        description,
         variant: "destructive",
       });
     },
