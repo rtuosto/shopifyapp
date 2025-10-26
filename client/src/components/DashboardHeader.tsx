@@ -14,7 +14,6 @@ export default function DashboardHeader({
   quotaUsed = 0,
   quotaTotal = 20
 }: DashboardHeaderProps) {
-  const quotaRemaining = quotaTotal - quotaUsed;
   const quotaPercentage = (quotaUsed / quotaTotal) * 100;
   
   // Color code based on usage level
@@ -34,7 +33,7 @@ export default function DashboardHeader({
         </Badge>
         <Badge variant={quotaVariant} className="gap-1" data-testid="badge-quota">
           <Sparkles className="w-3 h-3" />
-          {quotaRemaining} of {quotaTotal} AI Ideas
+          {quotaUsed} of {quotaTotal} AI Ideas
         </Badge>
         <span className="text-sm text-muted-foreground" data-testid="text-last-sync">
           Last synced {lastSync}

@@ -160,12 +160,15 @@ export default function ActiveTests() {
   });
 
   // Filter active and draft tests and enrich with product names
-  const activeTests: EnrichedTest[] = tests
+  const activeAndDraftTests: EnrichedTest[] = tests
     .filter((t: Test) => t.status === "active" || t.status === "draft")
     .map((test: Test) => ({
       ...test,
       productName: products.find((p: Product) => p.id === test.productId)?.title || "Unknown Product",
     }));
+
+  // Filter only truly active tests for metrics (exclude drafts)
+  const trulyActiveTests = activeAndDraftTests.filter((t) => t.status === "active");
 
   // Activate test mutation
   const activateTestMutation = useMutation({
@@ -215,11 +218,11 @@ export default function ActiveTests() {
     },
   });
 
-  // Calculate summary metrics with safe parsing
+  // Calculate summary metrics ONLY from truly active tests (exclude drafts)
   // Parse bigint fields as numbers (they come from DB as strings)
-  const totalImpressions = activeTests.reduce((sum, t) => sum + (Number(t.impressions) || 0), 0);
-  const totalConversions = activeTests.reduce((sum, t) => sum + (Number(t.conversions) || 0), 0);
-  const totalRevenue = activeTests.reduce((sum, t) => {
+  const totalImpressions = trulyActiveTests.reduce((sum, t) => sum + (Number(t.impressions) || 0), 0);
+  const totalConversions = trulyActiveTests.reduce((sum, t) => sum + (Number(t.conversions) || 0), 0);
+  const totalRevenue = trulyActiveTests.reduce((sum, t) => {
     const revenue = t.revenue ? parseFloat(t.revenue) : 0;
     return sum + (isNaN(revenue) ? 0 : revenue);
   }, 0);
@@ -258,12 +261,12 @@ export default function ActiveTests() {
       </div>
 
       {/* Summary Metrics */}
-      {activeTests.length > 0 && (
+      {trulyActiveTests.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card data-testid="card-metric-tests">
             <CardHeader className="pb-3">
               <CardDescription>Active Tests</CardDescription>
-              <CardTitle className="text-3xl">{activeTests.length}</CardTitle>
+              <CardTitle className="text-3xl">{trulyActiveTests.length}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-xs text-muted-foreground">Running experiments</p>
@@ -310,11 +313,11 @@ export default function ActiveTests() {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <div className="text-center space-y-2">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-              <p className="text-sm text-muted-foreground">Loading active tests...</p>
+              <p className="text-sm text-muted-foreground">Loading tests...</p>
             </div>
           </CardContent>
         </Card>
-      ) : activeTests.length === 0 ? (
+      ) : activeAndDraftTests.length === 0 ? (
         <Card data-testid="card-no-tests">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <div className="text-center space-y-2">
@@ -327,9 +330,9 @@ export default function ActiveTests() {
         </Card>
       ) : (
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold" data-testid="text-tests-heading">Running Tests</h2>
+          <h2 className="text-xl font-semibold" data-testid="text-tests-heading">Tests</h2>
           <div className="grid grid-cols-1 gap-4">
-            {activeTests.map((test, index) => {
+            {activeAndDraftTests.map((test, index) => {
               const impressions = test.impressions || 0;
               const conversions = test.conversions || 0;
               const conversionRate = impressions > 0 ? (conversions / impressions) * 100 : 0;
