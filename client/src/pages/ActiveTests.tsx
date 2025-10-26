@@ -434,16 +434,6 @@ export default function ActiveTests() {
                           </div>
                           
                           <div>
-                            <p className="text-xs text-muted-foreground">Revenue</p>
-                            <p className="text-xl font-bold" data-testid={`text-control-revenue-${index}`}>
-                              ${(() => {
-                                const rev = test.controlRevenue ? parseFloat(test.controlRevenue) : 0;
-                                return (isNaN(rev) ? 0 : rev).toFixed(2);
-                              })()}
-                            </p>
-                          </div>
-                          
-                          <div>
                             <p className="text-xs text-muted-foreground">RPV (Revenue Per Visitor)</p>
                             <p className="text-xl font-bold" data-testid={`text-control-rpv-${index}`}>
                               ${(() => {
@@ -489,16 +479,6 @@ export default function ActiveTests() {
                               {(test.variantImpressions || 0) > 0 
                                 ? (((test.variantConversions || 0) / (test.variantImpressions || 1)) * 100).toFixed(2)
                                 : '0.00'}% rate
-                            </p>
-                          </div>
-                          
-                          <div>
-                            <p className="text-xs text-muted-foreground">Revenue</p>
-                            <p className="text-xl font-bold" data-testid={`text-variant-revenue-${index}`}>
-                              ${(() => {
-                                const rev = test.variantRevenue ? parseFloat(test.variantRevenue) : 0;
-                                return (isNaN(rev) ? 0 : rev).toFixed(2);
-                              })()}
                             </p>
                           </div>
                           
@@ -556,7 +536,7 @@ export default function ActiveTests() {
                         <Badge variant="secondary" className="text-xs">Bayesian</Badge>
                       </div>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {/* Actual Traffic Distribution */}
                           <div className="space-y-2">
                             <p className="text-xs text-muted-foreground">Actual Traffic Distribution</p>
@@ -606,25 +586,6 @@ export default function ActiveTests() {
                                 </p>
                               </div>
 
-                              <div className="space-y-2">
-                                <p className="text-xs text-muted-foreground">Expected Loss (per 1K)</p>
-                                <p className="text-2xl font-bold">
-                                  ${(() => {
-                                    const config = test.bayesianConfig as any;
-                                    const eoc = config.expectedOpportunityCost || 0;
-                                    return eoc.toFixed(2);
-                                  })()}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {(() => {
-                                    const config = test.bayesianConfig as any;
-                                    const budget = config.safetyBudget || 50;
-                                    const eoc = config.expectedOpportunityCost || 0;
-                                    const remaining = Math.max(0, budget - eoc);
-                                    return `${remaining.toFixed(0)} of ${budget} budget left`;
-                                  })()}
-                                </p>
-                              </div>
                             </>
                           )}
                         </div>
