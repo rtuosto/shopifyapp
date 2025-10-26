@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { StopCircle, TrendingUp, Eye, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { StopCircle, TrendingUp, Eye, ArrowUpRight, ArrowDownRight, Play } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import type { Test, Product, TestEvolutionSnapshot } from "@shared/schema";
 
@@ -159,13 +159,37 @@ export default function ActiveTests() {
     queryKey: ["/api/products"],
   });
 
-  // Filter active tests and enrich with product names
+  // Filter active and draft tests and enrich with product names
   const activeTests: EnrichedTest[] = tests
-    .filter((t: Test) => t.status === "active")
+    .filter((t: Test) => t.status === "active" || t.status === "draft")
     .map((test: Test) => ({
       ...test,
       productName: products.find((p: Product) => p.id === test.productId)?.title || "Unknown Product",
     }));
+
+  // Activate test mutation
+  const activateTestMutation = useMutation({
+    mutationFn: async (testId: string) => {
+      const res = await apiRequest("POST", `/api/tests/${testId}/activate`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Test Activated",
+        description: "Test is now live and collecting data",
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to activate test",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Deactivate test mutation
   const deactivateTestMutation = useMutation({
@@ -212,7 +236,7 @@ export default function ActiveTests() {
         <div className="space-y-1">
           <h1 className="text-3xl font-bold" data-testid="text-page-title">Active Tests</h1>
           <p className="text-muted-foreground" data-testid="text-page-description">
-            Monitor live A/B tests and track real-time performance
+            Activate draft tests and monitor live A/B test performance
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -294,9 +318,9 @@ export default function ActiveTests() {
         <Card data-testid="card-no-tests">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <div className="text-center space-y-2">
-              <h3 className="text-lg font-semibold">No Active Tests</h3>
+              <h3 className="text-lg font-semibold">No Tests Yet</h3>
               <p className="text-sm text-muted-foreground max-w-md">
-                Accept an AI recommendation from the Dashboard to launch your first A/B test
+                Create a test from an AI recommendation to get started
               </p>
             </div>
           </CardContent>
@@ -338,25 +362,42 @@ export default function ActiveTests() {
                           <CardTitle className="text-lg" data-testid={`text-product-name-${index}`}>
                             {test.productName}
                           </CardTitle>
-                          <Badge variant="default" data-testid={`badge-status-${index}`}>
-                            Live
+                          <Badge 
+                            variant={test.status === "draft" ? "secondary" : "default"} 
+                            data-testid={`badge-status-${index}`}
+                          >
+                            {test.status === "draft" ? "Draft" : "Live"}
                           </Badge>
                         </div>
                         <CardDescription data-testid={`text-test-type-${index}`}>
                           {test.testType} Test
                         </CardDescription>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => deactivateTestMutation.mutate(test.id)}
-                        disabled={deactivateTestMutation.isPending}
-                        data-testid={`button-stop-test-${index}`}
-                        className="gap-1"
-                      >
-                        <StopCircle className="w-4 h-4" />
-                        Stop Test
-                      </Button>
+                      {test.status === "draft" ? (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => activateTestMutation.mutate(test.id)}
+                          disabled={activateTestMutation.isPending}
+                          data-testid={`button-activate-test-${index}`}
+                          className="gap-1"
+                        >
+                          <Play className="w-4 h-4" />
+                          {activateTestMutation.isPending ? "Activating..." : "Activate Test"}
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => deactivateTestMutation.mutate(test.id)}
+                          disabled={deactivateTestMutation.isPending}
+                          data-testid={`button-stop-test-${index}`}
+                          className="gap-1"
+                        >
+                          <StopCircle className="w-4 h-4" />
+                          Stop Test
+                        </Button>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent>
