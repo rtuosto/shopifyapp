@@ -3,9 +3,10 @@ import { Badge } from "@/components/ui/badge";
 import { Lightbulb, TrendingUp, Shield, BarChart3 } from "lucide-react";
 
 interface Insight {
-  type: "psychology" | "competitor" | "seo" | "data";
-  title: string;
-  description: string;
+  type: "psychology" | "competitor" | "seo" | "data" | "SEO" | "business";
+  title?: string;
+  description?: string;
+  detail?: string; // Alternative format from AI
 }
 
 interface AIInsightsPanelProps {
@@ -15,11 +16,6 @@ interface AIInsightsPanelProps {
 export default function AIInsightsPanel({ 
   insights
 }: AIInsightsPanelProps) {
-  console.log('[AIInsightsPanel] Received insights:', insights);
-  console.log('[AIInsightsPanel] Insights type:', typeof insights);
-  console.log('[AIInsightsPanel] Is array?', Array.isArray(insights));
-  console.log('[AIInsightsPanel] Length:', insights?.length);
-  
   const getIconForType = (type: string) => {
     switch (type) {
       case "psychology":
@@ -54,7 +50,12 @@ export default function AIInsightsPanel({
           </p>
         )}
         {validInsights.map((insight, index) => {
-          const Icon = getIconForType(insight.type);
+          const Icon = getIconForType(insight.type.toLowerCase());
+          
+          // Handle both formats: {title, description} or {detail}
+          const insightTitle = insight.title || insight.type.charAt(0).toUpperCase() + insight.type.slice(1).toLowerCase();
+          const insightDescription = insight.description || insight.detail || "";
+          
           return (
             <div 
               key={index} 
@@ -66,10 +67,10 @@ export default function AIInsightsPanel({
               </div>
               <div className="flex-1 space-y-1">
                 <p className="text-sm font-medium" data-testid={`text-insight-title-${index}`}>
-                  {insight.title}
+                  {insightTitle}
                 </p>
                 <p className="text-sm text-muted-foreground" data-testid={`text-insight-description-${index}`}>
-                  {insight.description}
+                  {insightDescription}
                 </p>
               </div>
             </div>
