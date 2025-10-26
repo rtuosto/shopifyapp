@@ -275,6 +275,11 @@ export default function AIRecommendations() {
     const rec = recommendations.find(r => r.id === id) || archivedRecommendations.find(r => r.id === id);
     if (!rec) return;
 
+    console.log('[AIRecommendations] Opening preview for recommendation:', rec);
+    console.log('[AIRecommendations] Insights:', rec.insights);
+    console.log('[AIRecommendations] Insights type:', typeof rec.insights);
+    console.log('[AIRecommendations] Is array?', Array.isArray(rec.insights));
+
     const product = products.find(p => p.id === rec.productId);
     setSelectedRecommendation(rec);
     setSelectedProduct(product || null);

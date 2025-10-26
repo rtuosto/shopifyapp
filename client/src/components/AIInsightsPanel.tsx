@@ -15,6 +15,11 @@ interface AIInsightsPanelProps {
 export default function AIInsightsPanel({ 
   insights
 }: AIInsightsPanelProps) {
+  console.log('[AIInsightsPanel] Received insights:', insights);
+  console.log('[AIInsightsPanel] Insights type:', typeof insights);
+  console.log('[AIInsightsPanel] Is array?', Array.isArray(insights));
+  console.log('[AIInsightsPanel] Length:', insights?.length);
+  
   const getIconForType = (type: string) => {
     switch (type) {
       case "psychology":
@@ -30,6 +35,9 @@ export default function AIInsightsPanel({
     }
   };
 
+  // Handle case where insights might be undefined or not an array
+  const validInsights = Array.isArray(insights) ? insights : [];
+
   return (
     <Card className="p-6 space-y-6" data-testid="card-ai-insights">
       <div>
@@ -40,7 +48,12 @@ export default function AIInsightsPanel({
 
       <div className="space-y-4">
         <h4 className="text-sm font-semibold text-muted-foreground">WHY THIS WILL WORK</h4>
-        {insights.map((insight, index) => {
+        {validInsights.length === 0 && (
+          <p className="text-sm text-muted-foreground" data-testid="text-no-insights">
+            No AI insights available for this recommendation.
+          </p>
+        )}
+        {validInsights.map((insight, index) => {
           const Icon = getIconForType(insight.type);
           return (
             <div 
