@@ -8,6 +8,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { StopCircle, TrendingUp, Eye, ArrowUpRight, ArrowDownRight, Play } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import type { Test, Product, TestEvolutionSnapshot } from "@shared/schema";
+import { formatTestType } from "@/lib/testTypeFormatter";
 
 interface EnrichedTest extends Test {
   productName: string;
@@ -373,7 +374,7 @@ export default function ActiveTests() {
                           </Badge>
                         </div>
                         <CardDescription data-testid={`text-test-type-${index}`}>
-                          {test.testType} Test
+                          {formatTestType(test.testType)}
                         </CardDescription>
                       </div>
                       {test.status === "draft" ? (
