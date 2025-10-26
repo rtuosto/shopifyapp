@@ -897,7 +897,7 @@ export default function ActiveTests() {
           </p>
           <p>
             <strong>RPV (Revenue Per Visitor):</strong> The primary metric
-            optimized by our Bayesian engine. RPV = Total Revenue ÷ Total
+            optimized by our smart allocation system. RPV = Total Revenue ÷ Total
             Impressions. A variant can win with higher RPV even if it has lower
             AOV, by converting visitors at a higher rate. AOV (Average Order
             Value) is shown as a secondary metric.
