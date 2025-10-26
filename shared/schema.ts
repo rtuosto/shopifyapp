@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, bigint, decimal, jsonb, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, decimal, jsonb, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -115,18 +115,18 @@ export const tests = pgTable("tests", {
   }>(),
   
   // Per-variant metrics for true A/B testing
-  controlImpressions: bigint("control_impressions", { mode: "number" }).default(0),
-  variantImpressions: bigint("variant_impressions", { mode: "number" }).default(0),
-  controlConversions: bigint("control_conversions", { mode: "number" }).default(0),
-  variantConversions: bigint("variant_conversions", { mode: "number" }).default(0),
+  controlImpressions: integer("control_impressions").default(0),
+  variantImpressions: integer("variant_impressions").default(0),
+  controlConversions: integer("control_conversions").default(0),
+  variantConversions: integer("variant_conversions").default(0),
   controlRevenue: decimal("control_revenue", { precision: 10, scale: 2 }).default("0"),
   variantRevenue: decimal("variant_revenue", { precision: 10, scale: 2 }).default("0"),
   
   // Legacy aggregate fields (kept for backwards compatibility)
   arpu: decimal("arpu", { precision: 10, scale: 2 }).default("0"),
   arpuLift: decimal("arpu_lift", { precision: 5, scale: 2 }).default("0"),
-  impressions: bigint("impressions", { mode: "number" }).default(0),
-  conversions: bigint("conversions", { mode: "number" }).default(0),
+  impressions: integer("impressions").default(0),
+  conversions: integer("conversions").default(0),
   revenue: decimal("revenue", { precision: 10, scale: 2 }).default("0"),
   
   // Metadata
@@ -227,11 +227,11 @@ export type TestConversion = typeof testConversions.$inferSelect;
 export const testEvolutionSnapshots = pgTable("test_evolution_snapshots", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   testId: varchar("test_id").notNull().references(() => tests.id, { onDelete: "cascade" }),
-  impressions: bigint("impressions", { mode: "number" }).notNull(), // Cumulative impressions at this snapshot
-  controlImpressions: bigint("control_impressions", { mode: "number" }).notNull(),
-  variantImpressions: bigint("variant_impressions", { mode: "number" }).notNull(),
-  controlConversions: bigint("control_conversions", { mode: "number" }).notNull(),
-  variantConversions: bigint("variant_conversions", { mode: "number" }).notNull(),
+  impressions: integer("impressions").notNull(), // Cumulative impressions at this snapshot
+  controlImpressions: integer("control_impressions").notNull(),
+  variantImpressions: integer("variant_impressions").notNull(),
+  controlConversions: integer("control_conversions").notNull(),
+  variantConversions: integer("variant_conversions").notNull(),
   controlRevenue: decimal("control_revenue", { precision: 10, scale: 2 }).notNull(),
   variantRevenue: decimal("variant_revenue", { precision: 10, scale: 2 }).notNull(),
   controlRPV: decimal("control_rpv", { precision: 10, scale: 2 }).notNull(), // Revenue Per Visitor
