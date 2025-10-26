@@ -105,7 +105,7 @@ export const tests = pgTable("tests", {
   targetSelector: text("target_selector"), // CSS selector for template tests (e.g., ".product-grid")
   
   // Test Configuration
-  status: text("status").notNull().default("draft"), // "draft", "active", "completed", "cancelled"
+  status: text("status").notNull().default("draft"), // "draft", "active", "paused", "completed", "cancelled"
   controlData: jsonb("control_data").$type<Record<string, any>>().notNull(),
   variantData: jsonb("variant_data").$type<Record<string, any>>().notNull(),
   

@@ -876,6 +876,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Pause test - temporarily stop serving variants while keeping data
+  app.post("/api/tests/:id/pause", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      const testId = req.params.id;
+      
+      const test = await storage.getTest(shop, testId);
+      if (!test) {
+        return res.status(404).json({ error: "Test not found" });
+      }
+      
+      if (test.status !== "active") {
+        return res.status(400).json({ error: "Only active tests can be paused" });
+      }
+      
+      console.log(`[Test Pause] Pausing test ${testId}`);
+      
+      // Mark test as paused - SDK will stop serving variants but data is preserved
+      const pausedTest = await storage.updateTest(shop, testId, {
+        status: "paused",
+      });
+      
+      console.log(`[Test Pause] Test paused successfully`);
+      
+      res.json({
+        success: true,
+        test: pausedTest,
+        message: "Test paused successfully",
+      });
+    } catch (error) {
+      console.error("Error pausing test:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to pause test";
+      res.status(500).json({ error: errorMessage });
+    }
+  });
+  
+  // Resume test - reactivate a paused test
+  app.post("/api/tests/:id/resume", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      const testId = req.params.id;
+      
+      const test = await storage.getTest(shop, testId);
+      if (!test) {
+        return res.status(404).json({ error: "Test not found" });
+      }
+      
+      if (test.status !== "paused") {
+        return res.status(400).json({ error: "Only paused tests can be resumed" });
+      }
+      
+      console.log(`[Test Resume] Resuming test ${testId}`);
+      
+      // Reactivate the test
+      const resumedTest = await storage.updateTest(shop, testId, {
+        status: "active",
+      });
+      
+      console.log(`[Test Resume] Test resumed successfully`);
+      
+      res.json({
+        success: true,
+        test: resumedTest,
+        message: "Test resumed successfully",
+      });
+    } catch (error) {
+      console.error("Error resuming test:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to resume test";
+      res.status(500).json({ error: errorMessage });
+    }
+  });
+
   // Bayesian allocation update
   app.post("/api/tests/:id/update-allocation", requireShopifySessionOrDev, async (req, res) => {
     try {
