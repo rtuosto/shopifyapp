@@ -111,8 +111,8 @@ export const tests = pgTable("tests", {
   
   // Optimization Strategy (Bayesian only - uses Thompson Sampling for dynamic allocation)
   allocationStrategy: text("allocation_strategy").notNull().default("bayesian"), // Always "bayesian"
-  controlAllocation: decimal("control_allocation", { precision: 5, scale: 2 }).default("95"), // Percentage (0-100), starts at 95% (TTTS)
-  variantAllocation: decimal("variant_allocation", { precision: 5, scale: 2 }).default("5"), // Percentage (0-100), starts at 5% (TTTS)
+  controlAllocation: decimal("control_allocation", { precision: 5, scale: 2 }).default("50"), // Percentage (0-100), starts at 50% balanced
+  variantAllocation: decimal("variant_allocation", { precision: 5, scale: 2 }).default("50"), // Percentage (0-100), starts at 50% balanced
   
   // Statistical Configuration
   confidenceThreshold: decimal("confidence_threshold", { precision: 3, scale: 2 }).default("0.95"), // 95% confidence

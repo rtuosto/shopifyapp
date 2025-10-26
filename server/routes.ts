@@ -787,11 +787,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "active",
         startDate: new Date(),
         bayesianConfig: bayesianState,
-        controlAllocation: "75", // Start cautious: 75% control
-        variantAllocation: "5",  // 5% variant
+        controlAllocation: "50", // Start balanced: 50% control
+        variantAllocation: "50",  // 50% variant
       };
       
-      console.log(`[Test Activation] Initialized Bayesian state with cautious allocation (75/5)`);
+      console.log(`[Test Activation] Initialized Bayesian state with balanced allocation (50/50)`);
       
       // Activate the test in our database
       const activatedTest = await storage.updateTest(shop, testId, updateData);
