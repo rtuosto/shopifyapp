@@ -310,24 +310,71 @@ export default function AIRecommendations() {
     const rec = recommendations.find(r => r.id === id) || archivedRecommendations.find(r => r.id === id);
     if (!rec) return;
 
+    // CRITICAL: Open window IMMEDIATELY (synchronously) during user click
+    // This must happen BEFORE any async operations to avoid popup blockers
+    const previewWindow = window.open('about:blank', '_blank', 'width=1400,height=900');
+    
+    if (!previewWindow) {
+      toast({
+        title: "Popup Blocked",
+        description: "Please allow popups to preview on your store",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
+      // Show loading state in the preview window
+      previewWindow.document.write(`
+        <html>
+          <head>
+            <title>Loading Preview...</title>
+            <style>
+              body {
+                margin: 0;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: #f5f5f5;
+              }
+              .loader {
+                text-align: center;
+              }
+              .spinner {
+                border: 4px solid #e0e0e0;
+                border-top: 4px solid #5C6AC4;
+                border-radius: 50%;
+                width: 50px;
+                height: 50px;
+                animation: spin 1s linear infinite;
+                margin: 0 auto 20px;
+              }
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="loader">
+              <div class="spinner"></div>
+              <p>Preparing preview...</p>
+            </div>
+          </body>
+        </html>
+      `);
+
       // Create preview session and get storefront URL
       const res = await apiRequest("POST", "/api/preview/sessions", {
         recommendationId: id,
       });
       const data = await res.json();
 
-      // Open preview in new tab/window
-      const previewWindow = window.open(data.previewUrl, '_blank', 'width=1400,height=900');
-      
-      if (!previewWindow) {
-        toast({
-          title: "Popup Blocked",
-          description: "Please allow popups to preview on your store",
-          variant: "destructive",
-        });
-        return;
-      }
+      // Navigate the already-open window to the preview URL
+      previewWindow.location.href = data.previewUrl;
 
       // Listen for completion messages from preview window
       const messageHandler = (event: MessageEvent) => {
@@ -358,6 +405,12 @@ export default function AIRecommendations() {
 
     } catch (error) {
       console.error("Error creating preview session:", error);
+      
+      // Close the preview window since we failed to get the URL
+      if (previewWindow && !previewWindow.closed) {
+        previewWindow.close();
+      }
+      
       toast({
         title: "Preview Failed",
         description: "Could not create preview session",
