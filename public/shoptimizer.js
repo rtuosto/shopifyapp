@@ -860,22 +860,55 @@
       console.log('[Shoptimizer Preview] Updated price');
     }
 
-    // Apply description
+    // Apply description - try to find and update, or create if needed
     if (data.description) {
       const descSelectors = [
         '.product-single__description',
         '.product__description',
         '[data-product-description]',
         '.product-description',
-        '[itemprop="description"]'
+        '[itemprop="description"]',
+        '.rte' // Common Shopify theme class for rich text
       ];
       
+      let descElement = null;
       for (const selector of descSelectors) {
-        const descElement = document.querySelector(selector);
+        descElement = document.querySelector(selector);
         if (descElement) {
           descElement.innerHTML = data.description;
+          descElement.style.display = 'block'; // Make sure it's visible
           console.log('[Shoptimizer Preview] Updated description');
           break;
+        }
+      }
+      
+      // If no description element found, try to create one
+      if (!descElement) {
+        // Find product info area to inject description
+        const productInfoSelectors = [
+          '.product-single',
+          '.product__info',
+          '.product-form',
+          '.product-details',
+          'form[action*="/cart/add"]'
+        ];
+        
+        for (const selector of productInfoSelectors) {
+          const container = document.querySelector(selector);
+          if (container) {
+            // Create description container
+            const newDesc = document.createElement('div');
+            newDesc.className = 'product-description shoptimizer-injected';
+            newDesc.innerHTML = `<div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-left: 3px solid #5C6AC4; border-radius: 4px;">
+              <strong style="display: block; margin-bottom: 8px; color: #202223;">Product Description (Preview)</strong>
+              <div style="color: #6D7175; line-height: 1.6;">${data.description}</div>
+            </div>`;
+            
+            // Insert at the top of the container
+            container.insertBefore(newDesc, container.firstChild);
+            console.log('[Shoptimizer Preview] Created description element');
+            break;
+          }
         }
       }
     }
