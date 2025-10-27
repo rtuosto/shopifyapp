@@ -1,4 +1,4 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, lt } from "drizzle-orm";
 import { db } from "./db";
 import { 
   products, 
@@ -10,6 +10,7 @@ import {
   testConversions,
   testEvolutionSnapshots,
   shops,
+  previewSessions,
   type Product,
   type InsertProduct,
   type Recommendation,
@@ -28,6 +29,8 @@ import {
   type InsertTestEvolutionSnapshot,
   type Shop,
   type InsertShop,
+  type PreviewSession,
+  type InsertPreviewSession,
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -307,6 +310,40 @@ export class DbStorage implements IStorage {
   async createTestEvolutionSnapshotsBulk(snapshots: InsertTestEvolutionSnapshot[]): Promise<void> {
     if (snapshots.length === 0) return;
     await db.insert(testEvolutionSnapshots).values(snapshots);
+  }
+
+  // Preview Sessions (storefront overlay preview)
+  async getPreviewSession(token: string): Promise<PreviewSession | undefined> {
+    const result = await db.select().from(previewSessions)
+      .where(eq(previewSessions.token, token))
+      .limit(1);
+    return result[0];
+  }
+
+  async createPreviewSession(shop: string, session: InsertPreviewSession): Promise<PreviewSession> {
+    const [result] = await db.insert(previewSessions).values({ ...session, shop }).returning();
+    return result;
+  }
+
+  async completePreviewSession(token: string, approved: "yes" | "no"): Promise<PreviewSession | undefined> {
+    const [result] = await db.update(previewSessions)
+      .set({ completedAt: new Date(), approved })
+      .where(eq(previewSessions.token, token))
+      .returning();
+    return result;
+  }
+
+  async cleanupExpiredPreviewSessions(): Promise<number> {
+    const now = new Date();
+    const result = await db.delete(previewSessions)
+      .where(lt(previewSessions.expiresAt, now))
+      .returning();
+    
+    const deleted = result.length;
+    if (deleted > 0) {
+      console.log(`[DbStorage] Cleaned up ${deleted} expired preview session(s)`);
+    }
+    return deleted;
   }
 }
 

@@ -2693,5 +2693,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+  
+  // Schedule periodic cleanup of expired preview sessions
+  // Run every 5 minutes to prevent token accumulation
+  const CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
+  setInterval(async () => {
+    try {
+      await storage.cleanupExpiredPreviewSessions();
+      console.log('[Preview Cleanup] Expired preview sessions cleaned up');
+    } catch (error) {
+      console.error('[Preview Cleanup] Error cleaning up preview sessions:', error);
+    }
+  }, CLEANUP_INTERVAL);
+  
+  // Run initial cleanup on startup
+  storage.cleanupExpiredPreviewSessions().catch(err => {
+    console.error('[Preview Cleanup] Initial cleanup failed:', err);
+  });
+  
   return httpServer;
 }
