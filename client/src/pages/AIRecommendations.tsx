@@ -29,7 +29,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import AIRecommendationCard from "@/components/AIRecommendationCard";
-import TestPreviewIframe from "@/components/TestPreviewIframe";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -38,11 +37,8 @@ import type { Product, Recommendation, Test } from "@shared/schema";
 
 export default function AIRecommendations() {
   const { toast } = useToast();
-  const [previewOpen, setPreviewOpen] = useState(false);
   const [dismissDialogOpen, setDismissDialogOpen] = useState(false);
   const [storeIdeasDialogOpen, setStoreIdeasDialogOpen] = useState(false);
-  const [selectedRecommendation, setSelectedRecommendation] = useState<Recommendation | null>(null);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedProductId, setSelectedProductId] = useState<string>("");
   const [dismissingRecommendation, setDismissingRecommendation] = useState<Recommendation | null>(null);
 
@@ -310,14 +306,64 @@ export default function AIRecommendations() {
     },
   });
 
-  const handlePreview = (id: string) => {
+  const handlePreview = async (id: string) => {
     const rec = recommendations.find(r => r.id === id) || archivedRecommendations.find(r => r.id === id);
     if (!rec) return;
 
-    const product = products.find(p => p.id === rec.productId);
-    setSelectedRecommendation(rec);
-    setSelectedProduct(product || null);
-    setPreviewOpen(true);
+    try {
+      // Create preview session and get storefront URL
+      const res = await apiRequest("POST", "/api/preview/sessions", {
+        recommendationId: id,
+      });
+      const data = await res.json();
+
+      // Open preview in new tab/window
+      const previewWindow = window.open(data.previewUrl, '_blank', 'width=1400,height=900');
+      
+      if (!previewWindow) {
+        toast({
+          title: "Popup Blocked",
+          description: "Please allow popups to preview on your store",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Listen for completion messages from preview window
+      const messageHandler = (event: MessageEvent) => {
+        if (event.data?.type === 'shoptimizer-preview-complete') {
+          console.log('[Dashboard] Preview completed:', event.data);
+          
+          if (event.data.approved) {
+            // User approved the recommendation - create test
+            createTestMutation.mutate({ recommendationId: id });
+          } else {
+            toast({
+              title: "Preview Closed",
+              description: "No changes were made",
+            });
+          }
+          
+          // Clean up listener
+          window.removeEventListener('message', messageHandler);
+        }
+      };
+      
+      window.addEventListener('message', messageHandler);
+      
+      // Clean up listener after 30 minutes (preview sessions expire in 15 min)
+      setTimeout(() => {
+        window.removeEventListener('message', messageHandler);
+      }, 30 * 60 * 1000);
+
+    } catch (error) {
+      console.error("Error creating preview session:", error);
+      toast({
+        title: "Preview Failed",
+        description: "Could not create preview session",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleAccept = (id: string, editedVariant?: any) => {
@@ -637,41 +683,6 @@ export default function AIRecommendations() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Preview Iframe */}
-      {selectedRecommendation && selectedProduct && shopData?.shop && (
-        <TestPreviewIframe
-          open={previewOpen}
-          onOpenChange={setPreviewOpen}
-          testTitle={selectedRecommendation.title}
-          productHandle={selectedProduct.handle}
-          shopDomain={shopData.shop}
-          control={{
-            title: selectedProduct.title,
-            price: parseFloat(selectedProduct.price),
-            compareAtPrice: selectedProduct.compareAtPrice ? parseFloat(selectedProduct.compareAtPrice) : undefined,
-            description: selectedProduct.description ?? "",
-            images: selectedProduct.images,
-            rating: selectedProduct.rating ? parseFloat(selectedProduct.rating) : undefined,
-            reviewCount: selectedProduct.reviewCount ?? undefined,
-          }}
-          variant={{
-            title: (selectedRecommendation.proposedChanges.title as string | undefined) ?? selectedProduct.title,
-            price: selectedRecommendation.proposedChanges.price 
-              ? parseFloat(selectedRecommendation.proposedChanges.price as string)
-              : parseFloat(selectedProduct.price),
-            compareAtPrice: selectedProduct.compareAtPrice ? parseFloat(selectedProduct.compareAtPrice) : undefined,
-            description: (selectedRecommendation.proposedChanges.description as string | undefined) ?? selectedProduct.description ?? "",
-            images: selectedProduct.images,
-            rating: selectedProduct.rating ? parseFloat(selectedProduct.rating) : undefined,
-            reviewCount: selectedProduct.reviewCount ?? undefined,
-          }}
-          changes={Object.keys(selectedRecommendation.proposedChanges)}
-          insights={selectedRecommendation.insights}
-          onApprove={(editedVariant) => handleAccept(selectedRecommendation.id, editedVariant)}
-          onSaveDraft={(editedVariant) => handleSaveDraft(selectedRecommendation.id, editedVariant)}
-        />
-      )}
     </div>
   );
 }
