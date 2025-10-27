@@ -377,13 +377,13 @@ export default function Tests() {
   });
 
   // Calculate summary metrics ONLY from truly active tests (exclude drafts)
-  // Parse bigint fields as numbers (they come from DB as strings)
+  // Sum control and variant impressions/conversions separately to avoid string concatenation
   const totalImpressions = trulyActiveTests.reduce(
-    (sum, t) => sum + (Number(t.impressions) || 0),
+    (sum, t) => sum + (Number(t.controlImpressions) || 0) + (Number(t.variantImpressions) || 0),
     0,
   );
   const totalConversions = trulyActiveTests.reduce(
-    (sum, t) => sum + (Number(t.conversions) || 0),
+    (sum, t) => sum + (Number(t.controlConversions) || 0) + (Number(t.variantConversions) || 0),
     0,
   );
   const totalRevenue = trulyActiveTests.reduce((sum, t) => {
