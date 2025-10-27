@@ -599,10 +599,324 @@
   }
 
   // ============================================
+  // Preview Mode (Storefront Overlay)
+  // ============================================
+
+  function getPreviewToken() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('shoptimizer_preview');
+  }
+
+  async function initPreviewMode(token) {
+    console.log('[Shoptimizer Preview] Initializing preview mode with token:', token);
+
+    // Fetch preview session data from backend
+    try {
+      const response = await fetch(`${SHOPTIMIZER_CONFIG.apiUrl}/api/preview/sessions/${token}`);
+      
+      if (!response.ok) {
+        console.error('[Shoptimizer Preview] Failed to fetch session:', response.status);
+        return;
+      }
+
+      const session = await response.json();
+      console.log('[Shoptimizer Preview] Session loaded:', session);
+
+      // Render preview overlay UI
+      renderPreviewOverlay(session, token);
+      
+    } catch (error) {
+      console.error('[Shoptimizer Preview] Error loading preview session:', error);
+    }
+  }
+
+  function renderPreviewOverlay(session, token) {
+    // Create overlay container
+    const overlay = document.createElement('div');
+    overlay.id = 'shoptimizer-preview-overlay';
+    overlay.innerHTML = `
+      <style>
+        #shoptimizer-preview-overlay {
+          position: fixed;
+          bottom: 20px;
+          right: 20px;
+          z-index: 999999;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        #shoptimizer-preview-card {
+          background: white;
+          border-radius: 12px;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+          padding: 20px;
+          max-width: 400px;
+          border: 2px solid #5C6AC4;
+        }
+        #shoptimizer-preview-card h3 {
+          margin: 0 0 12px 0;
+          font-size: 16px;
+          font-weight: 600;
+          color: #202223;
+        }
+        #shoptimizer-preview-card p {
+          margin: 0 0 16px 0;
+          font-size: 14px;
+          color: #6D7175;
+          line-height: 1.4;
+        }
+        .shoptimizer-preview-variant-toggle {
+          display: flex;
+          gap: 8px;
+          margin-bottom: 16px;
+        }
+        .shoptimizer-preview-variant-btn {
+          flex: 1;
+          padding: 10px;
+          border: 2px solid #E1E3E5;
+          background: white;
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 500;
+          transition: all 0.2s;
+        }
+        .shoptimizer-preview-variant-btn.active {
+          background: #5C6AC4;
+          border-color: #5C6AC4;
+          color: white;
+        }
+        .shoptimizer-preview-variant-btn:hover:not(.active) {
+          border-color: #5C6AC4;
+        }
+        .shoptimizer-preview-actions {
+          display: flex;
+          gap: 8px;
+        }
+        .shoptimizer-preview-btn {
+          flex: 1;
+          padding: 12px;
+          border: none;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .shoptimizer-preview-btn-primary {
+          background: #5C6AC4;
+          color: white;
+        }
+        .shoptimizer-preview-btn-primary:hover {
+          background: #4959BD;
+        }
+        .shoptimizer-preview-btn-secondary {
+          background: #F1F2F4;
+          color: #202223;
+        }
+        .shoptimizer-preview-btn-secondary:hover {
+          background: #E1E3E5;
+        }
+        .shoptimizer-preview-changes {
+          background: #F6F6F7;
+          border-radius: 8px;
+          padding: 12px;
+          margin-bottom: 16px;
+          font-size: 13px;
+        }
+        .shoptimizer-preview-changes strong {
+          color: #202223;
+          display: block;
+          margin-bottom: 4px;
+        }
+        .shoptimizer-preview-changes span {
+          color: #6D7175;
+        }
+      </style>
+      <div id="shoptimizer-preview-card">
+        <h3>🔬 Preview Mode</h3>
+        <p>See how this optimization looks on your live store</p>
+        
+        <div class="shoptimizer-preview-variant-toggle">
+          <button class="shoptimizer-preview-variant-btn active" data-variant="control">
+            Current
+          </button>
+          <button class="shoptimizer-preview-variant-btn" data-variant="variant">
+            Optimized
+          </button>
+        </div>
+        
+        <div class="shoptimizer-preview-changes" id="shoptimizer-preview-changes">
+          Loading changes...
+        </div>
+        
+        <div class="shoptimizer-preview-actions">
+          <button class="shoptimizer-preview-btn shoptimizer-preview-btn-secondary" id="shoptimizer-preview-close">
+            Close
+          </button>
+          <button class="shoptimizer-preview-btn shoptimizer-preview-btn-primary" id="shoptimizer-preview-approve">
+            Accept & Test
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // Display what changed
+    displayChanges(session.changes);
+
+    // Set up variant toggle
+    let currentVariant = 'control';
+    const variantBtns = overlay.querySelectorAll('.shoptimizer-preview-variant-btn');
+    
+    variantBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const variant = btn.dataset.variant;
+        if (variant === currentVariant) return;
+        
+        currentVariant = variant;
+        
+        // Update button states
+        variantBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        // Apply variant to page
+        const data = variant === 'control' ? session.controlData : session.variantData;
+        applyPreviewVariant(data);
+      });
+    });
+
+    // Set up action buttons
+    overlay.querySelector('#shoptimizer-preview-close').addEventListener('click', async () => {
+      await completePreview(token, 'no');
+      notifyDashboard({ action: 'closed', approved: false });
+      window.close(); // Close preview tab
+    });
+
+    overlay.querySelector('#shoptimizer-preview-approve').addEventListener('click', async () => {
+      await completePreview(token, 'yes');
+      notifyDashboard({ action: 'approved', approved: true });
+      window.close(); // Close preview tab
+    });
+
+    // Apply initial variant (control)
+    applyPreviewVariant(session.controlData);
+  }
+
+  function displayChanges(changes) {
+    const changesDiv = document.getElementById('shoptimizer-preview-changes');
+    const changeParts = [];
+
+    if (changes.title) {
+      changeParts.push('<strong>Title:</strong> <span>Updated</span>');
+    }
+    if (changes.price) {
+      changeParts.push('<strong>Price:</strong> <span>$' + changes.price + '</span>');
+    }
+    if (changes.description) {
+      changeParts.push('<strong>Description:</strong> <span>Enhanced</span>');
+    }
+
+    changesDiv.innerHTML = changeParts.join('<br>') || 'No changes detected';
+  }
+
+  function applyPreviewVariant(data) {
+    console.log('[Shoptimizer Preview] Applying variant:', data);
+
+    // Apply title
+    if (data.title) {
+      const titleSelectors = [
+        '.product-single__title',
+        '.product__title',
+        '[data-product-title]',
+        '.product-title',
+        'h1[itemprop="name"]',
+        'h1'
+      ];
+      
+      for (const selector of titleSelectors) {
+        const titleElement = document.querySelector(selector);
+        if (titleElement) {
+          titleElement.textContent = data.title;
+          console.log('[Shoptimizer Preview] Updated title');
+          break;
+        }
+      }
+    }
+
+    // Apply price
+    if (data.price) {
+      const priceSelectors = [
+        '.product__price',
+        '.product-single__price',
+        '[data-product-price]',
+        '.price',
+        '[itemprop="price"]'
+      ];
+      
+      document.querySelectorAll(priceSelectors.join(', ')).forEach(el => {
+        const formattedPrice = formatPrice(data.price);
+        el.textContent = formattedPrice;
+      });
+      console.log('[Shoptimizer Preview] Updated price');
+    }
+
+    // Apply description
+    if (data.description) {
+      const descSelectors = [
+        '.product-single__description',
+        '.product__description',
+        '[data-product-description]',
+        '.product-description',
+        '[itemprop="description"]'
+      ];
+      
+      for (const selector of descSelectors) {
+        const descElement = document.querySelector(selector);
+        if (descElement) {
+          descElement.innerHTML = data.description;
+          console.log('[Shoptimizer Preview] Updated description');
+          break;
+        }
+      }
+    }
+  }
+
+  async function completePreview(token, approved) {
+    try {
+      await fetch(`${SHOPTIMIZER_CONFIG.apiUrl}/api/preview/sessions/${token}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approved }),
+      });
+      console.log('[Shoptimizer Preview] Completed:', approved);
+    } catch (error) {
+      console.error('[Shoptimizer Preview] Error completing preview:', error);
+    }
+  }
+
+  function notifyDashboard(data) {
+    // Send message to parent window (dashboard)
+    if (window.opener && !window.opener.closed) {
+      window.opener.postMessage({
+        type: 'shoptimizer-preview-complete',
+        ...data
+      }, '*'); // In production, restrict to specific origin
+      console.log('[Shoptimizer Preview] Notified dashboard:', data);
+    }
+  }
+
+  // ============================================
   // Main Initialization
   // ============================================
 
   async function initShoptimizer() {
+    // Check if preview mode
+    const previewToken = getPreviewToken();
+    if (previewToken) {
+      console.log('[Shoptimizer] Preview mode detected');
+      await initPreviewMode(previewToken);
+      return; // Don't run normal A/B testing in preview mode
+    }
     try {
       // Get or create persistent session ID
       const sessionId = getSessionId();
