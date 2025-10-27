@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import DeviceToggle, { type DeviceType } from "./DeviceToggle";
 import AIInsightsPanel from "./AIInsightsPanel";
-import { ArrowLeftRight, CheckCircle2, FileText, Loader2 } from "lucide-react";
+import { ArrowLeftRight, CheckCircle2, FileText, Loader2, ExternalLink, AlertCircle } from "lucide-react";
+import ProductPreview from "./ProductPreview";
 import { sendToPreview, listenToPreview, type PreviewMode, type PreviewMessage, type ApplyVariantPayload, type EditFieldPayload } from "@/lib/preview-messaging";
 
 interface ProductData {
@@ -59,6 +60,7 @@ export default function TestPreviewIframe({
   const [editedVariant, setEditedVariant] = useState<ProductData>(variant);
   const [isLoading, setIsLoading] = useState(true);
   const [iframeHeight, setIframeHeight] = useState(800);
+  const [iframeError, setIframeError] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Reset edited variant when modal opens or variant changes
@@ -71,8 +73,24 @@ export default function TestPreviewIframe({
     if (open) {
       setMode("control");
       setIsLoading(true);
+      setIframeError(false);
     }
   }, [open]);
+
+  // Detect iframe loading errors (CSP blocks)
+  useEffect(() => {
+    if (!open) return;
+
+    const timer = setTimeout(() => {
+      if (isLoading) {
+        // If still loading after 3 seconds, assume CSP block
+        setIframeError(true);
+        setIsLoading(false);
+      }
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [open, isLoading]);
 
   // Listen for messages from iframe
   useEffect(() => {
@@ -218,9 +236,9 @@ export default function TestPreviewIframe({
             </div>
           </div>
 
-          {/* Preview iframe */}
+          {/* Preview iframe or fallback */}
           <div className="relative bg-muted rounded-lg overflow-hidden" style={{ minHeight: '400px' }}>
-            {isLoading && (
+            {isLoading && !iframeError && (
               <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
                 <div className="flex flex-col items-center gap-2">
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -228,23 +246,68 @@ export default function TestPreviewIframe({
                 </div>
               </div>
             )}
-            
-            <div className="flex justify-center p-4">
-              <iframe
-                ref={iframeRef}
-                src={productUrl}
-                style={{
-                  width: getIframeWidth(),
-                  maxWidth: getIframeMaxWidth(),
-                  height: `${iframeHeight}px`,
-                  border: 'none',
-                  backgroundColor: 'white',
-                }}
-                title="Product Preview"
-                data-testid="iframe-preview"
-                sandbox="allow-scripts allow-same-origin"
-              />
-            </div>
+
+            {iframeError ? (
+              <div className="p-6 space-y-4">
+                {/* CSP Error Notice */}
+                <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-500 mt-0.5" />
+                  <div className="flex-1">
+                    <h4 className="font-medium text-amber-900 dark:text-amber-100 mb-1">
+                      Live Preview Unavailable
+                    </h4>
+                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                      Shopify's security settings prevent embedding product pages. Using mock preview instead.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 gap-2"
+                      onClick={() => window.open(productUrl, '_blank')}
+                      data-testid="button-open-new-tab"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Open Live Product Page
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Mock Product Preview Fallback */}
+                <div className="flex justify-center">
+                  <div style={{ width: getIframeWidth(), maxWidth: getIframeMaxWidth() }}>
+                    <ProductPreview
+                      product={mode === "variant" ? editedVariant : control}
+                      device={device}
+                      highlights={mode === "variant" ? changes : []}
+                      editable={mode === "variant"}
+                      onEdit={(field, value) => {
+                        setEditedVariant(prev => ({
+                          ...prev,
+                          [field]: value
+                        }));
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-center p-4">
+                <iframe
+                  ref={iframeRef}
+                  src={productUrl}
+                  style={{
+                    width: getIframeWidth(),
+                    maxWidth: getIframeMaxWidth(),
+                    height: `${iframeHeight}px`,
+                    border: 'none',
+                    backgroundColor: 'white',
+                  }}
+                  title="Product Preview"
+                  data-testid="iframe-preview"
+                  sandbox="allow-scripts allow-same-origin"
+                />
+              </div>
+            )}
           </div>
 
           {/* AI Insights */}
