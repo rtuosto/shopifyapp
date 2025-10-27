@@ -868,6 +868,35 @@
       console.log('[Shoptimizer Preview] Removed injected description');
     }
     
+    // Helper: Check if element is inside a price container
+    function isInsidePriceContainer(element) {
+      const priceContainerSelectors = [
+        'product-price',
+        '.product__price',
+        '.product-single__price',
+        '[data-product-price]',
+        '.price-container',
+        '[itemprop="price"]',
+        '[itemprop="offers"]'
+      ];
+      
+      let currentEl = element;
+      while (currentEl && currentEl !== document.body) {
+        const tagName = currentEl.tagName?.toLowerCase();
+        const className = currentEl.className || '';
+        
+        // Check tag name and class name
+        if (tagName === 'product-price' || 
+            className.includes('price') ||
+            currentEl.hasAttribute('itemprop') && (currentEl.getAttribute('itemprop') === 'price' || currentEl.getAttribute('itemprop') === 'offers')) {
+          return true;
+        }
+        
+        currentEl = currentEl.parentElement;
+      }
+      return false;
+    }
+    
     // If variant has a description, apply it
     if (data.description) {
       const descSelectors = [
@@ -881,7 +910,19 @@
       
       let descElement = null;
       for (const selector of descSelectors) {
-        descElement = document.querySelector(selector);
+        const candidates = document.querySelectorAll(selector);
+        
+        // Find first candidate that's NOT inside a price container
+        for (const candidate of candidates) {
+          if (!isInsidePriceContainer(candidate)) {
+            descElement = candidate;
+            console.log(`[Shoptimizer Preview] Found description element via ${selector}`);
+            break;
+          } else {
+            console.log(`[Shoptimizer Preview] Skipping ${selector} - inside price container`);
+          }
+        }
+        
         if (descElement) {
           descElement.innerHTML = data.description;
           descElement.style.display = 'block'; // Make sure it's visible
