@@ -29,7 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import AIRecommendationCard from "@/components/AIRecommendationCard";
-import TestPreviewModal from "@/components/TestPreviewModal";
+import TestPreviewIframe from "@/components/TestPreviewIframe";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -55,6 +55,11 @@ export default function AIRecommendations() {
     resetDate: string;
   }>({
     queryKey: ["/api/quota"],
+  });
+
+  // Fetch shop domain
+  const { data: shopData } = useQuery<{ shop: string }>({
+    queryKey: ["/api/shop"],
   });
 
   // Fetch products
@@ -633,12 +638,14 @@ export default function AIRecommendations() {
         </DialogContent>
       </Dialog>
 
-      {/* Preview Modal */}
-      {selectedRecommendation && selectedProduct && (
-        <TestPreviewModal
+      {/* Preview Iframe */}
+      {selectedRecommendation && selectedProduct && shopData?.shop && (
+        <TestPreviewIframe
           open={previewOpen}
           onOpenChange={setPreviewOpen}
           testTitle={selectedRecommendation.title}
+          productHandle={selectedProduct.handle}
+          shopDomain={shopData.shop}
           control={{
             title: selectedProduct.title,
             price: parseFloat(selectedProduct.price),

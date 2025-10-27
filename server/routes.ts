@@ -100,6 +100,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Shop Info API
+  app.get("/api/shop", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      res.json({ shop });
+    } catch (error) {
+      console.error("Error fetching shop info:", error);
+      res.status(500).json({ error: "Failed to fetch shop info" });
+    }
+  });
+
   // Products API (protected by Shopify auth in production)
   app.get("/api/products", requireShopifySessionOrDev, async (req, res) => {
     try {
