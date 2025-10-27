@@ -868,27 +868,54 @@
       console.log('[Shoptimizer Preview] Removed injected description');
     }
     
-    // Helper: Check if element is inside a price container
-    function isInsidePriceContainer(element) {
-      const priceContainerSelectors = [
-        'product-price',
-        '.product__price',
-        '.product-single__price',
-        '[data-product-price]',
-        '.price-container',
-        '[itemprop="price"]',
-        '[itemprop="offers"]'
+    // Helper: Find the main product container (not recommendation widgets)
+    function findMainProductContainer() {
+      const mainProductSelectors = [
+        'main[id*="product"]',
+        'main[class*="product"]',
+        '[id*="MainProduct"]',
+        '.product-single',
+        '.product-template',
+        '#product',
+        '.main-product'
       ];
       
+      for (const selector of mainProductSelectors) {
+        const container = document.querySelector(selector);
+        if (container) {
+          console.log(`[Shoptimizer Preview] Found main product container: ${selector}`);
+          return container;
+        }
+      }
+      
+      // Fallback to main or body
+      return document.querySelector('main') || document.body;
+    }
+    
+    // Helper: Check if element is inside unwanted sections
+    function isInUnwantedSection(element) {
       let currentEl = element;
       while (currentEl && currentEl !== document.body) {
-        const tagName = currentEl.tagName?.toLowerCase();
         const className = currentEl.className || '';
+        const id = currentEl.id || '';
         
-        // Check tag name and class name
-        if (tagName === 'product-price' || 
-            className.includes('price') ||
-            currentEl.hasAttribute('itemprop') && (currentEl.getAttribute('itemprop') === 'price' || currentEl.getAttribute('itemprop') === 'offers')) {
+        // Check for recommendation widgets, related products, etc.
+        if (
+          className.includes('recommend') ||
+          className.includes('related') ||
+          className.includes('upsell') ||
+          className.includes('product-card') ||
+          className.includes('product-item') ||
+          className.includes('collection') ||
+          id.includes('recommend') ||
+          id.includes('related') ||
+          // Price containers
+          currentEl.tagName?.toLowerCase() === 'product-price' ||
+          className.includes('price') ||
+          (currentEl.hasAttribute('itemprop') && 
+           (currentEl.getAttribute('itemprop') === 'price' || 
+            currentEl.getAttribute('itemprop') === 'offers'))
+        ) {
           return true;
         }
         
@@ -899,69 +926,91 @@
     
     // If variant has a description, apply it
     if (data.description) {
+      // First, find the main product container to scope our search
+      const mainContainer = findMainProductContainer();
+      
       const descSelectors = [
         '.product-single__description',
         '.product__description',
         '[data-product-description]',
         '.product-description:not(.shoptimizer-injected)',
         '[itemprop="description"]',
-        '.rte' // Common Shopify theme class for rich text
+        '.rte'
       ];
       
       let descElement = null;
+      
+      // Search for description elements ONLY within main product container
       for (const selector of descSelectors) {
-        const candidates = document.querySelectorAll(selector);
+        const candidates = mainContainer.querySelectorAll(selector);
         
-        // Find first candidate that's NOT inside a price container
+        // Find first candidate that's NOT in an unwanted section
         for (const candidate of candidates) {
-          if (!isInsidePriceContainer(candidate)) {
+          if (!isInUnwantedSection(candidate)) {
             descElement = candidate;
-            console.log(`[Shoptimizer Preview] Found description element via ${selector}`);
+            console.log(`[Shoptimizer Preview] Found description element via ${selector} in main container`);
             break;
           } else {
-            console.log(`[Shoptimizer Preview] Skipping ${selector} - inside price container`);
+            console.log(`[Shoptimizer Preview] Skipping ${selector} - in unwanted section`);
           }
         }
         
         if (descElement) {
           descElement.innerHTML = data.description;
-          descElement.style.display = 'block'; // Make sure it's visible
-          console.log('[Shoptimizer Preview] Updated description');
+          descElement.style.display = 'block';
+          console.log('[Shoptimizer Preview] Updated existing description');
           break;
         }
       }
       
-      // If no description element found, create one
+      // If no description element found, create one in the main product area
       if (!descElement) {
-        // Find product info area to inject description
+        console.log('[Shoptimizer Preview] No existing description found, creating new one');
+        
+        // Find product info area within main container
         const productInfoSelectors = [
-          '.product-single',
           '.product__info',
           '.product-form',
           '.product-details',
-          'form[action*="/cart/add"]'
+          'form[action*="/cart/add"]',
+          '.product-single',
+          '[class*="product-info"]'
         ];
         
+        let targetContainer = null;
         for (const selector of productInfoSelectors) {
-          const container = document.querySelector(selector);
-          if (container) {
-            // Create description container
-            const newDesc = document.createElement('div');
-            newDesc.className = 'product-description shoptimizer-injected';
-            newDesc.innerHTML = `<div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-left: 3px solid #5C6AC4; border-radius: 4px;">
-              <strong style="display: block; margin-bottom: 8px; color: #202223;">Product Description (Preview)</strong>
-              <div style="color: #6D7175; line-height: 1.6;">${data.description}</div>
-            </div>`;
-            
-            // Insert at the top of the container
-            container.insertBefore(newDesc, container.firstChild);
-            console.log('[Shoptimizer Preview] Created description element');
-            break;
+          const containers = mainContainer.querySelectorAll(selector);
+          for (const container of containers) {
+            if (!isInUnwantedSection(container)) {
+              targetContainer = container;
+              console.log(`[Shoptimizer Preview] Found target container: ${selector}`);
+              break;
+            }
           }
+          if (targetContainer) break;
         }
+        
+        // Fallback to main container itself
+        if (!targetContainer) {
+          targetContainer = mainContainer;
+          console.log('[Shoptimizer Preview] Using main container as fallback');
+        }
+        
+        // Create description element
+        const newDesc = document.createElement('div');
+        newDesc.className = 'product-description shoptimizer-injected';
+        newDesc.innerHTML = `<div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-left: 3px solid #5C6AC4; border-radius: 4px;">
+          <strong style="display: block; margin-bottom: 8px; color: #202223;">Product Description (Preview)</strong>
+          <div style="color: #6D7175; line-height: 1.6;">${data.description}</div>
+        </div>`;
+        
+        // Insert at the top of the container
+        targetContainer.insertBefore(newDesc, targetContainer.firstChild);
+        console.log('[Shoptimizer Preview] Created description element in main product area');
       }
     } else {
-      // If control has no description, make sure any existing description is hidden
+      // If control has no description, hide any existing ones in main product area
+      const mainContainer = findMainProductContainer();
       const descSelectors = [
         '.product-single__description',
         '.product__description',
@@ -972,11 +1021,13 @@
       ];
       
       for (const selector of descSelectors) {
-        const descElement = document.querySelector(selector);
-        if (descElement) {
-          descElement.style.display = 'none';
-          console.log('[Shoptimizer Preview] Hid description (control has none)');
-          break;
+        const candidates = mainContainer.querySelectorAll(selector);
+        for (const candidate of candidates) {
+          if (!isInUnwantedSection(candidate)) {
+            candidate.style.display = 'none';
+            console.log('[Shoptimizer Preview] Hid description (control has none)');
+            return; // Only hide the first one we find
+          }
         }
       }
     }
