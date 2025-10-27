@@ -1098,14 +1098,14 @@
     console.log('[Shoptimizer Preview] Entering preview mode:', { mode, data, highlights, editable });
 
     if (mode === 'variant') {
-      applyPreviewVariant(data, highlights, editable);
+      applyIframePreviewVariant(data, highlights, editable);
     } else {
       // Control mode - restore originals or do nothing
       removePreviewHighlights();
     }
   }
 
-  function applyPreviewVariant(data, highlights, editable) {
+  function applyIframePreviewVariant(data, highlights, editable) {
     // Apply changes similar to applyVariant but with preview highlighting
     console.log('[Shoptimizer Preview] Applying variant:', data);
 
