@@ -733,10 +733,262 @@
     initShoptimizer();
   }
 
+  // ============================================
+  // Preview Mode Support (for iframe testing)
+  // ============================================
+
+  let previewMode = null;
+  let previewData = {};
+  let previewHighlights = [];
+  let previewEditable = false;
+
+  function enterPreviewMode(mode, data, highlights, editable) {
+    previewMode = mode;
+    previewData = data || {};
+    previewHighlights = highlights || [];
+    previewEditable = editable || false;
+
+    console.log('[Shoptimizer Preview] Entering preview mode:', { mode, data, highlights, editable });
+
+    if (mode === 'variant') {
+      applyPreviewVariant(data, highlights, editable);
+    } else {
+      // Control mode - restore originals or do nothing
+      removePreviewHighlights();
+    }
+  }
+
+  function applyPreviewVariant(data, highlights, editable) {
+    // Apply changes similar to applyVariant but with preview highlighting
+    console.log('[Shoptimizer Preview] Applying variant:', data);
+
+    // Apply title change
+    if (data.title) {
+      const titleSelectors = [
+        '.product-single__title',
+        '.product__title',
+        '[data-product-title]',
+        '.product-title',
+        'h1[itemprop="name"]',
+        'h1'
+      ];
+      
+      for (const selector of titleSelectors) {
+        const titleElement = document.querySelector(selector);
+        if (titleElement) {
+          // Store original if not already stored
+          if (!titleElement.dataset.originalText) {
+            titleElement.dataset.originalText = titleElement.textContent;
+          }
+          titleElement.textContent = data.title;
+          
+          if (highlights.includes('title') && editable) {
+            addPreviewHighlight(titleElement, 'title', data.title);
+          }
+          console.log(`[Shoptimizer Preview] Updated title via ${selector}`);
+          break;
+        }
+      }
+    }
+
+    // Apply description change
+    if (data.description) {
+      const descSelectors = [
+        '.product-single__description',
+        '.product__description',
+        '[data-product-description]',
+        '.product-description',
+        '[itemprop="description"]'
+      ];
+      
+      for (const selector of descSelectors) {
+        const descElement = document.querySelector(selector);
+        if (descElement) {
+          if (!descElement.dataset.originalHtml) {
+            descElement.dataset.originalHtml = descElement.innerHTML;
+          }
+          descElement.innerHTML = data.description;
+          
+          if (highlights.includes('description') && editable) {
+            addPreviewHighlight(descElement, 'description', data.description);
+          }
+          console.log(`[Shoptimizer Preview] Updated description via ${selector}`);
+          break;
+        }
+      }
+    }
+
+    // Apply price change
+    if (data.price) {
+      const priceSelectors = [
+        '.product__price',
+        '.product-single__price',
+        '[data-product-price]',
+        '.price',
+        '[itemprop="price"]'
+      ];
+      
+      const priceElements = document.querySelectorAll(priceSelectors.join(', '));
+      const formattedPrice = formatPrice(data.price);
+      
+      priceElements.forEach(el => {
+        if (!el.dataset.originalPrice) {
+          el.dataset.originalPrice = el.textContent;
+        }
+        el.textContent = formattedPrice;
+        
+        if (highlights.includes('price') && editable) {
+          addPreviewHighlight(el, 'price', data.price);
+        }
+        console.log(`[Shoptimizer Preview] Updated price to ${formattedPrice}`);
+      });
+    }
+  }
+
+  function addPreviewHighlight(element, field, value) {
+    // Add visual highlight for editable fields
+    element.style.position = 'relative';
+    element.style.cursor = 'pointer';
+    element.style.outline = '2px dashed #3b82f6';
+    element.style.outlineOffset = '4px';
+    element.dataset.shoptimizerField = field;
+    element.dataset.shoptimizerValue = value;
+
+    // Add click handler for editing
+    if (!element.dataset.shoptimizerClickAdded) {
+      element.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleFieldEdit(field, value);
+      });
+      element.dataset.shoptimizerClickAdded = 'true';
+    }
+
+    // Add tooltip
+    const tooltip = document.createElement('div');
+    tooltip.className = 'shoptimizer-preview-tooltip';
+    tooltip.textContent = `Click to edit ${field}`;
+    tooltip.style.cssText = `
+      position: absolute;
+      top: -30px;
+      left: 0;
+      background: #3b82f6;
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      white-space: nowrap;
+      z-index: 10000;
+      pointer-events: none;
+    `;
+    element.style.position = 'relative';
+    element.appendChild(tooltip);
+  }
+
+  function removePreviewHighlights() {
+    // Remove all preview highlights and restore originals
+    document.querySelectorAll('[data-shoptimizer-field]').forEach(el => {
+      el.style.outline = '';
+      el.style.outlineOffset = '';
+      el.style.cursor = '';
+      
+      // Restore originals
+      if (el.dataset.originalText) {
+        el.textContent = el.dataset.originalText;
+        delete el.dataset.originalText;
+      }
+      if (el.dataset.originalHtml) {
+        el.innerHTML = el.dataset.originalHtml;
+        delete el.dataset.originalHtml;
+      }
+      if (el.dataset.originalPrice) {
+        el.textContent = el.dataset.originalPrice;
+        delete el.dataset.originalPrice;
+      }
+      
+      // Remove tooltip
+      const tooltip = el.querySelector('.shoptimizer-preview-tooltip');
+      if (tooltip) {
+        tooltip.remove();
+      }
+      
+      delete el.dataset.shoptimizerField;
+      delete el.dataset.shoptimizerValue;
+      delete el.dataset.shoptimizerClickAdded;
+    });
+  }
+
+  function handleFieldEdit(field, currentValue) {
+    // Notify parent window that user wants to edit this field
+    sendToParent({
+      type: 'preview:edit',
+      payload: {
+        field: field,
+        value: prompt(`Edit ${field}:`, currentValue) || currentValue
+      }
+    });
+  }
+
+  function sendToParent(message) {
+    if (window.parent === window) return;
+    window.parent.postMessage(message, '*');
+  }
+
+  // Listen for preview commands from parent window
+  function initPreviewMode() {
+    // Check if we're in an iframe
+    if (window.self !== window.parent) {
+      console.log('[Shoptimizer Preview] Running in iframe, listening for preview commands');
+      
+      window.addEventListener('message', function(event) {
+        if (!event.data || !event.data.type) return;
+        
+        if (event.data.type === 'preview:apply') {
+          const { mode, variantData, highlights, editable } = event.data.payload;
+          enterPreviewMode(mode, variantData, highlights, editable);
+        }
+      });
+
+      // Notify parent that we're ready
+      sendToParent({
+        type: 'preview:ready',
+        payload: {}
+      });
+
+      // Send height updates
+      const sendHeight = () => {
+        const height = Math.max(
+          document.body.scrollHeight,
+          document.body.offsetHeight,
+          document.documentElement.clientHeight,
+          document.documentElement.scrollHeight,
+          document.documentElement.offsetHeight
+        );
+        sendToParent({
+          type: 'preview:height',
+          payload: { height }
+        });
+      };
+
+      // Send initial height
+      setTimeout(sendHeight, 1000);
+      
+      // Watch for height changes
+      if (window.ResizeObserver) {
+        const resizeObserver = new ResizeObserver(sendHeight);
+        resizeObserver.observe(document.body);
+      }
+    }
+  }
+
+  // Initialize preview mode if in iframe
+  initPreviewMode();
+
   // Expose API
   window.Shoptimizer = {
     init: initShoptimizer,
     config: SHOPTIMIZER_CONFIG,
     getSessionId: getSessionId,
+    enterPreviewMode: enterPreviewMode, // For manual preview mode activation
   };
 })();
