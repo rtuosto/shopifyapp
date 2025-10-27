@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import cors from "cors";
+import { randomUUID } from "crypto";
 import { storage } from "./storage";
 import { shopify, fetchProducts, updateProduct, getProductVariants, sessionStorage } from "./shopify";
 import { generateOptimizationRecommendations, generateBatchRecommendations } from "./ai-service";
@@ -592,6 +593,144 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error restoring recommendation:", error);
       res.status(500).json({ error: "Failed to restore recommendation" });
+    }
+  });
+
+  // Preview Sessions API
+  // Create a preview session for storefront overlay preview (protected - requires auth)
+  app.post("/api/preview/sessions", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      const { recommendationId } = req.body;
+
+      if (!recommendationId) {
+        return res.status(400).json({ error: "Missing recommendationId" });
+      }
+
+      const recommendation = await storage.getRecommendation(shop, recommendationId);
+      if (!recommendation) {
+        return res.status(404).json({ error: "Recommendation not found" });
+      }
+
+      const product = await storage.getProduct(shop, recommendation.productId);
+      if (!product) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+
+      // Generate secure, opaque token (short, URL-safe)
+      const token = randomUUID().replace(/-/g, '').substring(0, 16);
+
+      // Create preview session (expires in 15 minutes)
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+
+      // Build control data from product
+      const controlData: Record<string, any> = {
+        title: product.title,
+        price: product.price,
+      };
+      if (product.description) {
+        controlData.description = product.description;
+      }
+
+      const session = await storage.createPreviewSession(shop, {
+        token,
+        productId: product.id,
+        recommendationId: recommendation.id,
+        controlData,
+        variantData: recommendation.proposedChanges,
+        changes: recommendation.proposedChanges, // What changed (for UI display)
+        insights: recommendation.insights,
+        expiresAt,
+      });
+
+      // Build storefront URL with preview token
+      const shopDomain = shop;
+      const previewUrl = `https://${shopDomain}/products/${product.handle}?shoptimizer_preview=${token}`;
+
+      console.log(`[Preview] Created session ${session.id} for ${product.title} (token: ${token})`);
+      console.log(`[Preview] URL: ${previewUrl}`);
+
+      res.json({
+        sessionId: session.id,
+        token,
+        previewUrl,
+        expiresAt: session.expiresAt,
+      });
+    } catch (error) {
+      console.error("Error creating preview session:", error);
+      res.status(500).json({ error: "Failed to create preview session" });
+    }
+  });
+
+  // Get preview session data (public, CORS-enabled for SDK)
+  app.get("/api/preview/sessions/:token", storefrontCors, async (req, res) => {
+    try {
+      const { token } = req.params;
+      
+      const session = await storage.getPreviewSession(token);
+      if (!session) {
+        return res.status(404).json({ error: "Preview session not found or expired" });
+      }
+
+      // Check if expired
+      if (session.expiresAt < new Date()) {
+        return res.status(410).json({ error: "Preview session expired" });
+      }
+
+      // Check if already completed
+      if (session.completedAt) {
+        return res.status(410).json({ error: "Preview session already completed" });
+      }
+
+      // Return preview data for SDK
+      res.json({
+        token: session.token,
+        controlData: session.controlData,
+        variantData: session.variantData,
+        changes: session.changes,
+        insights: session.insights,
+        expiresAt: session.expiresAt,
+      });
+    } catch (error) {
+      console.error("Error fetching preview session:", error);
+      res.status(500).json({ error: "Failed to fetch preview session" });
+    }
+  });
+
+  // Complete preview session (approve or dismiss) - public, CORS-enabled for SDK
+  app.post("/api/preview/sessions/:token/complete", storefrontCors, async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { approved } = req.body;
+
+      if (approved !== "yes" && approved !== "no") {
+        return res.status(400).json({ error: "Invalid approved value (must be 'yes' or 'no')" });
+      }
+
+      const session = await storage.getPreviewSession(token);
+      if (!session) {
+        return res.status(404).json({ error: "Preview session not found" });
+      }
+
+      // Check if already completed
+      if (session.completedAt) {
+        return res.status(400).json({ error: "Preview session already completed" });
+      }
+
+      // Mark as completed
+      const updated = await storage.completePreviewSession(token, approved);
+      
+      console.log(`[Preview] Session ${session.id} completed: ${approved}`);
+
+      res.json({
+        success: true,
+        approved: updated?.approved,
+        completedAt: updated?.completedAt,
+      });
+    } catch (error) {
+      console.error("Error completing preview session:", error);
+      res.status(500).json({ error: "Failed to complete preview session" });
     }
   });
 
