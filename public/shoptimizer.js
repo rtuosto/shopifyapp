@@ -1248,8 +1248,8 @@
     window.parent.postMessage(message, '*');
   }
 
-  // Listen for preview commands from parent window
-  function initPreviewMode() {
+  // Listen for preview commands from parent window (iframe mode - legacy)
+  function initIframePreviewMode() {
     // Check if we're in an iframe
     if (window.self !== window.parent) {
       console.log('[Shoptimizer Preview] Running in iframe, listening for preview commands');
@@ -1295,8 +1295,8 @@
     }
   }
 
-  // Initialize preview mode if in iframe
-  initPreviewMode();
+  // Initialize iframe preview mode if in iframe
+  initIframePreviewMode();
 
   // Expose API
   window.Shoptimizer = {
