@@ -288,7 +288,7 @@ export const previewSessions = pgTable("preview_sessions", {
   // Preview data
   controlData: jsonb("control_data").$type<Record<string, any>>().notNull(),
   variantData: jsonb("variant_data").$type<Record<string, any>>().notNull(),
-  changes: jsonb("changes").$type<Record<string, any>>().notNull(), // What changed (for display)
+  changes: jsonb("changes").$type<string[]>().notNull(), // Array of changed field names
   insights: jsonb("insights").$type<Array<{
     type: "psychology" | "competitor" | "seo" | "data";
     title: string;

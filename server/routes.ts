@@ -639,7 +639,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recommendationId: recommendation.id,
         controlData,
         variantData: recommendation.proposedChanges,
-        changes: recommendation.proposedChanges, // What changed (for UI display)
+        changes: Object.keys(recommendation.proposedChanges), // Array of changed field names
         insights: recommendation.insights,
         expiresAt,
       });
