@@ -6,6 +6,7 @@ import { startSync, completeSyncSuccess, completeSyncError } from "./sync-status
 
 interface ShopifyProduct {
   id: string;
+  handle: string;
   title: string;
   description: string | null;
   priceRangeV2: {
@@ -83,6 +84,7 @@ export async function syncProductsFromShopify(session: Session): Promise<number>
       
       const productData: InsertProduct = {
         shopifyProductId: shopifyProduct.id,
+        handle: shopifyProduct.handle,
         title: shopifyProduct.title,
         description: shopifyProduct.description || null,
         price: shopifyProduct.priceRangeV2.minVariantPrice.amount,

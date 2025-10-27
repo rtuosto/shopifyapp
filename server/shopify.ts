@@ -38,6 +38,7 @@ export async function fetchProducts(session: Session) {
             edges {
               node {
                 id
+                handle
                 title
                 description
                 priceRangeV2 {

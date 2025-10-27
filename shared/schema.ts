@@ -27,6 +27,7 @@ export const products = pgTable("products", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   shop: varchar("shop").notNull().default("default-shop"), // Shopify store identifier
   shopifyProductId: text("shopify_product_id").notNull(),
+  handle: text("handle").notNull(), // URL-friendly product identifier (e.g., "blue-snowboard")
   title: text("title").notNull(),
   description: text("description"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
