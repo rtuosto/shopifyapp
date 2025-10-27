@@ -860,13 +860,21 @@
       console.log('[Shoptimizer Preview] Updated price');
     }
 
-    // Apply description - try to find and update, or create if needed
+    // Apply description - handle both adding and removing
+    // First, remove any previously injected description
+    const injectedDesc = document.querySelector('.shoptimizer-injected');
+    if (injectedDesc) {
+      injectedDesc.remove();
+      console.log('[Shoptimizer Preview] Removed injected description');
+    }
+    
+    // If variant has a description, apply it
     if (data.description) {
       const descSelectors = [
         '.product-single__description',
         '.product__description',
         '[data-product-description]',
-        '.product-description',
+        '.product-description:not(.shoptimizer-injected)',
         '[itemprop="description"]',
         '.rte' // Common Shopify theme class for rich text
       ];
@@ -882,7 +890,7 @@
         }
       }
       
-      // If no description element found, try to create one
+      // If no description element found, create one
       if (!descElement) {
         // Find product info area to inject description
         const productInfoSelectors = [
@@ -909,6 +917,25 @@
             console.log('[Shoptimizer Preview] Created description element');
             break;
           }
+        }
+      }
+    } else {
+      // If control has no description, make sure any existing description is hidden
+      const descSelectors = [
+        '.product-single__description',
+        '.product__description',
+        '[data-product-description]',
+        '.product-description:not(.shoptimizer-injected)',
+        '[itemprop="description"]',
+        '.rte'
+      ];
+      
+      for (const selector of descSelectors) {
+        const descElement = document.querySelector(selector);
+        if (descElement) {
+          descElement.style.display = 'none';
+          console.log('[Shoptimizer Preview] Hid description (control has none)');
+          break;
         }
       }
     }
