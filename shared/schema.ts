@@ -276,3 +276,38 @@ export const insertTestEvolutionSnapshotSchema = createInsertSchema(testEvolutio
 
 export type InsertTestEvolutionSnapshot = z.infer<typeof insertTestEvolutionSnapshotSchema>;
 export type TestEvolutionSnapshot = typeof testEvolutionSnapshots.$inferSelect;
+
+// Preview Sessions table - Stores temporary preview sessions for storefront overlay preview (multi-tenant)
+export const previewSessions = pgTable("preview_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  token: varchar("token").notNull().unique(), // Opaque token for URL (short, single-use)
+  shop: varchar("shop").notNull().default("default-shop"), // Shopify store identifier
+  productId: varchar("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  recommendationId: varchar("recommendation_id").references(() => recommendations.id, { onDelete: "set null" }),
+  
+  // Preview data
+  controlData: jsonb("control_data").$type<Record<string, any>>().notNull(),
+  variantData: jsonb("variant_data").$type<Record<string, any>>().notNull(),
+  changes: jsonb("changes").$type<Record<string, any>>().notNull(), // What changed (for display)
+  insights: jsonb("insights").$type<Array<{
+    type: "psychology" | "competitor" | "seo" | "data";
+    title: string;
+    description: string;
+  }>>().notNull(),
+  
+  // Session state
+  expiresAt: timestamp("expires_at").notNull(), // Short-lived (15 minutes)
+  completedAt: timestamp("completed_at"), // When user approved/dismissed
+  approved: text("approved"), // "yes" | "no" | null (pending)
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertPreviewSessionSchema = createInsertSchema(previewSessions).omit({
+  id: true,
+  shop: true, // Shop is automatically added by storage layer
+  createdAt: true,
+});
+
+export type InsertPreviewSession = z.infer<typeof insertPreviewSessionSchema>;
+export type PreviewSession = typeof previewSessions.$inferSelect;

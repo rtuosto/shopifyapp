@@ -17,6 +17,8 @@ import {
   type InsertTestEvolutionSnapshot,
   type Shop,
   type InsertShop,
+  type PreviewSession,
+  type InsertPreviewSession,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -72,6 +74,12 @@ export interface IStorage {
   getTestEvolutionSnapshots(testId: string): Promise<TestEvolutionSnapshot[]>;
   createTestEvolutionSnapshot(snapshot: InsertTestEvolutionSnapshot): Promise<TestEvolutionSnapshot>;
   createTestEvolutionSnapshotsBulk(snapshots: InsertTestEvolutionSnapshot[]): Promise<void>;
+
+  // Preview Sessions (storefront overlay preview)
+  getPreviewSession(token: string): Promise<PreviewSession | undefined>;
+  createPreviewSession(shop: string, session: InsertPreviewSession): Promise<PreviewSession>;
+  completePreviewSession(token: string, approved: "yes" | "no"): Promise<PreviewSession | undefined>;
+  cleanupExpiredPreviewSessions(): Promise<number>; // Returns count of deleted sessions
 }
 
 export class MemStorage implements IStorage {
@@ -82,6 +90,8 @@ export class MemStorage implements IStorage {
   private tests: Map<string, Map<string, Test>>;
   private metrics: Map<string, Map<string, Metric>>;
   private sessionAssignments: Map<string, Map<string, SessionAssignment>>;
+  // Preview sessions stored by token (globally, not shop-scoped)
+  private previewSessions: Map<string, PreviewSession>;
 
   constructor() {
     this.shops = new Map();
@@ -90,6 +100,7 @@ export class MemStorage implements IStorage {
     this.tests = new Map();
     this.metrics = new Map();
     this.sessionAssignments = new Map();
+    this.previewSessions = new Map();
   }
   
   // Helper to ensure shop namespace exists
@@ -581,6 +592,62 @@ export class MemStorage implements IStorage {
 
   async createTestEvolutionSnapshotsBulk(snapshots: InsertTestEvolutionSnapshot[]): Promise<void> {
     console.warn(`[MemStorage] ${snapshots.length} test evolution snapshots not persisted in memory - upgrade to DbStorage`);
+  }
+
+  // Preview Sessions (NOT PERSISTENT - will be lost on restart!)
+  async getPreviewSession(token: string): Promise<PreviewSession | undefined> {
+    console.warn("[MemStorage] Preview sessions not persisted in memory - upgrade to DbStorage");
+    return this.previewSessions.get(token);
+  }
+
+  async createPreviewSession(shop: string, insertSession: InsertPreviewSession): Promise<PreviewSession> {
+    console.warn("[MemStorage] Preview sessions not persisted in memory - upgrade to DbStorage");
+    const id = randomUUID();
+    const session: PreviewSession = {
+      ...insertSession,
+      id,
+      shop,
+      insights: insertSession.insights as Array<{
+        type: "psychology" | "competitor" | "seo" | "data";
+        title: string;
+        description: string;
+      }>,
+      completedAt: null,
+      approved: null,
+      createdAt: new Date(),
+    };
+    this.previewSessions.set(insertSession.token, session);
+    return session;
+  }
+
+  async completePreviewSession(token: string, approved: "yes" | "no"): Promise<PreviewSession | undefined> {
+    const session = this.previewSessions.get(token);
+    if (!session) return undefined;
+    
+    const updated: PreviewSession = {
+      ...session,
+      completedAt: new Date(),
+      approved,
+    };
+    this.previewSessions.set(token, updated);
+    return updated;
+  }
+
+  async cleanupExpiredPreviewSessions(): Promise<number> {
+    const now = new Date();
+    let deleted = 0;
+    
+    for (const [token, session] of this.previewSessions.entries()) {
+      if (session.expiresAt < now) {
+        this.previewSessions.delete(token);
+        deleted++;
+      }
+    }
+    
+    if (deleted > 0) {
+      console.log(`[MemStorage] Cleaned up ${deleted} expired preview session(s)`);
+    }
+    return deleted;
   }
 }
 
