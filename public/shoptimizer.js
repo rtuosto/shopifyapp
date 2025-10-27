@@ -806,13 +806,13 @@
     const changesDiv = document.getElementById('shoptimizer-preview-changes');
     const changeParts = [];
 
-    if (changes.title) {
+    if (changes.includes('title')) {
       changeParts.push('<strong>Title:</strong> <span>Updated</span>');
     }
-    if (changes.price) {
-      changeParts.push('<strong>Price:</strong> <span>$' + changes.price + '</span>');
+    if (changes.includes('price')) {
+      changeParts.push('<strong>Price:</strong> <span>Updated</span>');
     }
-    if (changes.description) {
+    if (changes.includes('description')) {
       changeParts.push('<strong>Description:</strong> <span>Enhanced</span>');
     }
 
