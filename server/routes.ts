@@ -625,13 +625,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       expiresAt.setMinutes(expiresAt.getMinutes() + 15);
 
       // Build control data from product
+      // Include ALL fields that are in proposedChanges, even if empty
+      // This ensures the SDK can detect when fields are being added (empty → value)
       const controlData: Record<string, any> = {
         title: product.title,
         price: product.price,
+        description: product.description || '',
       };
-      if (product.description) {
-        controlData.description = product.description;
-      }
 
       const session = await storage.createPreviewSession(shop, {
         token,
