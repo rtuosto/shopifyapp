@@ -19,6 +19,8 @@ import {
   type InsertShop,
   type PreviewSession,
   type InsertPreviewSession,
+  type ThemePositioningRules,
+  type InsertThemePositioningRules,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -80,6 +82,11 @@ export interface IStorage {
   createPreviewSession(shop: string, session: InsertPreviewSession): Promise<PreviewSession>;
   completePreviewSession(token: string, approved: "yes" | "no"): Promise<PreviewSession | undefined>;
   cleanupExpiredPreviewSessions(): Promise<number>; // Returns count of deleted sessions
+
+  // Theme Positioning Rules (theme analysis for accurate preview placement)
+  getThemePositioningRules(shop: string): Promise<ThemePositioningRules | undefined>;
+  createOrUpdateThemePositioningRules(shop: string, rules: InsertThemePositioningRules): Promise<ThemePositioningRules>;
+  deleteThemePositioningRules(shop: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {

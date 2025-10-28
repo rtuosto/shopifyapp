@@ -37,6 +37,7 @@ Shoptimizer utilizes a full-stack architecture. The frontend uses React with Sha
 - **Collection Page Variant Support**: Ensures consistent variant display on various Shopify pages using DOM manipulation and MutationObserver.
 - **Auto-Configuration**: The SDK automatically detects the backend URL for simplified installation.
 - **CORS Configuration**: Public SDK endpoints are configured with CORS headers for cross-origin requests.
+- **Theme Positioning System (Preview Enhancement)**: Implements a template clone strategy to learn theme-specific DOM positioning rules for accurate preview rendering. Creates hidden draft products with all fields populated, analyzes storefront HTML with Cheerio to extract positioning rules, and caches them per theme. SDK preview mode fetches and applies these rules for better positioning accuracy. **Current Status**: Foundation implemented (database schema, clone creation, HTML parsing, rule caching, SDK integration). **Known Limitation**: Selectors may fail on hydrated storefronts; system falls back to heuristics. **Recommended Improvements**: (1) Use sibling-relative positioning instead of absolute selectors, (2) Verify selectors post-extraction, (3) Add theme-specific automated tests.
 - **UI/UX**: Utilizes Shadcn UI components and Tailwind CSS for an embedded Shopify app experience.
 
 ## External Dependencies

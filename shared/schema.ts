@@ -311,3 +311,52 @@ export const insertPreviewSessionSchema = createInsertSchema(previewSessions).om
 
 export type InsertPreviewSession = z.infer<typeof insertPreviewSessionSchema>;
 export type PreviewSession = typeof previewSessions.$inferSelect;
+
+// Theme Positioning Rules table - Stores DOM positioning rules learned from theme analysis (multi-tenant)
+export const themePositioningRules = pgTable("theme_positioning_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shop: varchar("shop").notNull().unique(), // One rule set per shop
+  themeId: varchar("theme_id").notNull(), // Shopify theme ID (for detecting theme changes)
+  themeName: text("theme_name"), // Human-readable theme name
+  
+  // DOM positioning rules extracted from theme analysis
+  rules: jsonb("rules").$type<{
+    // CSS selectors for product containers
+    mainProductContainer: string | null; // Main product area selector
+    productInfoContainer: string | null; // Product info/details container
+    
+    // Description positioning
+    descriptionSelector: string | null; // Existing description element selector
+    descriptionInsertionPoint: {
+      method: 'appendChild' | 'insertBefore' | 'insertAfter'; // How to insert
+      targetSelector: string; // Reference element for insertion
+      className: string | null; // CSS classes to add to injected element
+    } | null;
+    
+    // Title positioning
+    titleSelector: string | null; // Product title selector
+    
+    // Price positioning
+    priceSelectors: string[] | null; // All price element selectors
+    
+    // Additional metadata
+    hasDescriptionByDefault: boolean | null; // Whether products usually have descriptions
+  }>().notNull(),
+  
+  // Clone product used for analysis
+  cloneProductId: text("clone_product_id"), // Shopify product ID of the template clone (nullable - deleted after analysis)
+  
+  // Metadata
+  analyzedAt: timestamp("analyzed_at").notNull().defaultNow(), // When theme was last analyzed
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertThemePositioningRulesSchema = createInsertSchema(themePositioningRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertThemePositioningRules = z.infer<typeof insertThemePositioningRulesSchema>;
+export type ThemePositioningRules = typeof themePositioningRules.$inferSelect;

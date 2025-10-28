@@ -463,6 +463,186 @@ export const sessionStorage = {
   },
 };
 
+/**
+ * Create a template clone product for theme analysis
+ * Creates a product with all fields populated (title, description, price, variants, images)
+ * Product is marked as draft and unlisted so it doesn't appear in the store
+ */
+export async function createTemplateCloneProduct(session: Session): Promise<{ id: string; handle: string }> {
+  const client = new shopify.clients.Graphql({ session });
+  
+  const response = await client.request(`
+    mutation createProduct($input: ProductInput!) {
+      productCreate(input: $input) {
+        product {
+          id
+          handle
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `, {
+    variables: {
+      input: {
+        title: "Shoptimizer Theme Analysis Template (DO NOT DELETE)",
+        descriptionHtml: `<div style="margin: 20px 0;">
+          <h3>Product Description</h3>
+          <p>This is a template product used by Shoptimizer to analyze your theme's layout and positioning. It contains sample content to help determine where different elements should appear on your product pages.</p>
+          <ul>
+            <li>Feature one: Premium quality materials</li>
+            <li>Feature two: Free shipping on orders over $50</li>
+            <li>Feature three: 30-day money-back guarantee</li>
+          </ul>
+          <p><strong>This product is hidden and will not appear in your store.</strong></p>
+        </div>`,
+        vendor: "Shoptimizer",
+        productType: "System Template",
+        status: "DRAFT", // Draft products are hidden from storefront
+        tags: ["shoptimizer-template", "do-not-delete"],
+        variants: [
+          {
+            price: "99.99",
+            inventoryPolicy: "DENY",
+            inventoryManagement: "SHOPIFY",
+            inventoryQuantities: {
+              availableQuantity: 0,
+              locationId: "gid://shopify/Location/1" // Default location
+            }
+          }
+        ]
+      }
+    }
+  });
+
+  if (response.data?.productCreate?.userErrors?.length > 0) {
+    console.error('[Shopify API] Clone product creation errors:', response.data.productCreate.userErrors);
+    throw new Error(`Clone product creation failed: ${JSON.stringify(response.data.productCreate.userErrors)}`);
+  }
+
+  const product = response.data?.productCreate?.product;
+  if (!product) {
+    throw new Error('Clone product creation returned no product data');
+  }
+
+  console.log(`[Shopify API] Created template clone product: ${product.id} (${product.handle})`);
+  return {
+    id: product.id,
+    handle: product.handle
+  };
+}
+
+/**
+ * Delete a clone product by ID
+ */
+export async function deleteCloneProduct(session: Session, productId: string): Promise<boolean> {
+  const client = new shopify.clients.Graphql({ session });
+  
+  const response = await client.request(`
+    mutation deleteProduct($input: ProductDeleteInput!) {
+      productDelete(input: $input) {
+        deletedProductId
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `, {
+    variables: {
+      input: {
+        id: productId
+      }
+    }
+  });
+
+  if (response.data?.productDelete?.userErrors?.length > 0) {
+    console.error('[Shopify API] Clone product deletion errors:', response.data.productDelete.userErrors);
+    return false;
+  }
+
+  console.log(`[Shopify API] Deleted clone product: ${productId}`);
+  return true;
+}
+
+/**
+ * Fetch storefront HTML for a product page
+ * This is used to analyze theme structure and DOM positioning
+ */
+export async function fetchProductPageHtml(shop: string, productHandle: string): Promise<string> {
+  // Construct storefront URL
+  const storefrontUrl = `https://${shop}/products/${productHandle}`;
+  
+  console.log(`[Shopify API] Fetching storefront HTML from: ${storefrontUrl}`);
+  
+  try {
+    const response = await fetch(storefrontUrl, {
+      headers: {
+        'User-Agent': 'Shoptimizer Theme Analyzer/1.0'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const html = await response.text();
+    console.log(`[Shopify API] Fetched ${html.length} bytes of HTML`);
+    
+    return html;
+  } catch (error) {
+    console.error('[Shopify API] Error fetching storefront HTML:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch the current published theme ID and name from Shopify
+ */
+export async function fetchCurrentTheme(session: Session): Promise<{ id: string; name: string } | null> {
+  const client = new shopify.clients.Graphql({ session });
+  
+  try {
+    const response = await client.request(`
+      query {
+        themes(first: 10) {
+          edges {
+            node {
+              id
+              name
+              role
+            }
+          }
+        }
+      }
+    `);
+    
+    if (response.errors) {
+      console.error('[Shopify API] Theme fetch errors:', response.errors);
+      return null;
+    }
+    
+    const themes = response.data?.themes?.edges || [];
+    const publishedTheme = themes.find((edge: any) => edge.node.role === 'MAIN');
+    
+    if (publishedTheme) {
+      console.log(`[Shopify API] Found published theme: ${publishedTheme.node.name} (${publishedTheme.node.id})`);
+      return {
+        id: publishedTheme.node.id,
+        name: publishedTheme.node.name
+      };
+    }
+    
+    console.log('[Shopify API] No published theme found');
+    return null;
+  } catch (error) {
+    console.error('[Shopify API] Error fetching theme:', error);
+    return null;
+  }
+}
+
 // Helper function to convert database row to Session object
 function rowToSession(row: any): Session {
   const session = new Session({

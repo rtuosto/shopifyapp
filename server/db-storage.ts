@@ -11,6 +11,7 @@ import {
   testEvolutionSnapshots,
   shops,
   previewSessions,
+  themePositioningRules,
   type Product,
   type InsertProduct,
   type Recommendation,
@@ -31,6 +32,8 @@ import {
   type InsertShop,
   type PreviewSession,
   type InsertPreviewSession,
+  type ThemePositioningRules,
+  type InsertThemePositioningRules,
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -344,6 +347,40 @@ export class DbStorage implements IStorage {
       console.log(`[DbStorage] Cleaned up ${deleted} expired preview session(s)`);
     }
     return deleted;
+  }
+
+  // Theme Positioning Rules (theme analysis for accurate preview placement)
+  async getThemePositioningRules(shop: string): Promise<ThemePositioningRules | undefined> {
+    const result = await db.select().from(themePositioningRules)
+      .where(eq(themePositioningRules.shop, shop))
+      .limit(1);
+    return result[0];
+  }
+
+  async createOrUpdateThemePositioningRules(shop: string, rulesData: InsertThemePositioningRules): Promise<ThemePositioningRules> {
+    const existing = await this.getThemePositioningRules(shop);
+    
+    if (existing) {
+      // Update existing rules
+      const [result] = await db.update(themePositioningRules)
+        .set({ ...rulesData, updatedAt: new Date() })
+        .where(eq(themePositioningRules.shop, shop))
+        .returning();
+      return result;
+    } else {
+      // Create new rules
+      const [result] = await db.insert(themePositioningRules)
+        .values({ ...rulesData, shop })
+        .returning();
+      return result;
+    }
+  }
+
+  async deleteThemePositioningRules(shop: string): Promise<boolean> {
+    const result = await db.delete(themePositioningRules)
+      .where(eq(themePositioningRules.shop, shop))
+      .returning();
+    return result.length > 0;
   }
 }
 

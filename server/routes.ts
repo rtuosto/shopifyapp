@@ -734,6 +734,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Theme Analysis API - Analyzes theme structure for accurate preview positioning
+  app.post("/api/theme/analyze", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      const shopifySession = (req as any).shopifySession;
+      
+      console.log(`[Theme Analysis] Starting theme analysis for shop: ${shop}`);
+      
+      // Import required modules
+      const { createTemplateCloneProduct, deleteCloneProduct, fetchProductPageHtml, fetchCurrentTheme } = await import("./shopify");
+      const { analyzeThemeStructure } = await import("./theme-analyzer");
+      
+      // Step 1: Get current theme ID
+      console.log('[Theme Analysis] Fetching current theme info...');
+      const currentTheme = await fetchCurrentTheme(shopifySession);
+      const themeId = currentTheme?.id || "unknown-theme";
+      const themeName = currentTheme?.name || "Unknown Theme";
+      
+      // Step 2: Check if we already have rules for this theme
+      const existingRules = await storage.getThemePositioningRules(shop);
+      if (existingRules && existingRules.themeId === themeId) {
+        console.log('[Theme Analysis] Using cached rules for current theme');
+        return res.json({
+          success: true,
+          rules: existingRules,
+          cached: true
+        });
+      }
+      
+      // Step 3: Create template clone product
+      console.log('[Theme Analysis] Creating template clone product...');
+      const cloneProduct = await createTemplateCloneProduct(shopifySession);
+      
+      try {
+        // Step 4: Fetch storefront HTML (wait a moment for product to be available)
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+        console.log('[Theme Analysis] Fetching storefront HTML...');
+        const html = await fetchProductPageHtml(shop, cloneProduct.handle);
+        
+        // Step 5: Analyze theme structure
+        console.log('[Theme Analysis] Analyzing theme structure...');
+        const rules = analyzeThemeStructure(html);
+        
+        // Step 5: Store rules in database
+        console.log('[Theme Analysis] Storing positioning rules...');
+        const savedRules = await storage.createOrUpdateThemePositioningRules(shop, {
+          themeId,
+          themeName,
+          rules,
+          cloneProductId: cloneProduct.id,
+          analyzedAt: new Date(),
+        });
+        
+        console.log('[Theme Analysis] Theme analysis completed successfully');
+        
+        res.json({
+          success: true,
+          rules: savedRules,
+        });
+      } finally {
+        // Step 6: Always delete the clone product (cleanup)
+        console.log('[Theme Analysis] Deleting template clone product...');
+        await deleteCloneProduct(shopifySession, cloneProduct.id);
+      }
+    } catch (error) {
+      console.error("[Theme Analysis] Error analyzing theme:", error);
+      res.status(500).json({ 
+        error: "Failed to analyze theme structure",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // Get current theme positioning rules
+  app.get("/api/theme/rules", storefrontCors, async (req, res) => {
+    try {
+      const shop = req.query.shop as string;
+      
+      if (!shop) {
+        return res.status(400).json({ error: "Shop parameter required" });
+      }
+      
+      const rules = await storage.getThemePositioningRules(shop);
+      
+      if (!rules) {
+        return res.status(404).json({ error: "Theme positioning rules not found for this shop" });
+      }
+      
+      res.json({ rules: rules.rules });
+    } catch (error) {
+      console.error("Error fetching theme rules:", error);
+      res.status(500).json({ error: "Failed to fetch theme positioning rules" });
+    }
+  });
+
   // Tests API (protected)
   app.get("/api/tests", requireShopifySessionOrDev, async (req, res) => {
     try {
