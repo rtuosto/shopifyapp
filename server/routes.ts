@@ -1654,6 +1654,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const syncedCount = await syncProductsFromShopify(session);
       
+      // Trigger automatic theme analysis on first product sync
+      try {
+        const existingRules = await storage.getThemePositioningRules(shop);
+        
+        if (!existingRules && syncedCount > 0) {
+          console.log('[Theme Analysis] No existing rules found, triggering automatic theme analysis...');
+          
+          // Trigger analysis in background (don't wait for it)
+          analyzeThemeAndStoreRules(session, shop).then(() => {
+            console.log('[Theme Analysis] Automatic theme analysis completed successfully');
+          }).catch(error => {
+            console.error('[Theme Analysis] Automatic theme analysis failed:', error);
+          });
+        }
+      } catch (error) {
+        console.error('[Theme Analysis] Error checking for existing rules:', error);
+        // Don't fail the sync if theme analysis check fails
+      }
+      
       res.json({ 
         success: true, 
         syncedCount,
