@@ -185,13 +185,30 @@
         'h1'
       ];
       
+      let titleUpdated = false;
       for (const selector of titleSelectors) {
-        const titleElement = document.querySelector(selector);
-        if (titleElement) {
-          titleElement.textContent = data.title;
-          console.log(`[Shoptimizer] Updated title via ${selector}`);
-          break;
+        const titleElements = document.querySelectorAll(selector);
+        for (const titleElement of titleElements) {
+          // Skip hidden elements (templates, etc.)
+          const isVisible = titleElement.offsetParent !== null && 
+                           window.getComputedStyle(titleElement).display !== 'none' &&
+                           window.getComputedStyle(titleElement).visibility !== 'hidden';
+          
+          if (isVisible) {
+            const oldTitle = titleElement.textContent;
+            titleElement.textContent = data.title;
+            console.log(`[Shoptimizer] Updated title via ${selector}: "${oldTitle}" → "${data.title}"`);
+            titleUpdated = true;
+            break;
+          }
         }
+        if (titleUpdated) break;
+      }
+      
+      if (!titleUpdated) {
+        console.error('[Shoptimizer] Failed to update title - no visible title element found');
+        console.log('[Shoptimizer] Title data:', data.title);
+        console.log('[Shoptimizer] Tried selectors:', titleSelectors);
       }
     }
 
