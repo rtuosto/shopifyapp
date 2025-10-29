@@ -1424,21 +1424,38 @@
         'h1'
       ];
       
+      let titleUpdated = false;
       for (const selector of titleSelectors) {
-        const titleElement = document.querySelector(selector);
-        if (titleElement) {
-          // Store original if not already stored
-          if (!titleElement.dataset.originalText) {
-            titleElement.dataset.originalText = titleElement.textContent;
-          }
-          titleElement.textContent = data.title;
+        const titleElements = document.querySelectorAll(selector);
+        for (const titleElement of titleElements) {
+          // Skip hidden elements (templates, etc.)
+          const isVisible = titleElement.offsetParent !== null && 
+                           window.getComputedStyle(titleElement).display !== 'none' &&
+                           window.getComputedStyle(titleElement).visibility !== 'hidden';
           
-          if (highlights.includes('title') && editable) {
-            addPreviewHighlight(titleElement, 'title', data.title);
+          if (isVisible) {
+            const oldTitle = titleElement.textContent;
+            // Store original if not already stored
+            if (!titleElement.dataset.originalText) {
+              titleElement.dataset.originalText = titleElement.textContent;
+            }
+            titleElement.textContent = data.title;
+            
+            if (highlights.includes('title') && editable) {
+              addPreviewHighlight(titleElement, 'title', data.title);
+            }
+            console.log(`[Shoptimizer Preview] Updated title via ${selector}: "${oldTitle}" → "${data.title}"`);
+            titleUpdated = true;
+            break;
           }
-          console.log(`[Shoptimizer Preview] Updated title via ${selector}`);
-          break;
         }
+        if (titleUpdated) break;
+      }
+      
+      if (!titleUpdated) {
+        console.error('[Shoptimizer Preview] Failed to update title - no visible title element found');
+        console.log('[Shoptimizer Preview] Title data:', data.title);
+        console.log('[Shoptimizer Preview] Tried selectors:', titleSelectors);
       }
     }
 
