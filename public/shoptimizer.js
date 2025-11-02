@@ -941,60 +941,9 @@
   function applyPreviewVariant(data) {
     console.log('[Shoptimizer Preview] Applying variant:', data);
 
-    // Apply title
-    if (data.title) {
-      const titleSelectors = [
-        '.product-single__title',
-        '.product__title',
-        '[data-product-title]',
-        '.product-title',
-        'h1[itemprop="name"]',
-        'h1'
-      ];
-      
-      let titleUpdated = false;
-      for (const selector of titleSelectors) {
-        const titleElements = document.querySelectorAll(selector);
-        for (const titleElement of titleElements) {
-          // Skip hidden elements (templates, etc.)
-          const isVisible = titleElement.offsetParent !== null && 
-                           window.getComputedStyle(titleElement).display !== 'none' &&
-                           window.getComputedStyle(titleElement).visibility !== 'hidden';
-          
-          if (isVisible) {
-            const oldTitle = titleElement.textContent;
-            titleElement.textContent = data.title;
-            console.log(`[Shoptimizer Preview] Updated title via ${selector}: "${oldTitle}" → "${data.title}"`);
-            titleUpdated = true;
-            break;
-          }
-        }
-        if (titleUpdated) break;
-      }
-      
-      if (!titleUpdated) {
-        console.error('[Shoptimizer Preview] Failed to update title - no visible title element found');
-        console.log('[Shoptimizer Preview] Title data:', data.title);
-        console.log('[Shoptimizer Preview] Tried selectors:', titleSelectors);
-      }
-    }
-
-    // Apply price
-    if (data.price) {
-      const priceSelectors = [
-        '.product__price',
-        '.product-single__price',
-        '[data-product-price]',
-        '.price',
-        '[itemprop="price"]'
-      ];
-      
-      document.querySelectorAll(priceSelectors.join(', ')).forEach(el => {
-        const formattedPrice = formatPrice(data.price);
-        el.textContent = formattedPrice;
-      });
-      console.log('[Shoptimizer Preview] Updated price');
-    }
+    // Use shared helpers for title and price
+    updateTitle(data.title, { logPrefix: '[Shoptimizer Preview]' });
+    updatePrice(data.price, { logPrefix: '[Shoptimizer Preview]' });
 
     // Apply description - handle both adding and removing
     // First, remove any previously injected description
