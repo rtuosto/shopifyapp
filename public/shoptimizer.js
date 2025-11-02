@@ -1464,103 +1464,61 @@
     // Apply changes similar to applyVariant but with preview highlighting
     console.log('[Shoptimizer Preview] Applying variant:', data);
 
-    // Apply title change
-    if (data.title) {
-      const titleSelectors = [
-        '.product-single__title',
-        '.product__title',
-        '[data-product-title]',
-        '.product-title',
-        'h1[itemprop="name"]',
-        'h1'
-      ];
-      
-      let titleUpdated = false;
-      for (const selector of titleSelectors) {
-        const titleElements = document.querySelectorAll(selector);
-        for (const titleElement of titleElements) {
-          // Skip hidden elements (templates, etc.)
-          const isVisible = titleElement.offsetParent !== null && 
-                           window.getComputedStyle(titleElement).display !== 'none' &&
-                           window.getComputedStyle(titleElement).visibility !== 'hidden';
-          
-          if (isVisible) {
-            const oldTitle = titleElement.textContent;
-            // Store original if not already stored
-            if (!titleElement.dataset.originalText) {
-              titleElement.dataset.originalText = titleElement.textContent;
-            }
-            titleElement.textContent = data.title;
-            
-            if (highlights.includes('title') && editable) {
-              addPreviewHighlight(titleElement, 'title', data.title);
-            }
-            console.log(`[Shoptimizer Preview] Updated title via ${selector}: "${oldTitle}" → "${data.title}"`);
-            titleUpdated = true;
+    // Use shared helpers with original value storage
+    updateTitle(data.title, { logPrefix: '[Shoptimizer Preview]', storeOriginal: true });
+    updateDescription(data.description, { logPrefix: '[Shoptimizer Preview]', storeOriginal: true });
+    updatePrice(data.price, { logPrefix: '[Shoptimizer Preview]', storeOriginal: true });
+
+    // Add highlights if in editable mode
+    if (editable && highlights.length > 0) {
+      if (highlights.includes('title') && data.title) {
+        const titleSelectors = [
+          '.product-single__title',
+          '.product__title',
+          '[data-product-title]',
+          '.product-title',
+          'h1[itemprop="name"]',
+          'h1'
+        ];
+        for (const selector of titleSelectors) {
+          const titleElement = document.querySelector(selector);
+          if (titleElement && titleElement.offsetParent !== null) {
+            addPreviewHighlight(titleElement, 'title', data.title);
             break;
           }
         }
-        if (titleUpdated) break;
       }
-      
-      if (!titleUpdated) {
-        console.error('[Shoptimizer Preview] Failed to update title - no visible title element found');
-        console.log('[Shoptimizer Preview] Title data:', data.title);
-        console.log('[Shoptimizer Preview] Tried selectors:', titleSelectors);
-      }
-    }
 
-    // Apply description change
-    if (data.description) {
-      const descSelectors = [
-        '.product-single__description',
-        '.product__description',
-        '[data-product-description]',
-        '.product-description',
-        '[itemprop="description"]'
-      ];
-      
-      for (const selector of descSelectors) {
-        const descElement = document.querySelector(selector);
-        if (descElement) {
-          if (!descElement.dataset.originalHtml) {
-            descElement.dataset.originalHtml = descElement.innerHTML;
-          }
-          descElement.innerHTML = data.description;
-          
-          if (highlights.includes('description') && editable) {
+      if (highlights.includes('description') && data.description) {
+        const descSelectors = [
+          '.product-single__description',
+          '.product__description',
+          '[data-product-description]',
+          '.product-description',
+          '[itemprop="description"]'
+        ];
+        for (const selector of descSelectors) {
+          const descElement = document.querySelector(selector);
+          if (descElement) {
             addPreviewHighlight(descElement, 'description', data.description);
+            break;
           }
-          console.log(`[Shoptimizer Preview] Updated description via ${selector}`);
-          break;
         }
       }
-    }
 
-    // Apply price change
-    if (data.price) {
-      const priceSelectors = [
-        '.product__price',
-        '.product-single__price',
-        '[data-product-price]',
-        '.price',
-        '[itemprop="price"]'
-      ];
-      
-      const priceElements = document.querySelectorAll(priceSelectors.join(', '));
-      const formattedPrice = formatPrice(data.price);
-      
-      priceElements.forEach(el => {
-        if (!el.dataset.originalPrice) {
-          el.dataset.originalPrice = el.textContent;
+      if (highlights.includes('price') && data.price) {
+        const priceSelectors = [
+          '.product__price',
+          '.product-single__price',
+          '[data-product-price]',
+          '.price',
+          '[itemprop="price"]'
+        ];
+        const priceElement = document.querySelector(priceSelectors.join(', '));
+        if (priceElement) {
+          addPreviewHighlight(priceElement, 'price', data.price);
         }
-        el.textContent = formattedPrice;
-        
-        if (highlights.includes('price') && editable) {
-          addPreviewHighlight(el, 'price', data.price);
-        }
-        console.log(`[Shoptimizer Preview] Updated price to ${formattedPrice}`);
-      });
+      }
     }
   }
 
