@@ -368,28 +368,33 @@
 
     console.log(`[Shoptimizer] Applying ${variant} to product card:`, productId);
 
-    // Apply title change (scoped to card)
+    // Card-specific selectors (different from product detail pages)
+    const cardTitleSelectors = [
+      '.card__heading',
+      '.card-title',
+      '.product-card__title',
+      '.product-item__title',
+      '[data-product-title]',
+      'a.product-title',
+      'h3',
+      'h2'
+    ];
+
+    const cardPriceSelectors = [
+      '.price__regular .price-item--regular',
+      '.price-item--regular',
+      '.product-card__price',
+      '.product-item__price',
+      '[data-product-price]',
+      '.price',
+      '.money'
+    ];
+
+    // Update title (scoped to card)
     if (data.title) {
-      const titleSelectors = [
-        '.card__heading',
-        '.card-title',
-        '.product-card__title',
-        '.product-item__title',
-        '[data-product-title]',
-        'a.product-title',
-        'h3',
-        'h2'
-      ];
-      
-      for (const selector of titleSelectors) {
+      for (const selector of cardTitleSelectors) {
         const titleElement = cardElement.querySelector(selector);
-        if (titleElement) {
-          // Skip if already has this exact value (prevents unnecessary DOM updates)
-          if (titleElement.textContent === data.title) {
-            break;
-          }
-          
-          // Store original for potential rollback
+        if (titleElement && titleElement.textContent !== data.title) {
           if (!titleElement.dataset.originalTitle) {
             titleElement.dataset.originalTitle = titleElement.textContent;
           }
@@ -400,33 +405,19 @@
       }
     }
 
-    // Apply price change (scoped to card)
+    // Update price (scoped to card)
     if (data.price) {
-      const priceSelectors = [
-        '.price__regular .price-item--regular',
-        '.price-item--regular',
-        '.product-card__price',
-        '.product-item__price',
-        '[data-product-price]',
-        '.price',
-        '.money'
-      ];
-      
-      const priceElements = cardElement.querySelectorAll(priceSelectors.join(', '));
       const formattedPrice = formatPrice(data.price);
+      const priceElements = cardElement.querySelectorAll(cardPriceSelectors.join(', '));
       
       priceElements.forEach(el => {
-        // Skip if already has this exact value (prevents unnecessary DOM updates)
-        if (el.textContent === formattedPrice) {
-          return;
+        if (el.textContent !== formattedPrice) {
+          if (!el.dataset.originalPrice) {
+            el.dataset.originalPrice = el.textContent;
+          }
+          el.textContent = formattedPrice;
+          console.log(`[Shoptimizer] Updated card price to ${formattedPrice}`);
         }
-        
-        // Store original for potential rollback
-        if (!el.dataset.originalPrice) {
-          el.dataset.originalPrice = el.textContent;
-        }
-        el.textContent = formattedPrice;
-        console.log(`[Shoptimizer] Updated card price to ${formattedPrice}`);
       });
     }
 
