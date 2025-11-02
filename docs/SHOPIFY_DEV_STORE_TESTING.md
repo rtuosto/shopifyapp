@@ -40,7 +40,7 @@ Add this single line to your theme's `theme.liquid` file **before the closing `<
 - ✅ Detects your Replit backend URL (no manual config needed)
 - ✅ Detects your Shopify store domain (from Shopify's context)
 - ✅ Generates and persists session IDs
-- ✅ Fetches active tests and modifies product pages
+- ✅ Fetches active optimizations and modifies product pages
 
 ### (Optional) Manual Configuration Override
 
@@ -62,8 +62,8 @@ If you need to override the automatic detection (rare), you can add this **befor
 3. Look for logs like:
    ```
    [Shoptimizer] Session ID: abc-123-def-456
-   [Shoptimizer] Checking for active tests on product: gid://shopify/Product/123
-   [Shoptimizer] No active tests for this product
+   [Shoptimizer] Checking for active optimizations on product: gid://shopify/Product/123
+   [Shoptimizer] No active optimizations for this product
    ```
 
 **✅ Success criteria:** You see Shoptimizer logs with a UUID session ID
@@ -75,33 +75,33 @@ If you need to override the automatic detection (rare), you can add this **befor
 
 ---
 
-## Phase 2: Create and Activate A/B Test
+## Phase 2: Create and Activate A/B Optimization
 
-### Step 2.1: Create Test in Shoptimizer Admin
+### Step 2.1: Create Optimization in Shoptimizer Admin
 
 1. Log into Shoptimizer admin (embedded in Shopify Admin)
 2. Navigate to Dashboard
-3. Click "Accept & Launch Test" on any AI recommendation
-   - This creates and immediately activates the test
-   - Test will appear in "Active Tests" page
+3. Click "Accept & Launch Optimization" on any AI recommendation
+   - This creates and immediately activates the optimization
+   - Optimization will appear in "Active Optimizations" page
 
-**Alternative:** Manually create a test:
+**Alternative:** Manually create an optimization:
 1. Go to a product
 2. Generate recommendations
-3. Accept a recommendation to create the test
+3. Accept a recommendation to create the optimization
 
-### Step 2.2: Note Test Details
+### Step 2.2: Note Optimization Details
 
 Record the following for verification:
 - **Product ID**: `gid://shopify/Product/123...`
-- **Test ID**: Copy from Active Tests page
+- **Optimization ID**: Copy from Active Optimizations page
 - **Control value**: Original title/price/description
 - **Variant value**: The optimized version
 
 Example:
 ```
 Product: Blue Snowboard (gid://shopify/Product/7891011121314)
-Test: Title optimization
+Optimization: Title optimization
 Control: "Blue Snowboard"
 Variant: "Premium Blue Snowboard - Professional Grade"
 ```
@@ -116,9 +116,9 @@ Variant: "Premium Blue Snowboard - Professional Grade"
 2. Open DevTools → Console
 3. Look for logs:
    ```
-   [Shoptimizer] Active test found for this product: test-abc-123
+   [Shoptimizer] Active optimization found for this product: optimization-abc-123
    [Shoptimizer] User assigned to: variant (or control)
-   [Shoptimizer] Applying variant for test test-abc-123
+   [Shoptimizer] Applying variant for optimization optimization-abc-123
    ```
 
 **✅ Success:** You see an assignment (either "control" or "variant")
@@ -151,14 +151,14 @@ Check if the page content changed based on your assignment:
    - DevTools → Application tab → Local Storage → Your domain
    - Look for keys:
      - `shoptimizer_session_id`: Your UUID (should persist)
-     - `shoptimizer_assignments`: JSON object with your test assignments
+     - `shoptimizer_assignments`: JSON object with your optimization assignments
 
 **✅ Success:** Same variant every reload, localStorage persists UUID and assignments
 
 **❌ Troubleshooting:**
 - Different variants on reload? localStorage might be disabled
 - No content change? Check theme selectors in `shoptimizer.js` `applyVariant()`
-- Test not detected? Verify test is active in Shoptimizer admin
+- Optimization not detected? Verify optimization is active in Shoptimizer admin
 
 ---
 
@@ -172,18 +172,18 @@ Check if the page content changed based on your assignment:
 4. Inspect request payload:
    ```json
    {
-     "testId": "test-abc-123",
+     "optimizationId": "optimization-abc-123",
      "variant": "control",
      "sessionId": "your-uuid-here"
    }
    ```
 
-**✅ Success:** Impression request sent with correct test ID, variant, and session ID
+**✅ Success:** Impression request sent with correct optimization ID, variant, and session ID
 
 ### Step 4.2: Verify Metrics Update
 
-1. Go to Shoptimizer Admin → Active Tests
-2. Find your test
+1. Go to Shoptimizer Admin → Active Optimizations
+2. Find your optimization
 3. Check impressions counter incremented
 
 **Expected behavior:**
@@ -265,12 +265,12 @@ Look for output like:
 [Webhook] Found 1 matching products in database
 [Webhook] Found session ID: your-uuid-here
 [Webhook] Found 1 variant assignment(s) for session
-[Webhook] Session saw "variant" variant for test test-abc-123
-[Webhook] Attributing conversion to variant for test test-abc-123: 1x Blue Snowboard = $149.99
+[Webhook] Session saw "variant" variant for optimization optimization-abc-123
+[Webhook] Attributing conversion to variant for optimization optimization-abc-123: 1x Blue Snowboard = $149.99
 [Webhook] Control metrics - Conversions: 0, Revenue: $0.00
 [Webhook] Variant metrics - Conversions: 1, Revenue: $149.99
 [Webhook] Overall metrics - Conversions: 1, Revenue: $149.99, ARPU: $149.99
-[Webhook] Successfully attributed conversion for test test-abc-123
+[Webhook] Successfully attributed conversion for optimization optimization-abc-123
 ```
 
 **✅ Success indicators:**
@@ -294,8 +294,8 @@ Look for output like:
 
 ### Step 6.3: Verify Metrics in Shoptimizer Admin
 
-1. Go to Shoptimizer Admin → Active Tests
-2. Find your test
+1. Go to Shoptimizer Admin → Active Optimizations
+2. Find your optimization
 3. Verify metrics updated:
 
 **Example (if you were assigned to VARIANT):**
@@ -338,7 +338,7 @@ Variant:
 
 After 10+ test orders from different sessions:
 
-1. Check Active Tests page
+1. Check Active Optimizations page
 2. Verify roughly 50/50 split in impressions:
    - Control: ~45-55% of impressions
    - Variant: ~45-55% of impressions
@@ -363,38 +363,38 @@ After 10+ test orders from different sessions:
    [Webhook] No Shoptimizer session ID found in order attributes
    ```
 
-**✅ Expected:** Order completes, but not attributed to any test (graceful handling)
+**✅ Expected:** Order completes, but not attributed to any optimization (graceful handling)
 
 ### Test 8.2: Multiple Products in One Order
 
-1. Visit Product A (test active) → Assigned to control
-2. Visit Product B (test active) → Assigned to variant
+1. Visit Product A (optimization active) → Assigned to control
+2. Visit Product B (optimization active) → Assigned to variant
 3. Add both to cart
 4. Complete order
 5. Check logs:
    ```
-   [Webhook] Session saw "control" variant for test A
-   [Webhook] Session saw "variant" variant for test B
-   [Webhook] Attributing conversion to control for test A
-   [Webhook] Attributing conversion to variant for test B
+   [Webhook] Session saw "control" variant for optimization A
+   [Webhook] Session saw "variant" variant for optimization B
+   [Webhook] Attributing conversion to control for optimization A
+   [Webhook] Attributing conversion to variant for optimization B
    ```
 
 **✅ Expected:** Each product's conversion attributed to its specific variant
 
-### Test 8.3: Test Deactivation
+### Test 8.3: Optimization Deactivation
 
-1. Stop a test in Shoptimizer Admin
+1. Stop an optimization in Shoptimizer Admin
 2. Visit product page (same session)
 3. Check logs:
    ```
-   [Shoptimizer] No active tests for this product
+   [Shoptimizer] No active optimizations for this product
    ```
 
 **✅ Expected:** 
-- SDK detects no active test
+- SDK detects no active optimization
 - Content shows original values (no modifications)
 - No impression tracked
-- Future orders not attributed to stopped test
+- Future orders not attributed to stopped optimization
 
 ---
 
@@ -467,9 +467,9 @@ Use this checklist to confirm full end-to-end attribution works:
 - [ ] Order webhook receives session ID
 - [ ] Webhook looks up variant assignment for session
 - [ ] Conversion attributed to correct variant
-- [ ] Metrics update in Active Tests page
+- [ ] Metrics update in Active Optimizations page
 - [ ] Multiple sessions get different assignments (50/50 split)
-- [ ] Edge cases handled gracefully (no session, stopped test)
+- [ ] Edge cases handled gracefully (no session, stopped optimization)
 
 ---
 
@@ -483,12 +483,12 @@ Once all tests pass:
    - Re-register webhook for production domain
 
 2. **Monitor real traffic:**
-   - Watch Active Tests page for real user impressions
+   - Watch Active Optimizations page for real user impressions
    - Verify conversions attribute correctly
    - Check for any theme incompatibilities
 
 3. **Iterate:**
-   - Create more tests for different products
+   - Create more optimizations for different products
    - Test different optimization types (title, price, description)
    - Analyze ARPU lift for winning variants
 

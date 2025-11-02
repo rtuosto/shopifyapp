@@ -12,7 +12,7 @@ This guide explains how to deploy the Shoptimizer A/B testing SDK to a Shopify s
 
 The Shoptimizer system consists of three components:
 
-1. **Shopify Admin App** - Embedded app in Shopify Admin for creating tests
+1. **Shopify Admin App** - Embedded app in Shopify Admin for creating optimizations
 2. **Storefront JavaScript SDK** - Client-side script that runs on product pages (auto-configured)
 3. **Webhook Handler** - Backend endpoint that receives order events for conversion attribution
 
@@ -45,7 +45,7 @@ Add **one line** to your theme's `theme.liquid` file before the closing `</head>
 - ✅ Detects your Replit backend URL from environment
 - ✅ Detects your Shopify store domain from Shopify context
 - ✅ Generates persistent UUID session IDs (90-day expiry)
-- ✅ Fetches active tests and modifies product pages
+- ✅ Fetches active optimizations and modifies product pages
 - ✅ Tracks impressions and injects session IDs into cart
 
 ### (Optional) Manual Configuration Override
@@ -91,7 +91,7 @@ Visit any product page and check browser console (F12). You should see:
 ```
 [SDK] Serving auto-configured SDK with API URL: https://your-app.replit.app
 [Shoptimizer] Session ID: abc-123-def-456
-[Shoptimizer] Checking for active tests on product: gid://shopify/Product/123456
+[Shoptimizer] Checking for active optimizations on product: gid://shopify/Product/123456
 ```
 
 The `[SDK]` log confirms the backend auto-configured the SDK with the correct URL.
@@ -170,7 +170,7 @@ This adds the `session_assignments` table required for persistent variant tracki
 3. Look for Shoptimizer logs:
    ```
    [Shoptimizer] Session ID: {uuid}
-   [Shoptimizer] Checking for active tests on product: gid://shopify/Product/{id}
+   [Shoptimizer] Checking for active optimizations on product: gid://shopify/Product/{id}
    ```
 
 **If you see errors:**
@@ -179,20 +179,20 @@ This adds the `session_assignments` table required for persistent variant tracki
 
 ### Test 2: Verify Variant Assignment
 
-1. Create a test in Shoptimizer Admin
-2. Activate the test
+1. Create an optimization in Shoptimizer Admin
+2. Activate the optimization
 3. Visit the product page
 4. Console should show:
    ```
-   [Shoptimizer] Active test found for this product: {testId}
+   [Shoptimizer] Active optimization found for this product: {optimizationId}
    [Shoptimizer] User assigned to: control (or variant)
-   [Shoptimizer] Applying control for test {testId}
+   [Shoptimizer] Applying control for optimization {optimizationId}
    ```
 5. Reload page → Should see SAME variant (persistent assignment)
 
 ### Test 3: Verify Content Modification
 
-If test modifies title from "Blue Snowboard" to "Premium Blue Snowboard":
+If optimization modifies title from "Blue Snowboard" to "Premium Blue Snowboard":
 
 1. Visit product page
 2. Check if title changed
@@ -226,10 +226,10 @@ If test modifies title from "Blue Snowboard" to "Premium Blue Snowboard":
 3. You should see:
    ```
    [Webhook] Found session ID: abc-123-def-456
-   [Webhook] Session saw "variant" variant for test {testId}
+   [Webhook] Session saw "variant" variant for optimization {optimizationId}
    [Webhook] Attributing conversion to variant...
    ```
-4. In Shoptimizer Admin → Active Tests
+4. In Shoptimizer Admin → Active Optimizations
 5. Metrics should update for the correct variant (control or variant)
 
 ---
@@ -238,7 +238,7 @@ If test modifies title from "Blue Snowboard" to "Premium Blue Snowboard":
 
 ### SDK Not Loading
 
-**Symptom:** No console logs, tests don't work
+**Symptom:** No console logs, optimizations don't work
 
 **Solutions:**
 1. Check API URL is correct in `ShoptimizerConfig`
@@ -302,7 +302,7 @@ Before going live with real customers:
 - [ ] Session ID appears in cart/order attributes
 - [ ] Webhook is registered and verified in Shopify Admin
 - [ ] Test order successfully attributed to correct variant
-- [ ] Active Tests page shows correct metrics after test order
+- [ ] Active Optimizations page shows correct metrics after test order
 - [ ] SSL/TLS certificate is valid (avoid mixed content warnings)
 
 ---
@@ -316,8 +316,8 @@ If your theme uses non-standard selectors or you need custom behavior:
 Edit `applyVariant()` in `public/shoptimizer.js`:
 
 ```javascript
-function applyVariant(test, variant) {
-  const data = variant === 'control' ? test.controlData : test.variantData;
+function applyVariant(optimization, variant) {
+  const data = variant === 'control' ? optimization.controlData : optimization.variantData;
   
   // Custom title selector for your theme
   if (data.title) {
