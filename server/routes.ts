@@ -5,7 +5,7 @@ import { randomUUID } from "crypto";
 import { storage } from "./storage";
 import { shopify, fetchProducts, updateProduct, getProductVariants, sessionStorage } from "./shopify";
 import { generateOptimizationRecommendations, generateBatchRecommendations } from "./ai-service";
-import { insertRecommendationSchema, insertTestSchema } from "@shared/schema";
+import { insertRecommendationSchema, insertOptimizationSchema } from "@shared/schema";
 import { requireShopifySessionOrDev } from "./middleware/shopify-auth";
 import { syncProductsFromShopify, initializeShopData } from "./sync-service";
 import { getSyncStatus, completeSyncSuccess } from "./sync-status";
@@ -220,13 +220,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Product not found" });
       }
 
-      // Get active tests to filter out conflicting test types
-      const activeTests = await storage.getActiveTestsByProduct(shop, product.id);
-      const activeTestTypes = new Set(activeTests.map(t => t.testType));
+      // Get active optimizations to filter out conflicting optimization types
+      const activeOptimizations = await storage.getActiveOptimizationsByProduct(shop, product.id);
+      const activeOptimizationTypes = new Set(activeOptimizations.map(t => t.optimizationType));
       
       console.log(`[AI] Product: ${product.title} (${product.id})`);
-      console.log(`[AI] Active tests for this product:`, activeTests.map(t => ({ id: t.id, type: t.testType, status: t.status })));
-      console.log(`[AI] Active test types:`, Array.from(activeTestTypes));
+      console.log(`[AI] Active optimizations for this product:`, activeOptimizations.map(t => ({ id: t.id, type: t.optimizationType, status: t.status })));
+      console.log(`[AI] Active optimization types:`, Array.from(activeOptimizationTypes));
 
       const aiRecommendations = await generateOptimizationRecommendations({
         title: product.title,
@@ -237,16 +237,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         imageCount: product.images?.length || 0,
       });
 
-      console.log(`[AI] Generated ${aiRecommendations.length} recommendations:`, aiRecommendations.map(r => r.testType));
+      console.log(`[AI] Generated ${aiRecommendations.length} recommendations:`, aiRecommendations.map(r => r.optimizationType));
 
-      // Filter out recommendations for test types that already have active tests
+      // Filter out recommendations for optimization types that already have active optimizations
       const availableRecommendations = aiRecommendations.filter(rec => {
-        const hasConflict = activeTestTypes.has(rec.testType);
+        const hasConflict = activeOptimizationTypes.has(rec.optimizationType);
         if (hasConflict) {
-          console.log(`[AI] FILTERING OUT ${rec.testType} recommendation - active test exists`);
+          console.log(`[AI] FILTERING OUT ${rec.optimizationType} recommendation - active optimization exists`);
           return false;
         }
-        console.log(`[AI] KEEPING ${rec.testType} recommendation - no conflict`);
+        console.log(`[AI] KEEPING ${rec.optimizationType} recommendation - no conflict`);
         return true;
       });
 
@@ -291,13 +291,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
           }
           
-          // Get active tests to filter out conflicting test types
-          const activeTests = await storage.getActiveTestsByProduct(shop, product.id);
-          const activeTestTypes = new Set(activeTests.map(t => t.testType));
+          // Get active optimizations to filter out conflicting optimization types
+          const activeOptimizations = await storage.getActiveOptimizationsByProduct(shop, product.id);
+          const activeOptimizationTypes = new Set(activeOptimizations.map(t => t.optimizationType));
           
           console.log(`[AI] Product: ${product.title} (${product.id})`);
-          console.log(`[AI] Active tests for this product:`, activeTests.map(t => ({ id: t.id, type: t.testType, status: t.status })));
-          console.log(`[AI] Active test types:`, Array.from(activeTestTypes));
+          console.log(`[AI] Active optimizations for this product:`, activeOptimizations.map(t => ({ id: t.id, type: t.optimizationType, status: t.status })));
+          console.log(`[AI] Active optimization types:`, Array.from(activeOptimizationTypes));
           
           const aiRecommendations = await generateOptimizationRecommendations({
             title: product.title,
@@ -305,16 +305,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             price: parseFloat(product.price),
           });
 
-          console.log(`[AI] Generated ${aiRecommendations.length} recommendations:`, aiRecommendations.map(r => r.testType));
+          console.log(`[AI] Generated ${aiRecommendations.length} recommendations:`, aiRecommendations.map(r => r.optimizationType));
 
-          // Filter out recommendations for test types that already have active tests
+          // Filter out recommendations for optimization types that already have active optimizations
           const availableRecommendations = aiRecommendations.filter(rec => {
-            const hasConflict = activeTestTypes.has(rec.testType);
+            const hasConflict = activeOptimizationTypes.has(rec.optimizationType);
             if (hasConflict) {
-              console.log(`[AI] FILTERING OUT ${rec.testType} recommendation for ${product.title} - active test exists`);
+              console.log(`[AI] FILTERING OUT ${rec.optimizationType} recommendation for ${product.title} - active optimization exists`);
               return false;
             }
-            console.log(`[AI] KEEPING ${rec.testType} recommendation for ${product.title} - no conflict`);
+            console.log(`[AI] KEEPING ${rec.optimizationType} recommendation for ${product.title} - no conflict`);
             return true;
           });
 
@@ -400,16 +400,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Beta: Unlimited usage - still tracking for analytics & future pricing
       
-      // Get all products and active tests
+      // Get all products and active optimizations
       const products = await storage.getProducts(shop);
       if (products.length === 0) {
         return res.status(400).json({ error: "No products found. Please sync your store first." });
       }
       
-      const activeTests = await storage.getTests(shop, 'active');
-      const activeProductIds = activeTests.map(t => t.productId).filter((id): id is string => id !== null);
+      const activeOptimizations = await storage.getOptimizations(shop, 'active');
+      const activeProductIds = activeOptimizations.map(t => t.productId).filter((id): id is string => id !== null);
       
-      console.log(`[Store Analysis] Found ${products.length} products, ${activeProductIds.length} with active tests`);
+      console.log(`[Store Analysis] Found ${products.length} products, ${activeProductIds.length} with active optimizations`);
       
       // Run intelligent product selection algorithm
       const topProducts = selectTopProducts(products, activeProductIds, 25);
@@ -454,7 +454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             productId: rec.productId,
             title: rec.title,
             description: rec.description,
-            testType: rec.testType,
+            optimizationType: rec.optimizationType,
             proposedChanges: rec.proposedChanges,
             insights: rec.insights,
           })
@@ -491,9 +491,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Product not found" });
       }
       
-      // Get active tests to filter conflicts
-      const activeTests = await storage.getActiveTestsByProduct(shop, productId);
-      const activeTestTypes = new Set(activeTests.map(t => t.testType));
+      // Get active optimizations to filter conflicts
+      const activeOptimizations = await storage.getActiveOptimizationsByProduct(shop, productId);
+      const activeOptimizationTypes = new Set(activeOptimizations.map(t => t.optimizationType));
       
       // Increment quota BEFORE AI call to prevent concurrent overspend
       await storage.incrementQuota(shop, 1);
@@ -512,14 +512,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw aiError;
       }
       
-      // Filter out conflicting test types
-      const availableRecommendations = aiRecommendations.filter(rec => !activeTestTypes.has(rec.testType));
+      // Filter out conflicting optimization types
+      const availableRecommendations = aiRecommendations.filter(rec => !activeOptimizationTypes.has(rec.optimizationType));
       
       if (availableRecommendations.length === 0) {
         // Rollback quota since we can't generate
         await storage.incrementQuota(shop, -1);
         return res.status(400).json({ 
-          error: "No recommendations available. This product may already have tests for all recommendation types." 
+          error: "No recommendations available. This product may already have optimizations for all recommendation types." 
         });
       }
       
@@ -564,11 +564,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Generate replacement if requested (beta: unlimited usage)
       if (replace) {
-        // Get product and active tests
+        // Get product and active optimizations
         const product = await storage.getProduct(shop, rec.productId);
         if (product) {
-          const activeTests = await storage.getActiveTestsByProduct(shop, rec.productId);
-          const activeTestTypes = new Set(activeTests.map(t => t.testType));
+          const activeOptimizations = await storage.getActiveOptimizationsByProduct(shop, rec.productId);
+          const activeOptimizationTypes = new Set(activeOptimizations.map(t => t.optimizationType));
           
           // Increment quota BEFORE AI call
           await storage.incrementQuota(shop, 1);
@@ -591,7 +591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Filter conflicts and already-dismissed type
           const availableRecommendations = aiRecommendations.filter(
-            r => !activeTestTypes.has(r.testType) && r.testType !== rec.testType
+            r => !activeOptimizationTypes.has(r.optimizationType) && r.optimizationType !== rec.optimizationType
           );
           
           if (availableRecommendations.length > 0) {
@@ -891,69 +891,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Tests API (protected)
-  app.get("/api/tests", requireShopifySessionOrDev, async (req, res) => {
+  // Optimizations API (protected)
+  app.get("/api/optimizations", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
       const status = req.query.status as string | undefined;
-      const tests = await storage.getTests(shop, status);
+      const optimizations = await storage.getOptimizations(shop, status);
       
       // Enrich with product data
-      const enrichedTests = await Promise.all(
-        tests.map(async (test) => {
-          const product = test.productId ? await storage.getProduct(shop, test.productId) : null;
+      const enrichedOptimizations = await Promise.all(
+        optimizations.map(async (optimization) => {
+          const product = optimization.productId ? await storage.getProduct(shop, optimization.productId) : null;
           return {
-            ...test,
+            ...optimization,
             productName: product?.title || "Unknown Product",
           };
         })
       );
       
-      res.json(enrichedTests);
+      res.json(enrichedOptimizations);
     } catch (error) {
-      console.error("Error fetching tests:", error);
-      res.status(500).json({ error: "Failed to fetch tests" });
+      console.error("Error fetching optimizations:", error);
+      res.status(500).json({ error: "Failed to fetch optimizations" });
     }
   });
 
-  // Get evolution snapshots for a test
-  app.get("/api/tests/:id/evolution", requireShopifySessionOrDev, async (req, res) => {
+  // Get evolution snapshots for an optimization
+  app.get("/api/optimizations/:id/evolution", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
-      const test = await storage.getTest(shop, req.params.id);
+      const optimization = await storage.getOptimization(shop, req.params.id);
       
-      if (!test) {
-        return res.status(404).json({ error: "Test not found" });
+      if (!optimization) {
+        return res.status(404).json({ error: "Optimization not found" });
       }
       
-      const snapshots = await storage.getTestEvolutionSnapshots(req.params.id);
+      const snapshots = await storage.getOptimizationEvolutionSnapshots(req.params.id);
       res.json(snapshots);
     } catch (error) {
-      console.error("Error fetching test evolution snapshots:", error);
+      console.error("Error fetching optimization evolution snapshots:", error);
       res.status(500).json({ error: "Failed to fetch evolution snapshots" });
     }
   });
 
-  // Get single test with Bayesian state and metrics
-  app.get("/api/tests/:id", requireShopifySessionOrDev, async (req, res) => {
+  // Get single optimization with Bayesian state and metrics
+  app.get("/api/optimizations/:id", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
-      const test = await storage.getTest(shop, req.params.id);
+      const optimization = await storage.getOptimization(shop, req.params.id);
       
-      if (!test) {
-        return res.status(404).json({ error: "Test not found" });
+      if (!optimization) {
+        return res.status(404).json({ error: "Optimization not found" });
       }
       
       // Enrich with product data
-      const product = test.productId ? await storage.getProduct(shop, test.productId) : null;
+      const product = optimization.productId ? await storage.getProduct(shop, optimization.productId) : null;
       
       // Calculate derived metrics
-      const controlConversions = test.controlConversions ?? 0;
-      const variantConversions = test.variantConversions ?? 0;
-      const controlImpressions = test.controlImpressions ?? 0;
-      const variantImpressions = test.variantImpressions ?? 0;
-      const controlRevenue = parseFloat(test.controlRevenue ?? '0');
-      const variantRevenue = parseFloat(test.variantRevenue ?? '0');
+      const controlConversions = optimization.controlConversions ?? 0;
+      const variantConversions = optimization.variantConversions ?? 0;
+      const controlImpressions = optimization.controlImpressions ?? 0;
+      const variantImpressions = optimization.variantImpressions ?? 0;
+      const controlRevenue = parseFloat(optimization.controlRevenue ?? '0');
+      const variantRevenue = parseFloat(optimization.variantRevenue ?? '0');
       
       const controlARPU = controlConversions > 0 
         ? controlRevenue / controlConversions 
@@ -966,7 +966,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : 0;
       
       res.json({
-        ...test,
+        ...optimization,
         productName: product?.title || "Unknown Product",
         metrics: {
           control: {
@@ -989,105 +989,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
           arpuLift,
         },
-        bayesianState: test.bayesianConfig || null,
+        bayesianState: optimization.bayesianConfig || null,
       });
     } catch (error) {
-      console.error("Error fetching test:", error);
-      res.status(500).json({ error: "Failed to fetch test" });
+      console.error("Error fetching optimization:", error);
+      res.status(500).json({ error: "Failed to fetch optimization" });
     }
   });
 
-  app.post("/api/tests", requireShopifySessionOrDev, async (req, res) => {
+  app.post("/api/optimizations", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
-      const validatedData = insertTestSchema.parse(req.body);
-      const test = await storage.createTest(shop, validatedData);
-      res.json(test);
+      const validatedData = insertOptimizationSchema.parse(req.body);
+      const optimization = await storage.createOptimization(shop, validatedData);
+      res.json(optimization);
     } catch (error) {
-      console.error("Error creating test:", error);
-      res.status(400).json({ error: "Invalid test data" });
+      console.error("Error creating optimization:", error);
+      res.status(400).json({ error: "Invalid optimization data" });
     }
   });
 
-  app.patch("/api/tests/:id", requireShopifySessionOrDev, async (req, res) => {
+  app.patch("/api/optimizations/:id", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
-      const updated = await storage.updateTest(shop, req.params.id, req.body);
+      const updated = await storage.updateOptimization(shop, req.params.id, req.body);
       if (!updated) {
-        return res.status(404).json({ error: "Test not found" });
+        return res.status(404).json({ error: "Optimization not found" });
       }
       res.json(updated);
     } catch (error) {
-      console.error("Error updating test:", error);
-      res.status(500).json({ error: "Failed to update test" });
+      console.error("Error updating optimization:", error);
+      res.status(500).json({ error: "Failed to update optimization" });
     }
   });
 
-  // Activate test - enable A/B testing
-  // For price tests: Deploy variant prices to Shopify
-  // For other tests: Storefront JavaScript handles display
-  app.post("/api/tests/:id/activate", requireShopifySessionOrDev, async (req, res) => {
+  // Activate optimization - enable A/B testing
+  // For price optimizations: Deploy variant prices to Shopify
+  // For other optimizations: Storefront JavaScript handles display
+  app.post("/api/optimizations/:id/activate", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
-      const testId = req.params.id;
+      const optimizationId = req.params.id;
       
-      // Get the test
-      const test = await storage.getTest(shop, testId);
-      if (!test) {
-        return res.status(404).json({ error: "Test not found" });
+      // Get the optimization
+      const optimization = await storage.getOptimization(shop, optimizationId);
+      if (!optimization) {
+        return res.status(404).json({ error: "Optimization not found" });
       }
       
-      if (test.status !== "draft") {
-        return res.status(400).json({ error: "Only draft tests can be activated" });
+      if (optimization.status !== "draft") {
+        return res.status(400).json({ error: "Only draft optimizations can be activated" });
       }
       
-      if (!test.productId) {
-        return res.status(400).json({ error: "Test has no associated product" });
+      if (!optimization.productId) {
+        return res.status(400).json({ error: "Optimization has no associated product" });
       }
       
-      // Check for conflicting active tests (same product + test type)
-      const conflictingTests = await storage.getActiveTestsByProduct(shop, test.productId, test.testType);
-      if (conflictingTests.length > 0) {
-        const testTypeLabel = test.testType === 'price' ? 'price' : 
-                             test.testType === 'title' ? 'title' : 
-                             test.testType === 'description' ? 'description' : test.testType;
+      // Check for conflicting active optimizations (same product + optimization type)
+      const conflictingOptimizations = await storage.getActiveOptimizationsByProduct(shop, optimization.productId, optimization.optimizationType);
+      if (conflictingOptimizations.length > 0) {
+        const optimizationTypeLabel = optimization.optimizationType === 'price' ? 'price' : 
+                             optimization.optimizationType === 'title' ? 'title' : 
+                             optimization.optimizationType === 'description' ? 'description' : optimization.optimizationType;
         return res.status(409).json({ 
-          error: `Cannot activate test: This product already has an active ${testTypeLabel} test. Please stop the existing test first.`,
-          conflictingTestId: conflictingTests[0].id
+          error: `Cannot activate optimization: This product already has an active ${optimizationTypeLabel} optimization. Please stop the existing optimization first.`,
+          conflictingOptimizationId: conflictingOptimizations[0].id
         });
       }
       
       // Get the product
-      const product = await storage.getProduct(shop, test.productId);
+      const product = await storage.getProduct(shop, optimization.productId);
       if (!product) {
         return res.status(404).json({ error: "Product not found" });
       }
       
-      console.log(`[Test Activation] Activating A/B test ${testId} for product ${product.title}`);
-      console.log(`[Test Activation] Test type: ${test.testType}`);
-      console.log(`[Test Activation] Control:`, test.controlData);
-      console.log(`[Test Activation] Variant:`, test.variantData);
+      console.log(`[Optimization Activation] Activating optimization ${optimizationId} for product ${product.title}`);
+      console.log(`[Optimization Activation] Optimization type: ${optimization.optimizationType}`);
+      console.log(`[Optimization Activation] Control:`, optimization.controlData);
+      console.log(`[Optimization Activation] Variant:`, optimization.variantData);
       
-      // For price tests, deploy variant prices to Shopify
-      if (test.testType === "price" && test.variantData.variantPrices) {
+      // For price optimizations, deploy variant prices to Shopify
+      if (optimization.optimizationType === "price" && optimization.variantData.variantPrices) {
         try {
           const session = await sessionStorage.getSessionByShop(shop);
           if (!session) {
             throw new Error("No Shopify session found");
           }
           
-          console.log(`[Test Activation] Deploying variant prices to Shopify...`);
+          console.log(`[Optimization Activation] Deploying variant prices to Shopify...`);
           await updateProduct(session, product.shopifyProductId, {
-            variants: test.variantData.variantPrices,
+            variants: optimization.variantData.variantPrices,
           });
-          console.log(`[Test Activation] Variant prices deployed successfully`);
+          console.log(`[Optimization Activation] Variant prices deployed successfully`);
         } catch (error) {
-          console.error("[Test Activation] Failed to deploy prices to Shopify:", error);
+          console.error("[Optimization Activation] Failed to deploy prices to Shopify:", error);
           throw new Error("Failed to deploy price changes to Shopify");
         }
       }
       
-      // Initialize Bayesian state (all tests now use Bayesian allocation)
+      // Initialize Bayesian state (all optimizations now use Bayesian allocation)
       const { initializeBayesianState } = await import('./statistics/allocation-service');
       
       // Estimate conversion rate and AOV from product price
@@ -1109,181 +1109,181 @@ export async function registerRoutes(app: Express): Promise<Server> {
         variantAllocation: "50",  // 50% variant
       };
       
-      console.log(`[Test Activation] Initialized Bayesian state with balanced allocation (50/50)`);
+      console.log(`[Optimization Activation] Initialized Bayesian state with balanced allocation (50/50)`);
       
-      // Activate the test in our database
-      const activatedTest = await storage.updateTest(shop, testId, updateData);
+      // Activate the optimization in our database
+      const activatedOptimization = await storage.updateOptimization(shop, optimizationId, updateData);
       
-      console.log(`[Test Activation] Test activated successfully`);
+      console.log(`[Optimization Activation] Optimization activated successfully`);
       
       res.json({
         success: true,
-        test: activatedTest,
-        message: "Test activated successfully",
+        optimization: activatedOptimization,
+        message: "Optimization activated successfully",
       });
     } catch (error) {
-      console.error("Error activating test:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to activate test";
+      console.error("Error activating optimization:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to activate optimization";
       res.status(500).json({ error: errorMessage });
     }
   });
   
-  // Deactivate test - stop A/B testing and rollback changes
-  // For price tests: Restore original variant prices
-  // For other tests: No Shopify changes needed
-  app.post("/api/tests/:id/deactivate", requireShopifySessionOrDev, async (req, res) => {
+  // Deactivate optimization - stop A/B testing and rollback changes
+  // For price optimizations: Restore original variant prices
+  // For other optimizations: No Shopify changes needed
+  app.post("/api/optimizations/:id/deactivate", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
-      const testId = req.params.id;
+      const optimizationId = req.params.id;
       
-      // Get the test
-      const test = await storage.getTest(shop, testId);
-      if (!test) {
-        return res.status(404).json({ error: "Test not found" });
+      // Get the optimization
+      const optimization = await storage.getOptimization(shop, optimizationId);
+      if (!optimization) {
+        return res.status(404).json({ error: "Optimization not found" });
       }
       
-      if (test.status !== "active") {
-        return res.status(400).json({ error: "Only active tests can be deactivated" });
+      if (optimization.status !== "active") {
+        return res.status(400).json({ error: "Only active optimizations can be deactivated" });
       }
       
-      if (!test.productId) {
-        return res.status(400).json({ error: "Test has no associated product" });
+      if (!optimization.productId) {
+        return res.status(400).json({ error: "Optimization has no associated product" });
       }
       
       // Get the product
-      const product = await storage.getProduct(shop, test.productId);
+      const product = await storage.getProduct(shop, optimization.productId);
       if (!product) {
         return res.status(404).json({ error: "Product not found" });
       }
       
-      console.log(`[Test Deactivation] Stopping A/B test ${testId}`);
-      console.log(`[Test Deactivation] Test type: ${test.testType}`);
+      console.log(`[Optimization Deactivation] Stopping optimization ${optimizationId}`);
+      console.log(`[Optimization Deactivation] Optimization type: ${optimization.optimizationType}`);
       
-      // For price tests, restore original variant prices
-      if (test.testType === "price" && test.controlData.variantPrices) {
+      // For price optimizations, restore original variant prices
+      if (optimization.optimizationType === "price" && optimization.controlData.variantPrices) {
         try {
           const session = await sessionStorage.getSessionByShop(shop);
           if (!session) {
             throw new Error("No Shopify session found");
           }
           
-          console.log(`[Test Deactivation] Restoring original variant prices...`);
+          console.log(`[Optimization Deactivation] Restoring original variant prices...`);
           await updateProduct(session, product.shopifyProductId, {
-            variants: test.controlData.variantPrices,
+            variants: optimization.controlData.variantPrices,
           });
-          console.log(`[Test Deactivation] Original prices restored successfully`);
+          console.log(`[Optimization Deactivation] Original prices restored successfully`);
         } catch (error) {
-          console.error("[Test Deactivation] Failed to restore prices:", error);
+          console.error("[Optimization Deactivation] Failed to restore prices:", error);
           throw new Error("Failed to restore original prices in Shopify");
         }
       }
       
-      // Mark test as completed
-      const deactivatedTest = await storage.updateTest(shop, testId, {
+      // Mark optimization as completed
+      const deactivatedOptimization = await storage.updateOptimization(shop, optimizationId, {
         status: "completed",
         endDate: new Date(),
       });
       
-      console.log(`[Test Deactivation] Test stopped successfully`);
+      console.log(`[Optimization Deactivation] Optimization stopped successfully`);
       
       res.json({
         success: true,
-        test: deactivatedTest,
-        message: "Test deactivated successfully",
+        optimization: deactivatedOptimization,
+        message: "Optimization deactivated successfully",
       });
     } catch (error) {
-      console.error("Error deactivating test:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to deactivate test";
+      console.error("Error deactivating optimization:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to deactivate optimization";
       res.status(500).json({ error: errorMessage });
     }
   });
 
-  // Pause test - temporarily stop serving variants while keeping data
-  app.post("/api/tests/:id/pause", requireShopifySessionOrDev, async (req, res) => {
+  // Pause optimization - temporarily stop serving variants while keeping data
+  app.post("/api/optimizations/:id/pause", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
-      const testId = req.params.id;
+      const optimizationId = req.params.id;
       
-      const test = await storage.getTest(shop, testId);
-      if (!test) {
-        return res.status(404).json({ error: "Test not found" });
+      const optimization = await storage.getOptimization(shop, optimizationId);
+      if (!optimization) {
+        return res.status(404).json({ error: "Optimization not found" });
       }
       
-      if (test.status !== "active") {
-        return res.status(400).json({ error: "Only active tests can be paused" });
+      if (optimization.status !== "active") {
+        return res.status(400).json({ error: "Only active optimizations can be paused" });
       }
       
-      console.log(`[Test Pause] Pausing test ${testId}`);
+      console.log(`[Optimization Pause] Pausing optimization ${optimizationId}`);
       
-      // Mark test as paused - SDK will stop serving variants but data is preserved
-      const pausedTest = await storage.updateTest(shop, testId, {
+      // Mark optimization as paused - SDK will stop serving variants but data is preserved
+      const pausedOptimization = await storage.updateOptimization(shop, optimizationId, {
         status: "paused",
       });
       
-      console.log(`[Test Pause] Test paused successfully`);
+      console.log(`[Optimization Pause] Optimization paused successfully`);
       
       res.json({
         success: true,
-        test: pausedTest,
-        message: "Test paused successfully",
+        optimization: pausedOptimization,
+        message: "Optimization paused successfully",
       });
     } catch (error) {
-      console.error("Error pausing test:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to pause test";
+      console.error("Error pausing optimization:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to pause optimization";
       res.status(500).json({ error: errorMessage });
     }
   });
   
-  // Resume test - reactivate a paused test
-  app.post("/api/tests/:id/resume", requireShopifySessionOrDev, async (req, res) => {
+  // Resume optimization - reactivate a paused optimization
+  app.post("/api/optimizations/:id/resume", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
-      const testId = req.params.id;
+      const optimizationId = req.params.id;
       
-      const test = await storage.getTest(shop, testId);
-      if (!test) {
-        return res.status(404).json({ error: "Test not found" });
+      const optimization = await storage.getOptimization(shop, optimizationId);
+      if (!optimization) {
+        return res.status(404).json({ error: "Optimization not found" });
       }
       
-      if (test.status !== "paused") {
-        return res.status(400).json({ error: "Only paused tests can be resumed" });
+      if (optimization.status !== "paused") {
+        return res.status(400).json({ error: "Only paused optimizations can be resumed" });
       }
       
-      console.log(`[Test Resume] Resuming test ${testId}`);
+      console.log(`[Optimization Resume] Resuming optimization ${optimizationId}`);
       
-      // Reactivate the test
-      const resumedTest = await storage.updateTest(shop, testId, {
+      // Reactivate the optimization
+      const resumedOptimization = await storage.updateOptimization(shop, optimizationId, {
         status: "active",
       });
       
-      console.log(`[Test Resume] Test resumed successfully`);
+      console.log(`[Optimization Resume] Optimization resumed successfully`);
       
       res.json({
         success: true,
-        test: resumedTest,
-        message: "Test resumed successfully",
+        optimization: resumedOptimization,
+        message: "Optimization resumed successfully",
       });
     } catch (error) {
-      console.error("Error resuming test:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to resume test";
+      console.error("Error resuming optimization:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to resume optimization";
       res.status(500).json({ error: errorMessage });
     }
   });
 
   // Bayesian allocation update
-  app.post("/api/tests/:id/update-allocation", requireShopifySessionOrDev, async (req, res) => {
+  app.post("/api/optimizations/:id/update-allocation", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
-      const testId = req.params.id;
+      const optimizationId = req.params.id;
       
-      const test = await storage.getTest(shop, testId);
-      if (!test) {
-        return res.status(404).json({ error: "Test not found" });
+      const optimization = await storage.getOptimization(shop, optimizationId);
+      if (!optimization) {
+        return res.status(404).json({ error: "Optimization not found" });
       }
       
-      if (test.status !== "active") {
+      if (optimization.status !== "active") {
         return res.status(400).json({ 
-          error: "Can only update allocation for active tests" 
+          error: "Can only update allocation for active optimizations" 
         });
       }
       
@@ -1291,14 +1291,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { computeAllocationUpdate, updateBayesianState } = await import('./statistics/allocation-service');
       
       // Update Bayesian state with current metrics
-      const bayesianConfig = test.bayesianConfig as BayesianState || {} as BayesianState;
+      const bayesianConfig = optimization.bayesianConfig as BayesianState || {} as BayesianState;
       const metrics = {
-        controlImpressions: test.controlImpressions || 0,
-        variantImpressions: test.variantImpressions || 0,
-        controlConversions: test.controlConversions || 0,
-        variantConversions: test.variantConversions || 0,
-        controlRevenue: parseFloat(test.controlRevenue || "0"),
-        variantRevenue: parseFloat(test.variantRevenue || "0"),
+        controlImpressions: optimization.controlImpressions || 0,
+        variantImpressions: optimization.variantImpressions || 0,
+        controlConversions: optimization.controlConversions || 0,
+        variantConversions: optimization.variantConversions || 0,
+        controlRevenue: parseFloat(optimization.controlRevenue || "0"),
+        variantRevenue: parseFloat(optimization.variantRevenue || "0"),
       };
       
       const updatedState = updateBayesianState(bayesianConfig, metrics);
@@ -1306,18 +1306,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Compute new allocation
       const result = computeAllocationUpdate(updatedState, metrics);
       
-      // Update test in database
-      const updatedTest = await storage.updateTest(shop, testId, {
+      // Update optimization in database
+      const updatedOptimization = await storage.updateOptimization(shop, optimizationId, {
         controlAllocation: (result.allocation.control * 100).toFixed(2),
         variantAllocation: (result.allocation.variant * 100).toFixed(2),
         bayesianConfig: result.bayesianState,
       });
       
-      console.log(`[Bayesian Update] Test ${testId}: Control ${(result.allocation.control * 100).toFixed(1)}% / Variant ${(result.allocation.variant * 100).toFixed(1)}%`);
+      console.log(`[Bayesian Update] Optimization ${optimizationId}: Control ${(result.allocation.control * 100).toFixed(1)}% / Variant ${(result.allocation.variant * 100).toFixed(1)}%`);
       console.log(`[Bayesian Update] ${result.reasoning}`);
       
       res.json({
-        test: updatedTest,
+        optimization: updatedOptimization,
         allocation: result.allocation,
         metrics: result.metrics,
         promotionCheck: result.promotionCheck,
@@ -1332,33 +1332,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Check promotion criteria and auto-promote if ready
-  app.post("/api/tests/:id/check-promotion", requireShopifySessionOrDev, async (req, res) => {
+  app.post("/api/optimizations/:id/check-promotion", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
-      const testId = req.params.id;
+      const optimizationId = req.params.id;
       
-      const test = await storage.getTest(shop, testId);
-      if (!test) {
-        return res.status(404).json({ error: "Test not found" });
+      const optimization = await storage.getOptimization(shop, optimizationId);
+      if (!optimization) {
+        return res.status(404).json({ error: "Optimization not found" });
       }
       
-      if (test.status !== "active") {
+      if (optimization.status !== "active") {
         return res.status(400).json({ 
-          error: "Can only check promotion for active tests" 
+          error: "Can only check promotion for active optimizations" 
         });
       }
       
       // Import allocation service
       const { computeAllocationUpdate } = await import('./statistics/allocation-service');
       
-      const bayesianConfig = test.bayesianConfig as BayesianState || {} as BayesianState;
+      const bayesianConfig = optimization.bayesianConfig as BayesianState || {} as BayesianState;
       const metrics = {
-        controlImpressions: test.controlImpressions || 0,
-        variantImpressions: test.variantImpressions || 0,
-        controlConversions: test.controlConversions || 0,
-        variantConversions: test.variantConversions || 0,
-        controlRevenue: parseFloat(test.controlRevenue || "0"),
-        variantRevenue: parseFloat(test.variantRevenue || "0"),
+        controlImpressions: optimization.controlImpressions || 0,
+        variantImpressions: optimization.variantImpressions || 0,
+        controlConversions: optimization.controlConversions || 0,
+        variantConversions: optimization.variantConversions || 0,
+        controlRevenue: parseFloat(optimization.controlRevenue || "0"),
+        variantRevenue: parseFloat(optimization.variantRevenue || "0"),
       };
       
       // Compute allocation to get promotion check
@@ -1366,7 +1366,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // If promotion criteria met, upgrade to 100% variant
       if (result.promotionCheck.shouldPromote && result.promotionCheck.winner === "variant") {
-        const updatedTest = await storage.updateTest(shop, testId, {
+        const updatedOptimization = await storage.updateOptimization(shop, optimizationId, {
           controlAllocation: "0",
           variantAllocation: "100",
           status: "completed",
@@ -1377,32 +1377,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         });
         
-        console.log(`[Auto-Promotion] Test ${testId} promoted to 100% variant`);
+        console.log(`[Auto-Promotion] Optimization ${optimizationId} promoted to 100% variant`);
         console.log(`[Auto-Promotion] Criteria: ${result.reasoning}`);
         
         return res.json({
           promoted: true,
           winner: "variant",
-          test: updatedTest,
+          optimization: updatedOptimization,
           promotionCheck: result.promotionCheck,
           reasoning: result.reasoning,
         });
       }
       
-      // If should stop due to budget exhaustion, cancel test
+      // If should stop due to budget exhaustion, cancel optimization
       if (result.shouldStop) {
-        const updatedTest = await storage.updateTest(shop, testId, {
+        const updatedOptimization = await storage.updateOptimization(shop, optimizationId, {
           status: "cancelled",
           endDate: new Date(),
           bayesianConfig: result.bayesianState,
         });
         
-        console.log(`[Auto-Stop] Test ${testId} stopped: safety budget exhausted`);
+        console.log(`[Auto-Stop] Optimization ${optimizationId} stopped: safety budget exhausted`);
         
         return res.json({
           promoted: false,
           stopped: true,
-          test: updatedTest,
+          optimization: updatedOptimization,
           promotionCheck: result.promotionCheck,
           reasoning: result.reasoning,
         });
@@ -1449,13 +1449,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Helper function to calculate incremental metrics from tests
-  function calculateIncrementalMetrics(tests: any[]) {
-    const testCount = tests.length;
+  // Helper function to calculate incremental metrics from optimizations
+  function calculateIncrementalMetrics(optimizations: any[]) {
+    const optimizationCount = optimizations.length;
     
-    if (testCount === 0) {
+    if (optimizationCount === 0) {
       return {
-        testCount: 0,
+        optimizationCount: 0,
         incrementalRPV: 0,
         incrementalRevenue: 0,
         totalRevenue: 0,
@@ -1471,13 +1471,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     let weightedRPVLiftSum = 0;
     let totalImpressions = 0;
 
-    for (const test of tests) {
-      const controlImpressions = test.controlImpressions || 0;
-      const variantImpressions = test.variantImpressions || 0;
-      const controlConversions = test.controlConversions || 0;
-      const variantConversions = test.variantConversions || 0;
-      const controlRevenue = parseFloat(test.controlRevenue || "0");
-      const variantRevenue = parseFloat(test.variantRevenue || "0");
+    for (const optimization of optimizations) {
+      const controlImpressions = optimization.controlImpressions || 0;
+      const variantImpressions = optimization.variantImpressions || 0;
+      const controlConversions = optimization.controlConversions || 0;
+      const variantConversions = optimization.variantConversions || 0;
+      const controlRevenue = parseFloat(optimization.controlRevenue || "0");
+      const variantRevenue = parseFloat(optimization.variantRevenue || "0");
 
       // Calculate RPV for each arm
       const controlRPV = controlImpressions > 0 ? controlRevenue / controlImpressions : 0;
@@ -1498,16 +1498,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Weight RPV lift by impressions for proper averaging
       const rpvLift = variantRPV - controlRPV;
-      const testImpressions = controlImpressions + variantImpressions;
-      weightedRPVLiftSum += rpvLift * testImpressions;
-      totalImpressions += testImpressions;
+      const optimizationImpressions = controlImpressions + variantImpressions;
+      weightedRPVLiftSum += rpvLift * optimizationImpressions;
+      totalImpressions += optimizationImpressions;
     }
 
     // Calculate weighted average incremental RPV
     const incrementalRPV = totalImpressions > 0 ? weightedRPVLiftSum / totalImpressions : 0;
 
     return {
-      testCount,
+      optimizationCount,
       incrementalRPV,
       incrementalRevenue: totalIncrementalRevenue,
       totalRevenue: totalVariantRevenue,
@@ -1520,25 +1520,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dashboard", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
-      const [products, recommendations, allTests, latestMetric, syncStatus] = await Promise.all([
+      const [products, recommendations, allOptimizations, latestMetric, syncStatus] = await Promise.all([
         storage.getProducts(shop),
         storage.getRecommendations(shop, "pending"),
-        storage.getTests(shop), // Get ALL tests for metrics calculation
+        storage.getOptimizations(shop), // Get ALL optimizations for metrics calculation
         storage.getLatestMetric(shop),
         Promise.resolve(getSyncStatus(shop)),
       ]);
 
-      // Calculate all-time metrics (all tests regardless of status)
-      const allTimeMetrics = calculateIncrementalMetrics(allTests);
+      // Calculate all-time metrics (all optimizations regardless of status)
+      const allTimeMetrics = calculateIncrementalMetrics(allOptimizations);
 
-      // Calculate active test metrics (only active tests)
-      const activeTests = allTests.filter(t => t.status === "active");
-      const activeMetrics = calculateIncrementalMetrics(activeTests);
+      // Calculate active optimization metrics (only active optimizations)
+      const activeOptimizations = allOptimizations.filter(opt => opt.status === "active");
+      const activeMetrics = calculateIncrementalMetrics(activeOptimizations);
 
       res.json({
         totalProducts: products.length,
         pendingRecommendations: recommendations.length,
-        activeTests: activeTests.length,
+        activeOptimizations: activeOptimizations.length,
         latestMetric,
         syncStatus,
         allTimeMetrics,
@@ -1633,17 +1633,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[Webhook] Found ${sessionAssignments.length} variant assignment(s) for session`);
       
-      // Create a map of testId -> variant for quick lookup
+      // Create a map of optimizationId -> variant for quick lookup
       const assignmentMap = new Map(
-        sessionAssignments.map(a => [a.testId, a.variant])
+        sessionAssignments.map(a => [a.optimizationId, a.variant])
       );
       
-      // For each product, check if there's an active test and attribute to correct variant
+      // For each product, check if there's an active optimization and attribute to correct variant
       for (const product of orderedProducts) {
-        const activeTests = await storage.getTestsByProduct(shop, product.id);
-        const activeTest = activeTests.find(t => t.status === "active");
+        const activeOptimizations = await storage.getTestsByProduct(shop, product.id);
+        const activeOptimization = activeOptimizations.find(opt => opt.status === "active");
         
-        if (activeTest) {
+        if (activeOptimization) {
           // Find the line item for this product to get quantity and price
           const lineItem = orderData.line_items.find((item: any) => 
             `gid://shopify/Product/${item.product_id}` === product.shopifyProductId
@@ -1652,29 +1652,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (lineItem) {
             const revenue = parseFloat(lineItem.price) * lineItem.quantity;
             
-            // Look up which variant this session saw for this test
-            const variant = assignmentMap.get(activeTest.id);
+            // Look up which variant this session saw for this optimization
+            const variant = assignmentMap.get(activeOptimization.id);
             
             if (!variant) {
-              console.log(`[Webhook] No variant assignment found for test ${activeTest.id}, skipping attribution`);
-              // Session didn't see this test (maybe test was created after they visited)
+              console.log(`[Webhook] No variant assignment found for optimization ${activeOptimization.id}, skipping attribution`);
+              // Session didn't see this optimization (maybe optimization was created after they visited)
               continue;
             }
             
-            console.log(`[Webhook] Session saw "${variant}" variant for test ${activeTest.id}`);
+            console.log(`[Webhook] Session saw "${variant}" variant for optimization ${activeOptimization.id}`);
             
             // Update per-variant metrics
             const updates: any = {
-              conversions: (activeTest.conversions || 0) + lineItem.quantity,
-              revenue: (parseFloat(activeTest.revenue || "0") + revenue).toString(),
+              conversions: (activeOptimization.conversions || 0) + lineItem.quantity,
+              revenue: (parseFloat(activeOptimization.revenue || "0") + revenue).toString(),
             };
             
             if (variant === 'control') {
-              updates.controlConversions = (activeTest.controlConversions || 0) + lineItem.quantity;
-              updates.controlRevenue = (parseFloat(activeTest.controlRevenue || "0") + revenue).toString();
+              updates.controlConversions = (activeOptimization.controlConversions || 0) + lineItem.quantity;
+              updates.controlRevenue = (parseFloat(activeOptimization.controlRevenue || "0") + revenue).toString();
             } else {
-              updates.variantConversions = (activeTest.variantConversions || 0) + lineItem.quantity;
-              updates.variantRevenue = (parseFloat(activeTest.variantRevenue || "0") + revenue).toString();
+              updates.variantConversions = (activeOptimization.variantConversions || 0) + lineItem.quantity;
+              updates.variantRevenue = (parseFloat(activeOptimization.variantRevenue || "0") + revenue).toString();
             }
             
             // Calculate overall ARPU
@@ -1683,14 +1683,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const arpu = newConversions > 0 ? newRevenue / newConversions : 0;
             updates.arpu = arpu.toString();
             
-            console.log(`[Webhook] Attributing conversion to ${variant} for test ${activeTest.id}: ${lineItem.quantity}x ${product.title} = $${revenue}`);
+            console.log(`[Webhook] Attributing conversion to ${variant} for optimization ${activeOptimization.id}: ${lineItem.quantity}x ${product.title} = $${revenue}`);
             console.log(`[Webhook] Control metrics - Conversions: ${updates.controlConversions || 0}, Revenue: $${parseFloat(updates.controlRevenue || "0").toFixed(2)}`);
             console.log(`[Webhook] Variant metrics - Conversions: ${updates.variantConversions || 0}, Revenue: $${parseFloat(updates.variantRevenue || "0").toFixed(2)}`);
             console.log(`[Webhook] Overall metrics - Conversions: ${newConversions}, Revenue: $${newRevenue.toFixed(2)}, ARPU: $${arpu.toFixed(2)}`);
             
-            // Update test metrics
-            await storage.updateTest(shop, activeTest.id, updates);
-            console.log(`[Webhook] Successfully attributed conversion for test ${activeTest.id}`);
+            // Update optimization metrics
+            await storage.updateOptimization(shop, activeOptimization.id, updates);
+            console.log(`[Webhook] Successfully attributed conversion for optimization ${activeOptimization.id}`);
           }
         }
       }
@@ -1755,32 +1755,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Simulation endpoints for testing A/B test allocation and tracking
+  // Simulation endpoints for optimization allocation and tracking
   // POST /api/simulate/traffic - Simulates product impressions
   app.post("/api/simulate/traffic", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
-      const { testId, impressions = 100 } = req.body;
+      const { optimizationId, impressions = 100 } = req.body;
 
-      if (!testId) {
-        return res.status(400).json({ error: "testId is required" });
+      if (!optimizationId) {
+        return res.status(400).json({ error: "optimizationId is required" });
       }
 
-      const test = await storage.getTest(shop, testId);
-      if (!test) {
-        return res.status(404).json({ error: "Test not found" });
+      const optimization = await storage.getOptimization(shop, optimizationId);
+      if (!optimization) {
+        return res.status(404).json({ error: "Optimization not found" });
       }
 
-      if (test.status !== "active") {
-        return res.status(400).json({ error: "Test must be active to simulate traffic" });
+      if (optimization.status !== "active") {
+        return res.status(400).json({ error: "Optimization must be active to simulate traffic" });
       }
 
-      console.log(`[Simulate Traffic] START - testId: ${testId}, requested impressions: ${impressions}`);
-      console.log(`[Simulate Traffic] Test state BEFORE: impressions=${test.impressions}, control=${test.controlImpressions}, variant=${test.variantImpressions}`);
+      console.log(`[Simulate Traffic] START - optimizationId: ${optimizationId}, requested impressions: ${impressions}`);
+      console.log(`[Simulate Traffic] Optimization state BEFORE: impressions=${optimization.impressions}, control=${optimization.controlImpressions}, variant=${optimization.variantImpressions}`);
       
       // Use current allocation percentages for realistic simulation
-      const controlAllocation = parseFloat(test.controlAllocation || "50") / 100;
-      const variantAllocation = parseFloat(test.variantAllocation || "50") / 100;
+      const controlAllocation = parseFloat(optimization.controlAllocation || "50") / 100;
+      const variantAllocation = parseFloat(optimization.variantAllocation || "50") / 100;
       const totalAllocation = controlAllocation + variantAllocation;
       
       const controlImpressions = Math.floor(impressions * (controlAllocation / totalAllocation));
@@ -1791,8 +1791,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create individual impression records with unique session IDs
       const { randomUUID } = await import("crypto");
       for (let i = 0; i < controlImpressions; i++) {
-        await storage.createTestImpression({
-          testId,
+        await storage.createOptimizationImpression({
+          optimizationId,
           sessionId: randomUUID(),
           variant: "control",
         });
@@ -1800,31 +1800,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[Simulate Traffic] Created ${controlImpressions} control impression records`);
       
       for (let i = 0; i < variantImpressions; i++) {
-        await storage.createTestImpression({
-          testId,
+        await storage.createOptimizationImpression({
+          optimizationId,
           sessionId: randomUUID(),
           variant: "variant",
         });
       }
       console.log(`[Simulate Traffic] Created ${variantImpressions} variant impression records`);
 
-      // Update test with new aggregate impressions
+      // Update optimization with new aggregate impressions
       // Parse bigint fields as numbers (they come from DB as strings)
-      const newControlImpressions = (Number(test.controlImpressions) || 0) + controlImpressions;
-      const newVariantImpressions = (Number(test.variantImpressions) || 0) + variantImpressions;
-      const newImpressions = (Number(test.impressions) || 0) + impressions;
+      const newControlImpressions = (Number(optimization.controlImpressions) || 0) + controlImpressions;
+      const newVariantImpressions = (Number(optimization.variantImpressions) || 0) + variantImpressions;
+      const newImpressions = (Number(optimization.impressions) || 0) + impressions;
       
-      await storage.updateTest(shop, testId, {
+      await storage.updateOptimization(shop, optimizationId, {
         impressions: newImpressions,
         controlImpressions: newControlImpressions,
         variantImpressions: newVariantImpressions,
       });
 
-      console.log(`[Simulation] Generated ${impressions} impressions for test ${testId} (${controlImpressions} control, ${variantImpressions} variant)`);
+      console.log(`[Simulation] Generated ${impressions} impressions for optimization ${optimizationId} (${controlImpressions} control, ${variantImpressions} variant)`);
 
       res.json({
         success: true,
-        testId,
+        optimizationId,
         impressions: {
           total: impressions,
           control: controlImpressions,
@@ -1843,31 +1843,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const shop = (req as any).shop;
       const { 
-        testId, 
+        optimizationId, 
         orders = 10, 
         avgOrderValue,
         conversionRate 
       } = req.body;
 
-      if (!testId) {
-        return res.status(400).json({ error: "testId is required" });
+      if (!optimizationId) {
+        return res.status(400).json({ error: "optimizationId is required" });
       }
 
-      const test = await storage.getTest(shop, testId);
-      if (!test) {
-        return res.status(404).json({ error: "Test not found" });
+      const optimization = await storage.getOptimization(shop, optimizationId);
+      if (!optimization) {
+        return res.status(404).json({ error: "Optimization not found" });
       }
 
-      if (test.status !== "active") {
-        return res.status(400).json({ error: "Test must be active to simulate orders" });
+      if (optimization.status !== "active") {
+        return res.status(400).json({ error: "Optimization must be active to simulate orders" });
       }
 
-      if (!test.productId) {
-        return res.status(400).json({ error: "Test has no associated product" });
+      if (!optimization.productId) {
+        return res.status(400).json({ error: "Optimization has no associated product" });
       }
 
       // Get the product to use realistic pricing
-      const product = await storage.getProduct(shop, test.productId);
+      const product = await storage.getProduct(shop, optimization.productId);
       if (!product) {
         return res.status(400).json({ error: "Product not found" });
       }
@@ -1876,8 +1876,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const basePrice = avgOrderValue || parseFloat(product.price);
 
       // Use current allocation percentages for realistic simulation
-      const controlAllocation = parseFloat(test.controlAllocation || "50") / 100;
-      const variantAllocation = parseFloat(test.variantAllocation || "50") / 100;
+      const controlAllocation = parseFloat(optimization.controlAllocation || "50") / 100;
+      const variantAllocation = parseFloat(optimization.variantAllocation || "50") / 100;
       const totalAllocation = controlAllocation + variantAllocation;
       
       const controlOrders = Math.floor(orders * (controlAllocation / totalAllocation));
@@ -1894,8 +1894,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalRevenue += orderValue;
         controlRevenue += orderValue;
         
-        await storage.createTestConversion({
-          testId,
+        await storage.createOptimizationConversion({
+          optimizationId,
           sessionId: randomUUID(),
           variant: "control",
           revenue: orderValue.toFixed(2),
@@ -1907,28 +1907,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalRevenue += orderValue;
         variantRevenue += orderValue;
         
-        await storage.createTestConversion({
-          testId,
+        await storage.createOptimizationConversion({
+          optimizationId,
           sessionId: randomUUID(),
           variant: "variant",
           revenue: orderValue.toFixed(2),
         });
       }
 
-      // Update test metrics with aggregate counters
-      const newControlConversions = (test.controlConversions || 0) + controlOrders;
-      const newVariantConversions = (test.variantConversions || 0) + variantOrders;
-      const newConversions = (test.conversions || 0) + orders;
-      const newControlRevenue = parseFloat(test.controlRevenue || "0") + controlRevenue;
-      const newVariantRevenue = parseFloat(test.variantRevenue || "0") + variantRevenue;
-      const newRevenue = parseFloat(test.revenue || "0") + totalRevenue;
+      // Update optimization metrics with aggregate counters
+      const newControlConversions = (optimization.controlConversions || 0) + controlOrders;
+      const newVariantConversions = (optimization.variantConversions || 0) + variantOrders;
+      const newConversions = (optimization.conversions || 0) + orders;
+      const newControlRevenue = parseFloat(optimization.controlRevenue || "0") + controlRevenue;
+      const newVariantRevenue = parseFloat(optimization.variantRevenue || "0") + variantRevenue;
+      const newRevenue = parseFloat(optimization.revenue || "0") + totalRevenue;
       
       // Calculate ARPU for each variant
       const controlArpu = newControlConversions > 0 ? newControlRevenue / newControlConversions : 0;
       const variantArpu = newVariantConversions > 0 ? newVariantRevenue / newVariantConversions : 0;
       const arpu = newConversions > 0 ? newRevenue / newConversions : 0;
 
-      await storage.updateTest(shop, testId, {
+      await storage.updateOptimization(shop, optimizationId, {
         conversions: newConversions,
         controlConversions: newControlConversions,
         variantConversions: newVariantConversions,
@@ -1938,13 +1938,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         arpu: arpu.toString(),
       });
 
-      console.log(`[Simulation] Generated ${orders} orders for test ${testId}`);
+      console.log(`[Simulation] Generated ${orders} orders for optimization ${optimizationId}`);
       console.log(`[Simulation] Control: ${controlOrders}, Variant: ${variantOrders}`);
       console.log(`[Simulation] Revenue: $${totalRevenue.toFixed(2)}, ARPU: $${arpu.toFixed(2)}`);
 
       res.json({
         success: true,
-        testId,
+        optimizationId,
         orders: {
           total: orders,
           control: controlOrders,
@@ -1966,32 +1966,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const shop = (req as any).shop;
       const { 
-        testId, 
+        optimizationId, 
         visitors = 1000,
         controlConversionRate = 0.03, // 3% default for control
-        variantConversionRate = 0.03, // 3% default for variant (can be different to test lift)
+        variantConversionRate = 0.03, // 3% default for variant (can be different to measure lift)
         avgOrderValue
       } = req.body;
 
-      if (!testId) {
-        return res.status(400).json({ error: "testId is required" });
+      if (!optimizationId) {
+        return res.status(400).json({ error: "optimizationId is required" });
       }
 
-      const test = await storage.getTest(shop, testId);
-      if (!test) {
-        return res.status(404).json({ error: "Test not found" });
+      const optimization = await storage.getOptimization(shop, optimizationId);
+      if (!optimization) {
+        return res.status(404).json({ error: "Optimization not found" });
       }
 
-      if (test.status !== "active") {
-        return res.status(400).json({ error: "Test must be active to simulate batch" });
+      if (optimization.status !== "active") {
+        return res.status(400).json({ error: "Optimization must be active to simulate batch" });
       }
 
-      if (!test.productId) {
-        return res.status(400).json({ error: "Test has no associated product" });
+      if (!optimization.productId) {
+        return res.status(400).json({ error: "Optimization has no associated product" });
       }
 
       // Get product for pricing
-      const product = await storage.getProduct(shop, test.productId);
+      const product = await storage.getProduct(shop, optimization.productId);
       if (!product) {
         return res.status(400).json({ error: "Product not found" });
       }
@@ -2002,8 +2002,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Capture allocation BEFORE simulation
       const allocationBefore = {
-        control: parseFloat(test.controlAllocation || "50"),
-        variant: parseFloat(test.variantAllocation || "50"),
+        control: parseFloat(optimization.controlAllocation || "50"),
+        variant: parseFloat(optimization.variantAllocation || "50"),
       };
 
       // Track assignments for each visitor
@@ -2038,16 +2038,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Step 1: Assign visitor using CURRENT allocation (respects Bayesian updates)
         const assignment = await assignVisitor(storage, {
           shop,
-          testId,
+          optimizationId,
           sessionId,
-          test, // Pass test to avoid redundant lookup
+          optimization, // Pass optimization to avoid redundant lookup
         });
         
         assignments.push({ sessionId, variant: assignment.variant });
         
         // Step 2: Track impression
         impressionRecords.push({
-          testId,
+          optimizationId,
           sessionId,
           variant: assignment.variant,
         });
@@ -2071,7 +2071,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const orderValue = basePrice * variance;
           
           conversionRecords.push({
-            testId,
+            optimizationId,
             sessionId,
             variant: assignment.variant,
             revenue: orderValue.toFixed(2),
@@ -2126,29 +2126,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`[Simulator] Revenue - Control: $${controlRevenue.toFixed(2)}, Variant: $${variantRevenue.toFixed(2)}`);
 
       // Bulk insert for performance (avoid 1000+ individual database operations)
-      await storage.createTestImpressionsBulk(impressionRecords);
+      await storage.createOptimizationImpressionsBulk(impressionRecords);
       if (conversionRecords.length > 0) {
-        await storage.createTestConversionsBulk(conversionRecords);
+        await storage.createOptimizationConversionsBulk(conversionRecords);
       }
 
       const totalRevenue = controlRevenue + variantRevenue;
       const totalConversions = controlConversions + variantConversions;
 
-      // Update test metrics
+      // Update optimization metrics
       // Parse bigint fields as numbers (they come from DB as strings)
-      const newControlImpressions = (Number(test.controlImpressions) || 0) + controlImpressions;
-      const newVariantImpressions = (Number(test.variantImpressions) || 0) + variantImpressions;
-      const newControlConversions = (Number(test.controlConversions) || 0) + controlConversions;
-      const newVariantConversions = (Number(test.variantConversions) || 0) + variantConversions;
-      const newControlRevenue = parseFloat(test.controlRevenue || "0") + controlRevenue;
-      const newVariantRevenue = parseFloat(test.variantRevenue || "0") + variantRevenue;
+      const newControlImpressions = (Number(optimization.controlImpressions) || 0) + controlImpressions;
+      const newVariantImpressions = (Number(optimization.variantImpressions) || 0) + variantImpressions;
+      const newControlConversions = (Number(optimization.controlConversions) || 0) + controlConversions;
+      const newVariantConversions = (Number(optimization.variantConversions) || 0) + variantConversions;
+      const newControlRevenue = parseFloat(optimization.controlRevenue || "0") + controlRevenue;
+      const newVariantRevenue = parseFloat(optimization.variantRevenue || "0") + variantRevenue;
       
-      const newImpressions = (Number(test.impressions) || 0) + visitors;
-      const newConversions = (Number(test.conversions) || 0) + totalConversions;
-      const newRevenue = parseFloat(test.revenue || "0") + totalRevenue;
+      const newImpressions = (Number(optimization.impressions) || 0) + visitors;
+      const newConversions = (Number(optimization.conversions) || 0) + totalConversions;
+      const newRevenue = parseFloat(optimization.revenue || "0") + totalRevenue;
       const arpu = newConversions > 0 ? newRevenue / newConversions : 0;
 
-      const updatedTest = await storage.updateTest(shop, testId, {
+      const updatedOptimization = await storage.updateOptimization(shop, optimizationId, {
         impressions: newImpressions,
         conversions: newConversions,
         revenue: newRevenue.toString(),
@@ -2165,11 +2165,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let bayesianUpdate = null;
       let allocationAfter = allocationBefore;
       
-      if (updatedTest) {
+      if (updatedOptimization) {
         try {
           const { computeAllocationUpdate, updateBayesianState } = await import('./statistics/allocation-service');
           
-          const bayesianConfig = updatedTest.bayesianConfig as BayesianState || {} as BayesianState;
+          const bayesianConfig = updatedOptimization.bayesianConfig as BayesianState || {} as BayesianState;
           const metrics = {
             controlImpressions: newControlImpressions,
             variantImpressions: newVariantImpressions,
@@ -2183,7 +2183,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const result = computeAllocationUpdate(updatedState, metrics);
           
           // Update allocation in database
-          await storage.updateTest(shop, testId, {
+          await storage.updateOptimization(shop, optimizationId, {
             controlAllocation: (result.allocation.control * 100).toFixed(2),
             variantAllocation: (result.allocation.variant * 100).toFixed(2),
             bayesianConfig: result.bayesianState,
@@ -2209,7 +2209,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         success: true,
-        testId,
+        optimizationId,
         impressions: visitors,
         conversions: totalConversions,
         revenue: totalRevenue.toFixed(2),
@@ -2246,19 +2246,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const shop = (req as any).shop;
       const { 
-        testId, 
+        optimizationId, 
         visitors = '1000',
         controlConversionRate = '0.03',
         variantConversionRate = '0.03',
         avgOrderValue
       } = req.query;
 
-      if (!testId) {
-        return res.status(400).json({ error: "testId is required" });
+      if (!optimizationId) {
+        return res.status(400).json({ error: "optimizationId is required" });
       }
       
       // Convert query params to proper types and validate
-      const testIdStr = testId as string;
+      const optimizationIdStr = optimizationId as string;
       const visitorsNum = parseInt(visitors as string);
       const controlCR = parseFloat(controlConversionRate as string);
       const variantCR = parseFloat(variantConversionRate as string);
@@ -2278,21 +2278,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid avgOrderValue parameter" });
       }
 
-      const test = await storage.getTest(shop, testIdStr);
-      if (!test) {
-        return res.status(404).json({ error: "Test not found" });
+      const optimization = await storage.getOptimization(shop, optimizationIdStr);
+      if (!optimization) {
+        return res.status(404).json({ error: "Optimization not found" });
       }
 
-      if (test.status !== "active") {
-        return res.status(400).json({ error: "Test must be active to simulate batch" });
+      if (optimization.status !== "active") {
+        return res.status(400).json({ error: "Optimization must be active to simulate batch" });
       }
 
-      if (!test.productId) {
-        return res.status(400).json({ error: "Test has no associated product" });
+      if (!optimization.productId) {
+        return res.status(400).json({ error: "Optimization has no associated product" });
       }
 
       // Get product for pricing
-      const product = await storage.getProduct(shop, test.productId);
+      const product = await storage.getProduct(shop, optimization.productId);
       if (!product) {
         return res.status(400).json({ error: "Product not found" });
       }
@@ -2320,8 +2320,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { assignVisitor } = await import('./assignment-service');
 
       const allocationBefore = {
-        control: parseFloat(test.controlAllocation || "50"),
-        variant: parseFloat(test.variantAllocation || "50"),
+        control: parseFloat(optimization.controlAllocation || "50"),
+        variant: parseFloat(optimization.variantAllocation || "50"),
       };
 
       const impressionRecords = [];
@@ -2336,7 +2336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let variantRevenue = 0;
 
       sendEvent('start', {
-        testId: testIdStr,
+        optimizationId: optimizationIdStr,
         totalVisitors: visitorsNum,
         allocationBefore,
       });
@@ -2349,13 +2349,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const assignment = await assignVisitor(storage, {
           shop,
-          testId: testIdStr,
+          optimizationId: optimizationIdStr,
           sessionId,
-          test,
+          optimization,
         });
         
         impressionRecords.push({
-          testId: testIdStr,
+          optimizationId: optimizationIdStr,
           sessionId,
           variant: assignment.variant,
         });
@@ -2377,7 +2377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const orderValue = basePrice * variance;
           
           conversionRecords.push({
-            testId: testIdStr,
+            optimizationId: testIdStr,
             sessionId,
             variant: assignment.variant,
             revenue: orderValue.toFixed(2),
@@ -2401,16 +2401,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const currentVariantAlloc = totalImpressions > 0 ? (variantImpressions / totalImpressions) * 100 : 50;
 
           // Save snapshot for evolution charts
-          const cumulativeImpressions = (test.impressions || 0) + (i + 1);
-          const cumulativeControlImpressions = (test.controlImpressions || 0) + controlImpressions;
-          const cumulativeVariantImpressions = (test.variantImpressions || 0) + variantImpressions;
-          const cumulativeControlConversions = (test.controlConversions || 0) + controlConversions;
-          const cumulativeVariantConversions = (test.variantConversions || 0) + variantConversions;
-          const cumulativeControlRevenue = parseFloat(test.controlRevenue || "0") + controlRevenue;
-          const cumulativeVariantRevenue = parseFloat(test.variantRevenue || "0") + variantRevenue;
+          const cumulativeImpressions = (optimization.impressions || 0) + (i + 1);
+          const cumulativeControlImpressions = (optimization.controlImpressions || 0) + controlImpressions;
+          const cumulativeVariantImpressions = (optimization.variantImpressions || 0) + variantImpressions;
+          const cumulativeControlConversions = (optimization.controlConversions || 0) + controlConversions;
+          const cumulativeVariantConversions = (optimization.variantConversions || 0) + variantConversions;
+          const cumulativeControlRevenue = parseFloat(optimization.controlRevenue || "0") + controlRevenue;
+          const cumulativeVariantRevenue = parseFloat(optimization.variantRevenue || "0") + variantRevenue;
 
           snapshotRecords.push({
-            testId: testIdStr,
+            optimizationId: testIdStr,
             impressions: cumulativeImpressions,
             controlImpressions: cumulativeControlImpressions,
             variantImpressions: cumulativeVariantImpressions,
@@ -2469,31 +2469,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Persist to database
-      await storage.createTestImpressionsBulk(impressionRecords);
+      await storage.createOptimizationImpressionsBulk(impressionRecords);
       if (conversionRecords.length > 0) {
-        await storage.createTestConversionsBulk(conversionRecords);
+        await storage.createOptimizationConversionsBulk(conversionRecords);
       }
       if (snapshotRecords.length > 0) {
-        await storage.createTestEvolutionSnapshotsBulk(snapshotRecords);
+        await storage.createOptimizationEvolutionSnapshotsBulk(snapshotRecords);
       }
 
       const totalRevenue = controlRevenue + variantRevenue;
       const totalConversions = controlConversions + variantConversions;
 
       // Parse bigint fields as numbers (they come from DB as strings)
-      const newControlImpressions = (Number(test.controlImpressions) || 0) + controlImpressions;
-      const newVariantImpressions = (Number(test.variantImpressions) || 0) + variantImpressions;
-      const newControlConversions = (Number(test.controlConversions) || 0) + controlConversions;
-      const newVariantConversions = (Number(test.variantConversions) || 0) + variantConversions;
-      const newControlRevenue = parseFloat(test.controlRevenue || "0") + controlRevenue;
-      const newVariantRevenue = parseFloat(test.variantRevenue || "0") + variantRevenue;
+      const newControlImpressions = (Number(optimization.controlImpressions) || 0) + controlImpressions;
+      const newVariantImpressions = (Number(optimization.variantImpressions) || 0) + variantImpressions;
+      const newControlConversions = (Number(optimization.controlConversions) || 0) + controlConversions;
+      const newVariantConversions = (Number(optimization.variantConversions) || 0) + variantConversions;
+      const newControlRevenue = parseFloat(optimization.controlRevenue || "0") + controlRevenue;
+      const newVariantRevenue = parseFloat(optimization.variantRevenue || "0") + variantRevenue;
       
-      const newImpressions = (Number(test.impressions) || 0) + visitors;
-      const newConversions = (Number(test.conversions) || 0) + totalConversions;
-      const newRevenue = parseFloat(test.revenue || "0") + totalRevenue;
+      const newImpressions = (Number(optimization.impressions) || 0) + visitors;
+      const newConversions = (Number(optimization.conversions) || 0) + totalConversions;
+      const newRevenue = parseFloat(optimization.revenue || "0") + totalRevenue;
       const arpu = newConversions > 0 ? newRevenue / newConversions : 0;
 
-      const updatedTest = await storage.updateTest(shop, testIdStr, {
+      const updatedOptimization = await storage.updateOptimization(shop, testIdStr, {
         impressions: newImpressions,
         conversions: newConversions,
         revenue: newRevenue.toString(),
@@ -2510,11 +2510,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let allocationAfter = allocationBefore;
       let bayesianUpdate = null;
       
-      if (updatedTest) {
+      if (updatedOptimization) {
         try {
           const { computeAllocationUpdate, updateBayesianState } = await import('./statistics/allocation-service');
           
-          const bayesianConfig = updatedTest.bayesianConfig as BayesianState || {} as BayesianState;
+          const bayesianConfig = updatedOptimization.bayesianConfig as BayesianState || {} as BayesianState;
           const metrics = {
             controlImpressions: newControlImpressions,
             variantImpressions: newVariantImpressions,
@@ -2527,7 +2527,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const updatedState = updateBayesianState(bayesianConfig, metrics);
           const result = computeAllocationUpdate(updatedState, metrics);
           
-          await storage.updateTest(shop, testIdStr, {
+          await storage.updateOptimization(shop, testIdStr, {
             controlAllocation: (result.allocation.control * 100).toFixed(2),
             variantAllocation: (result.allocation.variant * 100).toFixed(2),
             bayesianConfig: result.bayesianState,
@@ -2550,7 +2550,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Send completion event
       sendEvent('complete', {
-        testId: testIdStr,
+        optimizationId: testIdStr,
         impressions: visitors,
         conversions: totalConversions,
         revenue: totalRevenue.toFixed(2),
@@ -2589,8 +2589,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // STOREFRONT API (PUBLIC - No Auth Required)
   // ==========================================
   
-  // Get all active tests for a shop (new unified endpoint)
-  app.get("/api/storefront/tests", async (req, res) => {
+  // Get all active optimizations for a shop (new unified endpoint)
+  app.get("/api/storefront/optimizations", async (req, res) => {
     try {
       const shop = req.query.shop as string;
       
@@ -2598,28 +2598,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Missing shop parameter" });
       }
       
-      // Get all active tests
-      const tests = await storage.getTests(shop);
-      const activeTests = tests.filter(t => t.status === "active");
+      // Get all active optimizations
+      const optimizations = await storage.getOptimizations(shop);
+      const activeOptimizations = optimizations.filter(opt => opt.status === "active");
       
       // Get products to map product IDs to Shopify IDs
       const products = await storage.getProducts(shop);
       const productMap = new Map(products.map(p => [p.id, p.shopifyProductId]));
       
-      // Format tests for storefront use
-      const formattedTests = activeTests.map(test => ({
-        id: test.id,
-        shopifyProductId: productMap.get(test.productId || ''),
-        testType: test.testType,
-        controlData: test.controlData,
-        variantData: test.variantData,
-        scope: test.scope || 'product',
+      // Format optimizations for storefront use
+      const formattedOptimizations = activeOptimizations.map(optimization => ({
+        id: optimization.id,
+        shopifyProductId: productMap.get(optimization.productId || ''),
+        optimizationType: optimization.optimizationType,
+        controlData: optimization.controlData,
+        variantData: optimization.variantData,
+        scope: optimization.scope || 'product',
       }));
       
-      res.json({ tests: formattedTests });
+      res.json({ optimizations: formattedOptimizations });
     } catch (error) {
-      console.error("Error fetching storefront tests:", error);
-      res.status(500).json({ error: "Failed to fetch tests" });
+      console.error("Error fetching storefront optimizations:", error);
+      res.status(500).json({ error: "Failed to fetch optimizations" });
     }
   });
   
@@ -2628,9 +2628,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // For simulator and future server-side assignment, use assignVisitor from assignment-service.ts
   app.post("/api/storefront/assign", async (req, res) => {
     try {
-      const { sessionId, testId, variant, shop } = req.body;
+      const { sessionId, optimizationId, variant, shop } = req.body;
       
-      if (!sessionId || !testId || !variant || !shop) {
+      if (!sessionId || !optimizationId || !variant || !shop) {
         return res.status(400).json({ error: "Missing required fields" });
       }
       
@@ -2638,10 +2638,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid variant value" });
       }
       
-      // Check if test exists and is active
-      const test = await storage.getTest(shop, testId);
-      if (!test || test.status !== "active") {
-        return res.status(404).json({ error: "Active test not found" });
+      // Check if optimization exists and is active
+      const optimization = await storage.getOptimization(shop, optimizationId);
+      if (!optimization || optimization.status !== "active") {
+        return res.status(404).json({ error: "Active optimization not found" });
       }
       
       // Record the assignment (90-day expiry)
@@ -2650,7 +2650,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       await storage.createSessionAssignment(shop, {
         sessionId,
-        testId,
+        optimizationId,
         variant,
         expiresAt,
       });
@@ -2688,9 +2688,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Track impression (product page view) with session tracking
   app.post("/api/storefront/impression", async (req, res) => {
     try {
-      const { testId, variant, sessionId, shop } = req.body;
+      const { optimizationId, variant, sessionId, shop } = req.body;
       
-      if (!testId || !variant || !shop) {
+      if (!optimizationId || !variant || !shop) {
         return res.status(400).json({ error: "Missing required fields" });
       }
       
@@ -2698,25 +2698,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid variant value" });
       }
       
-      // Get the test
-      const test = await storage.getTest(shop, testId);
-      if (!test || test.status !== "active") {
-        return res.status(404).json({ error: "Active test not found" });
+      // Get the optimization
+      const optimization = await storage.getOptimization(shop, optimizationId);
+      if (!optimization || optimization.status !== "active") {
+        return res.status(404).json({ error: "Active optimization not found" });
       }
       
       // Increment the appropriate impression counter
       // Parse bigint fields as numbers (they come from DB as strings)
       const updates: any = {
-        impressions: (Number(test.impressions) || 0) + 1,
+        impressions: (Number(optimization.impressions) || 0) + 1,
       };
       
       if (variant === "control") {
-        updates.controlImpressions = (Number(test.controlImpressions) || 0) + 1;
+        updates.controlImpressions = (Number(optimization.controlImpressions) || 0) + 1;
       } else {
-        updates.variantImpressions = (Number(test.variantImpressions) || 0) + 1;
+        updates.variantImpressions = (Number(optimization.variantImpressions) || 0) + 1;
       }
       
-      await storage.updateTest(shop, testId, updates);
+      await storage.updateOptimization(shop, optimizationId, updates);
       
       res.json({ success: true });
     } catch (error) {
@@ -2757,33 +2757,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Migration endpoint: Backfill legacy fixed tests to Bayesian
+  // Migration endpoint: Backfill legacy fixed optimizations to Bayesian
   app.post("/api/migrate/bayesian", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
       
-      // Get all tests (any status) that need migration
-      const allTests = await storage.getTests(shop);
-      const legacyTests = allTests.filter(t => t.allocationStrategy !== "bayesian");
+      // Get all optimizations (any status) that need migration
+      const allOptimizations = await storage.getOptimizations(shop);
+      const legacyOptimizations = allOptimizations.filter(opt => opt.allocationStrategy !== "bayesian");
       
-      if (legacyTests.length === 0) {
+      if (legacyOptimizations.length === 0) {
         return res.json({ 
           success: true, 
           migrated: 0, 
-          message: "No legacy tests found - all tests are already using Bayesian allocation" 
+          message: "No legacy optimizations found - all optimizations are already using Bayesian allocation" 
         });
       }
       
-      console.log(`[Migration] Found ${legacyTests.length} legacy tests to migrate`);
+      console.log(`[Migration] Found ${legacyOptimizations.length} legacy optimizations to migrate`);
       
       const { initializeBayesianState } = await import('./statistics/allocation-service');
       let migratedCount = 0;
       
-      for (const test of legacyTests) {
+      for (const optimization of legacyOptimizations) {
         // Get product for price estimation
-        const product = await storage.getProduct(shop, test.productId);
+        const product = await storage.getProduct(shop, optimization.productId);
         if (!product) {
-          console.log(`[Migration] Skipping test ${test.id} - product not found`);
+          console.log(`[Migration] Skipping optimization ${optimization.id} - product not found`);
           continue;
         }
         
@@ -2798,8 +2798,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           safetyBudget: 50,
         });
         
-        // Update test to Bayesian with proper initial allocation
-        await storage.updateTest(shop, test.id, {
+        // Update optimization to Bayesian with proper initial allocation
+        await storage.updateOptimization(shop, optimization.id, {
           allocationStrategy: "bayesian",
           bayesianConfig: bayesianState,
           controlAllocation: "75", // Cautious start
@@ -2807,16 +2807,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         migratedCount++;
-        console.log(`[Migration] Migrated test ${test.id} (${test.testType}) to Bayesian`);
+        console.log(`[Migration] Migrated optimization ${optimization.id} (${optimization.optimizationType}) to Bayesian`);
       }
       
       res.json({
         success: true,
         migrated: migratedCount,
-        message: `Successfully migrated ${migratedCount} tests to Bayesian allocation`,
+        message: `Successfully migrated ${migratedCount} optimizations to Bayesian allocation`,
       });
     } catch (error) {
-      console.error("[Migration] Error migrating tests:", error);
+      console.error("[Migration] Error migrating optimizations:", error);
       const errorMessage = error instanceof Error ? error.message : "Migration failed";
       res.status(500).json({ error: errorMessage });
     }

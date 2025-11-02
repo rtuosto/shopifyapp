@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, XCircle, Eye } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { formatTestType } from "@/lib/testTypeFormatter";
+import { formatOptimizationType } from "@/lib/optimizationTypeFormatter";
 
 interface AIRecommendationCardProps {
   id: string;
@@ -10,7 +10,7 @@ interface AIRecommendationCardProps {
   description: string;
   productName: string;
   productImage?: string;
-  testType: string;
+  optimizationType: string;
   impactScore?: number;
   onAccept?: () => void;
   onReject?: () => void;
@@ -27,7 +27,7 @@ export default function AIRecommendationCard({
   description,
   productName,
   productImage,
-  testType,
+  optimizationType,
   impactScore = 5,
   onAccept,
   onReject,
@@ -84,7 +84,7 @@ export default function AIRecommendationCard({
             <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
               <span data-testid={`text-product-name-${id}`} className="font-medium truncate">{productName}</span>
               <span>•</span>
-              <span data-testid={`text-test-type-${id}`}>{formatTestType(testType)}</span>
+              <span data-testid={`text-optimization-type-${id}`}>{formatOptimizationType(optimizationType)}</span>
             </div>
             <h3 className="text-sm font-semibold mb-1" data-testid={`text-recommendation-title-${id}`}>
               {title}
@@ -106,7 +106,7 @@ export default function AIRecommendationCard({
               size="sm"
               onClick={handlePreview}
               className="flex-1 gap-1.5"
-              data-testid={`button-preview-test-${id}`}
+              data-testid={`button-preview-optimization-${id}`}
               disabled={isProcessing}
             >
               <Eye className="w-3.5 h-3.5" />

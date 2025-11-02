@@ -63,15 +63,15 @@ export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
 
 // AI Recommendations table (multi-tenant)
-// TODO: Add data-driven confidence scores based on historical test performance
-// TODO: Add estimated impact calculations from similar past tests in this category
+// TODO: Add data-driven confidence scores based on historical optimization performance
+// TODO: Add estimated impact calculations from similar past optimizations in this category
 export const recommendations = pgTable("recommendations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   shop: varchar("shop").notNull().default("default-shop"), // Shopify store identifier
   productId: varchar("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   description: text("description").notNull(),
-  testType: text("test_type").notNull(), // "title", "price", "description", "image"
+  optimizationType: text("optimization_type").notNull(), // "title", "price", "description", "image"
   proposedChanges: jsonb("proposed_changes").$type<Record<string, any>>().notNull(),
   insights: jsonb("insights").$type<Array<{
     type: "psychology" | "competitor" | "seo" | "data";
@@ -93,19 +93,19 @@ export const insertRecommendationSchema = createInsertSchema(recommendations).om
 export type InsertRecommendation = z.infer<typeof insertRecommendationSchema>;
 export type Recommendation = typeof recommendations.$inferSelect;
 
-// A/B Tests table - Extensible for product-level, template-level, and advanced optimization (multi-tenant)
-export const tests = pgTable("tests", {
+// Optimizations table - Bayesian A/B optimizations for product-level improvements (multi-tenant)
+export const optimizations = pgTable("optimizations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   shop: varchar("shop").notNull().default("default-shop"), // Shopify store identifier
   
-  // Scope & Target (extensible for future template/page tests)
+  // Scope & Target (extensible for future template/page optimizations)
   scope: text("scope").notNull().default("product"), // "product" | "template" | "page" | "global"
-  productId: varchar("product_id").references(() => products.id, { onDelete: "cascade" }), // Nullable for template tests
+  productId: varchar("product_id").references(() => products.id, { onDelete: "cascade" }), // Nullable for template optimizations
   recommendationId: varchar("recommendation_id").references(() => recommendations.id, { onDelete: "set null" }),
-  testType: text("test_type").notNull(), // "title" | "price" | "layout" | "navigation" etc.
-  targetSelector: text("target_selector"), // CSS selector for template tests (e.g., ".product-grid")
+  optimizationType: text("optimization_type").notNull(), // "title" | "price" | "description" | etc.
+  targetSelector: text("target_selector"), // CSS selector for template optimizations (e.g., ".product-grid")
   
-  // Test Configuration
+  // Optimization Configuration
   status: text("status").notNull().default("draft"), // "draft", "active", "paused", "completed", "cancelled"
   controlData: jsonb("control_data").$type<Record<string, any>>().notNull(),
   variantData: jsonb("variant_data").$type<Record<string, any>>().notNull(),
@@ -164,15 +164,15 @@ export const tests = pgTable("tests", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertTestSchema = createInsertSchema(tests).omit({
+export const insertOptimizationSchema = createInsertSchema(optimizations).omit({
   id: true,
   shop: true, // Shop is automatically added by storage layer
   createdAt: true,
   updatedAt: true,
 });
 
-export type InsertTest = z.infer<typeof insertTestSchema>;
-export type Test = typeof tests.$inferSelect;
+export type InsertOptimization = z.infer<typeof insertOptimizationSchema>;
+export type Optimization = typeof optimizations.$inferSelect;
 
 // Analytics/Metrics table for tracking performance over time (multi-tenant)
 export const metrics = pgTable("metrics", {
@@ -183,7 +183,7 @@ export const metrics = pgTable("metrics", {
   avgOrderValue: decimal("avg_order_value", { precision: 10, scale: 2 }).notNull(),
   revenue: decimal("revenue", { precision: 10, scale: 2 }).notNull(),
   revenueLift: decimal("revenue_lift", { precision: 10, scale: 2 }).default("0"),
-  activeTests: integer("active_tests").default(0),
+  activeOptimizations: integer("active_optimizations").default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -201,7 +201,7 @@ export const sessionAssignments = pgTable("session_assignments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   shop: varchar("shop").notNull().default("default-shop"), // Shopify store identifier
   sessionId: varchar("session_id").notNull(), // UUID generated in browser, stored in localStorage
-  testId: varchar("test_id").notNull().references(() => tests.id, { onDelete: "cascade" }),
+  optimizationId: varchar("optimization_id").notNull().references(() => optimizations.id, { onDelete: "cascade" }),
   variant: text("variant").notNull(), // "control" | "variant"
   assignedAt: timestamp("assigned_at").defaultNow().notNull(),
   expiresAt: timestamp("expires_at").notNull(), // Default 90 days from assignment
@@ -216,45 +216,45 @@ export const insertSessionAssignmentSchema = createInsertSchema(sessionAssignmen
 export type InsertSessionAssignment = z.infer<typeof insertSessionAssignmentSchema>;
 export type SessionAssignment = typeof sessionAssignments.$inferSelect;
 
-// Test Impressions table - Tracks individual impression events (multi-tenant)
-export const testImpressions = pgTable("test_impressions", {
+// Optimization Impressions table - Tracks individual impression events (multi-tenant)
+export const optimizationImpressions = pgTable("optimization_impressions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  testId: varchar("test_id").notNull().references(() => tests.id, { onDelete: "cascade" }),
+  optimizationId: varchar("optimization_id").notNull().references(() => optimizations.id, { onDelete: "cascade" }),
   sessionId: varchar("session_id").notNull(),
   variant: text("variant").notNull(), // "control" | "variant"
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const insertTestImpressionSchema = createInsertSchema(testImpressions).omit({
+export const insertOptimizationImpressionSchema = createInsertSchema(optimizationImpressions).omit({
   id: true,
   createdAt: true,
 });
 
-export type InsertTestImpression = z.infer<typeof insertTestImpressionSchema>;
-export type TestImpression = typeof testImpressions.$inferSelect;
+export type InsertOptimizationImpression = z.infer<typeof insertOptimizationImpressionSchema>;
+export type OptimizationImpression = typeof optimizationImpressions.$inferSelect;
 
-// Test Conversions table - Tracks individual conversion events (multi-tenant)
-export const testConversions = pgTable("test_conversions", {
+// Optimization Conversions table - Tracks individual conversion events (multi-tenant)
+export const optimizationConversions = pgTable("optimization_conversions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  testId: varchar("test_id").notNull().references(() => tests.id, { onDelete: "cascade" }),
+  optimizationId: varchar("optimization_id").notNull().references(() => optimizations.id, { onDelete: "cascade" }),
   sessionId: varchar("session_id").notNull(),
   variant: text("variant").notNull(), // "control" | "variant"
   revenue: decimal("revenue", { precision: 10, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const insertTestConversionSchema = createInsertSchema(testConversions).omit({
+export const insertOptimizationConversionSchema = createInsertSchema(optimizationConversions).omit({
   id: true,
   createdAt: true,
 });
 
-export type InsertTestConversion = z.infer<typeof insertTestConversionSchema>;
-export type TestConversion = typeof testConversions.$inferSelect;
+export type InsertOptimizationConversion = z.infer<typeof insertOptimizationConversionSchema>;
+export type OptimizationConversion = typeof optimizationConversions.$inferSelect;
 
-// Test Evolution Snapshots - Stores periodic metric snapshots for evolution charts (multi-tenant)
-export const testEvolutionSnapshots = pgTable("test_evolution_snapshots", {
+// Optimization Evolution Snapshots - Stores periodic metric snapshots for evolution charts (multi-tenant)
+export const optimizationEvolutionSnapshots = pgTable("optimization_evolution_snapshots", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  testId: varchar("test_id").notNull().references(() => tests.id, { onDelete: "cascade" }),
+  optimizationId: varchar("optimization_id").notNull().references(() => optimizations.id, { onDelete: "cascade" }),
   impressions: integer("impressions").notNull(), // Cumulative impressions at this snapshot
   controlImpressions: integer("control_impressions").notNull(),
   variantImpressions: integer("variant_impressions").notNull(),
@@ -269,13 +269,13 @@ export const testEvolutionSnapshots = pgTable("test_evolution_snapshots", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const insertTestEvolutionSnapshotSchema = createInsertSchema(testEvolutionSnapshots).omit({
+export const insertOptimizationEvolutionSnapshotSchema = createInsertSchema(optimizationEvolutionSnapshots).omit({
   id: true,
   createdAt: true,
 });
 
-export type InsertTestEvolutionSnapshot = z.infer<typeof insertTestEvolutionSnapshotSchema>;
-export type TestEvolutionSnapshot = typeof testEvolutionSnapshots.$inferSelect;
+export type InsertOptimizationEvolutionSnapshot = z.infer<typeof insertOptimizationEvolutionSnapshotSchema>;
+export type OptimizationEvolutionSnapshot = typeof optimizationEvolutionSnapshots.$inferSelect;
 
 // Preview Sessions table - Stores temporary preview sessions for storefront overlay preview (multi-tenant)
 export const previewSessions = pgTable("preview_sessions", {

@@ -148,14 +148,14 @@ export function scoreProduct(product: Product, allProducts: Product[]): ProductS
 
 /**
  * Select top N products for AI recommendation generation
- * Excludes products that already have active tests
+ * Excludes products that already have active optimizations
  */
 export function selectTopProducts(
   products: Product[],
   activeProductIds: string[],
   limit: number = 25
 ): ProductScore[] {
-  // Filter out products with active tests
+  // Filter out products with active optimizations
   const eligibleProducts = products.filter(p => !activeProductIds.includes(p.id));
 
   // Score all eligible products

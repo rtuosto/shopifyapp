@@ -3,10 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Eye, TrendingUp, TrendingDown, Play, StopCircle } from "lucide-react";
 
-interface Test {
+interface Optimization {
   id: string;
   productName: string;
-  testType: string;
+  optimizationType: string;
   status: "active" | "completed" | "draft";
   arpu: number;
   arpuLift: number;
@@ -15,14 +15,14 @@ interface Test {
   startDate: string;
 }
 
-interface TestHistoryTableProps {
-  tests: Test[];
-  onViewTest?: (testId: string) => void;
-  onStartTest?: (testId: string) => void;
-  onStopTest?: (testId: string) => void;
+interface OptimizationHistoryTableProps {
+  optimizations: Optimization[];
+  onViewOptimization?: (optimizationId: string) => void;
+  onStartOptimization?: (optimizationId: string) => void;
+  onStopOptimization?: (optimizationId: string) => void;
 }
 
-export default function TestHistoryTable({ tests, onViewTest, onStartTest, onStopTest }: TestHistoryTableProps) {
+export default function OptimizationHistoryTable({ optimizations, onViewOptimization, onStartOptimization, onStopOptimization }: OptimizationHistoryTableProps) {
   const getStatusVariant = (status: string) => {
     switch (status) {
       case "active":
@@ -42,31 +42,31 @@ export default function TestHistoryTable({ tests, onViewTest, onStartTest, onSto
     return "text-muted-foreground";
   };
 
-  const handleViewTest = (testId: string) => {
-    onViewTest?.(testId);
-    console.log("Viewing test:", testId);
+  const handleViewOptimization = (optimizationId: string) => {
+    onViewOptimization?.(optimizationId);
+    console.log("Viewing optimization:", optimizationId);
   };
 
-  const handleStartTest = (testId: string, e: React.MouseEvent) => {
+  const handleStartOptimization = (optimizationId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    onStartTest?.(testId);
+    onStartOptimization?.(optimizationId);
   };
 
-  const handleStopTest = (testId: string, e: React.MouseEvent) => {
+  const handleStopOptimization = (optimizationId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    onStopTest?.(testId);
+    onStopOptimization?.(optimizationId);
   };
 
   return (
-    <Card data-testid="card-test-history">
+    <Card data-testid="card-optimization-history">
       <div className="p-6">
-        <h3 className="text-lg font-semibold mb-4" data-testid="text-table-title">Recent Tests</h3>
+        <h3 className="text-lg font-semibold mb-4" data-testid="text-table-title">Recent Optimizations</h3>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b text-left text-sm text-muted-foreground">
                 <th className="pb-3 font-medium">Product</th>
-                <th className="pb-3 font-medium">Test Type</th>
+                <th className="pb-3 font-medium">Optimization Type</th>
                 <th className="pb-3 font-medium">Status</th>
                 <th className="pb-3 font-medium text-right">ARPU</th>
                 <th className="pb-3 font-medium text-right">Conversions</th>
@@ -75,63 +75,63 @@ export default function TestHistoryTable({ tests, onViewTest, onStartTest, onSto
               </tr>
             </thead>
             <tbody>
-              {tests.map((test, index) => (
+              {optimizations.map((optimization, index) => (
                 <tr 
-                  key={test.id} 
+                  key={optimization.id} 
                   className="border-b last:border-0 hover-elevate"
-                  data-testid={`row-test-${index}`}
+                  data-testid={`row-optimization-${index}`}
                 >
                   <td className="py-3 font-medium" data-testid={`text-product-${index}`}>
-                    {test.productName}
+                    {optimization.productName}
                   </td>
-                  <td className="py-3 text-sm text-muted-foreground" data-testid={`text-test-type-${index}`}>
-                    {test.testType}
+                  <td className="py-3 text-sm text-muted-foreground" data-testid={`text-optimization-type-${index}`}>
+                    {optimization.optimizationType}
                   </td>
                   <td className="py-3">
-                    <Badge variant={getStatusVariant(test.status)} data-testid={`badge-status-${index}`}>
-                      {test.status}
+                    <Badge variant={getStatusVariant(optimization.status)} data-testid={`badge-status-${index}`}>
+                      {optimization.status}
                     </Badge>
                   </td>
                   <td className="py-3 text-right font-semibold tabular-nums" data-testid={`text-arpu-${index}`}>
-                    {test.arpu > 0 ? `$${test.arpu.toFixed(2)}` : '$0.00'}
+                    {optimization.arpu > 0 ? `$${optimization.arpu.toFixed(2)}` : '$0.00'}
                   </td>
                   <td className="py-3 text-right tabular-nums text-muted-foreground" data-testid={`text-conversions-${index}`}>
-                    {test.conversions}
+                    {optimization.conversions}
                   </td>
                   <td className="py-3 text-sm text-muted-foreground" data-testid={`text-date-${index}`}>
-                    {test.startDate}
+                    {optimization.startDate}
                   </td>
                   <td className="py-3">
                     <div className="flex items-center justify-end gap-2">
-                      {test.status === "draft" && onStartTest && (
+                      {optimization.status === "draft" && onStartOptimization && (
                         <Button 
                           variant="outline" 
                           size="sm" 
-                          onClick={(e) => handleStartTest(test.id, e)}
-                          data-testid={`button-start-test-${index}`}
+                          onClick={(e) => handleStartOptimization(optimization.id, e)}
+                          data-testid={`button-start-optimization-${index}`}
                           className="gap-1"
                         >
                           <Play className="w-3 h-3" />
-                          Start Test
+                          Start Optimization
                         </Button>
                       )}
-                      {test.status === "active" && onStopTest && (
+                      {optimization.status === "active" && onStopOptimization && (
                         <Button 
                           variant="outline" 
                           size="sm" 
-                          onClick={(e) => handleStopTest(test.id, e)}
-                          data-testid={`button-stop-test-${index}`}
+                          onClick={(e) => handleStopOptimization(optimization.id, e)}
+                          data-testid={`button-stop-optimization-${index}`}
                           className="gap-1"
                         >
                           <StopCircle className="w-3 h-3" />
-                          Stop Test
+                          Stop Optimization
                         </Button>
                       )}
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        onClick={() => handleViewTest(test.id)}
-                        data-testid={`button-view-test-${index}`}
+                        onClick={() => handleViewOptimization(optimization.id)}
+                        data-testid={`button-view-optimization-${index}`}
                       >
                         <Eye className="w-4 h-4" />
                       </Button>

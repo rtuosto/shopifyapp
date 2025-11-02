@@ -61,7 +61,7 @@ export default function SetupGuide() {
           <div>
             <CardTitle className="text-2xl">Welcome to Shoptimizer! 🎉</CardTitle>
             <CardDescription className="mt-2">
-              Complete these steps to start optimizing your products with A/B testing
+              Complete these steps to start optimizing your products with A/B optimization
             </CardDescription>
           </div>
           <Button variant="ghost" size="sm" asChild>
@@ -80,7 +80,7 @@ export default function SetupGuide() {
             <div className="flex-1">
               <h3 className="font-semibold text-lg">Step 1: Install Shoptimizer SDK</h3>
               <p className="text-sm text-muted-foreground mb-3">
-                Add this script to your theme.liquid file to enable A/B testing across all pages
+                Add this script to your theme.liquid file to enable A/B optimization across all pages
               </p>
               
               <div className="flex items-center justify-between mb-2">
@@ -158,9 +158,9 @@ export default function SetupGuide() {
           <div className="flex items-start gap-3">
             <Circle className="w-5 h-5 mt-0.5 text-primary" />
             <div className="flex-1">
-              <h3 className="font-semibold text-lg">Step 3: Create Your First A/B Test</h3>
+              <h3 className="font-semibold text-lg">Step 3: Create Your First A/B Optimization</h3>
               <p className="text-sm text-muted-foreground mb-3">
-                Once the SDK is installed, create tests to optimize your products
+                Once the SDK is installed, create optimizations to optimize your products
               </p>
               
               <div className="flex gap-2">
@@ -170,8 +170,8 @@ export default function SetupGuide() {
                   </Link>
                 </Button>
                 <Button variant="outline" size="sm" asChild>
-                  <Link href="/active-tests" data-testid="link-active-tests">
-                    View Active Tests
+                  <Link href="/optimizations" data-testid="link-active-optimizations">
+                    View Active Optimizations
                   </Link>
                 </Button>
               </div>

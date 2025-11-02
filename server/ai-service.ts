@@ -31,7 +31,7 @@ interface BatchProductData extends ProductData {
 interface OptimizationRecommendation {
   title: string;
   description: string;
-  testType: "title" | "price" | "description" | "image";
+  optimizationType: "title" | "price" | "description" | "image";
   proposedChanges: Record<string, any>;
   insights: Array<{
     type: "psychology" | "competitor" | "seo" | "data";
@@ -66,7 +66,7 @@ CRITICAL ANTI-HALLUCINATION RULES:
 If the current description is missing or weak, recommend adding GENERAL benefit-focused copy, SEO keywords, and persuasive structure - but NEVER invent specific product features or technical specifications.
 
 For each recommendation, provide:
-1. testType: What to change ("title", "price", "description", or "image")
+1. optimizationType: What to change ("title", "price", "description", or "image")
 2. title: A brief title for the recommendation
 3. description: Why this change will work
 4. proposedChanges: An object containing the ACTUAL new values (e.g., {"title": "new title here"} or {"price": 99.99} or {"description": "new description"})
@@ -124,7 +124,7 @@ Return your response as a JSON object with a "recommendations" array.`;
     return recommendations.map((rec: any) => ({
       title: rec.title,
       description: rec.description,
-      testType: rec.testType || "title",
+      optimizationType: rec.optimizationType || "title",
       proposedChanges: rec.proposedChanges || {},
       insights: rec.insights || [],
       impactScore: rec.impactScore || 5, // Extract impact score from GPT response
@@ -137,7 +137,7 @@ Return your response as a JSON object with a "recommendations" array.`;
       {
         title: "Optimize Product Title for SEO",
         description: "Enhance your product title with relevant keywords and power words to improve search visibility and click-through rates.",
-        testType: "title",
+        optimizationType: "title",
         proposedChanges: {
           title: `Premium ${product.title} - Professional Quality`,
         },
@@ -192,7 +192,7 @@ Prioritization Criteria:
 
 For each of your TOP ${targetCount} recommendations, provide:
 1. productId: The ID of the product from the list above (e.g., "ID: abc-123" → use "abc-123")
-2. testType: What to change ("title", "price", "description")
+2. optimizationType: What to change ("title", "price", "description")
 3. title: A brief title for the recommendation
 4. description: Why this change will work and its expected impact
 5. proposedChanges: An object with the ACTUAL new values (not instructions)
@@ -242,7 +242,7 @@ Return your response as a JSON object with a "recommendations" array, sorted by 
       productId: rec.productId,
       title: rec.title,
       description: rec.description,
-      testType: rec.testType || "title",
+      optimizationType: rec.optimizationType || "title",
       proposedChanges: rec.proposedChanges || {},
       insights: rec.insights || [],
       impactScore: rec.impactScore || 5, // AI's 1-10 revenue impact score (default to 5 if missing)
@@ -255,7 +255,7 @@ Return your response as a JSON object with a "recommendations" array, sorted by 
       productId: product.id,
       title: `Optimize "${product.title}" for Better Conversions`,
       description: "Enhance this product's messaging to improve click-through and conversion rates.",
-      testType: "title" as const,
+      optimizationType: "title" as const,
       proposedChanges: {
         title: `Premium ${product.title} - Professional Quality`,
       },

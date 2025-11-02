@@ -10,16 +10,16 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Play, Zap, CheckCircle2, AlertCircle, Radio } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
-import type { Test, Product } from "@shared/schema";
+import type { Optimization, Product } from "@shared/schema";
 
-interface EnrichedTest extends Test {
+interface EnrichedOptimization extends Optimization {
   productName: string;
 }
 
 interface SimulationResult {
   type: "batch" | "traffic" | "orders";
   timestamp: string;
-  testName: string;
+  optimizationName: string;
   allocationBefore?: { control: number; variant: number };
   allocationAfter?: { control: number; variant: number };
   variantPerformance?: {
@@ -81,7 +81,7 @@ interface SimulationResult {
 
 export default function Simulator() {
   const { toast } = useToast();
-  const [selectedTestId, setSelectedTestId] = useState<string>("");
+  const [selectedOptimizationId, setSelectedOptimizationId] = useState<string>("");
   const [lastSimulationResult, setLastSimulationResult] = useState<SimulationResult | null>(null);
   
   // Batch simulation parameters
@@ -107,30 +107,30 @@ export default function Simulator() {
     };
   }, []);
 
-  // Fetch active tests
-  const { data: tests = [], isLoading: testsLoading } = useQuery<EnrichedTest[]>({
-    queryKey: ["/api/tests"],
-    select: (data) => data.filter((t: Test) => t.status === "active"),
+  // Fetch active optimizations
+  const { data: optimizations = [], isLoading: optimizationsLoading } = useQuery<EnrichedOptimization[]>({
+    queryKey: ["/api/optimizations"],
+    select: (data) => data.filter((t: Optimization) => t.status === "active"),
   });
 
-  // Fetch all products to enrich test data
+  // Fetch all products to enrich optimization data
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["/api/products"],
   });
 
-  // Enrich tests with product names
-  const enrichedTests = tests.map((test) => ({
-    ...test,
-    productName: products.find((p) => p.id === test.productId)?.title || "Unknown Product",
+  // Enrich optimizations with product names
+  const enrichedOptimizations = optimizations.map((optimization) => ({
+    ...optimization,
+    productName: products.find((p) => p.id === optimization.productId)?.title || "Unknown Product",
   }));
 
-  const selectedTest = enrichedTests.find((t) => t.id === selectedTestId);
+  const selectedOptimization = enrichedOptimizations.find((t) => t.id === selectedOptimizationId);
 
   // Batch simulation mutation
   const batchSimulation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/simulate/batch", {
-        testId: selectedTestId,
+        optimizationId: selectedOptimizationId,
         visitors,
         controlConversionRate: controlConversionRate / 100,
         variantConversionRate: variantConversionRate / 100,
@@ -141,7 +141,7 @@ export default function Simulator() {
       const result: SimulationResult = {
         type: "batch",
         timestamp: new Date().toLocaleTimeString(),
-        testName: selectedTest?.productName || "Unknown",
+        optimizationName: selectedOptimization?.productName || "Unknown",
         allocationBefore: data.allocationBefore,
         allocationAfter: data.allocationAfter,
         variantPerformance: data.variantPerformance,
@@ -159,7 +159,7 @@ export default function Simulator() {
           : `Generated ${data.impressions} visitors and ${data.conversions} conversions`,
       });
       
-      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/optimizations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
     },
     onError: (error: Error) => {
@@ -173,7 +173,7 @@ export default function Simulator() {
 
   // Streaming simulation handler using EventSource API for proper SSE
   const startStreamingSimulation = () => {
-    if (!selectedTestId) return;
+    if (!selectedOptimizationId) return;
     
     // Close any existing EventSource
     if (eventSourceRef.current) {
@@ -187,7 +187,7 @@ export default function Simulator() {
 
     // Build URL with query parameters (EventSource only supports GET)
     const params = new URLSearchParams({
-      testId: selectedTestId,
+      optimizationId: selectedOptimizationId,
       visitors: visitors.toString(),
       controlConversionRate: (controlConversionRate / 100).toString(),
       variantConversionRate: (variantConversionRate / 100).toString(),
@@ -218,7 +218,7 @@ export default function Simulator() {
       const result: SimulationResult = {
         type: "batch",
         timestamp: new Date().toLocaleTimeString(),
-        testName: selectedTest?.productName || "Unknown",
+        optimizationName: selectedOptimization?.productName || "Unknown",
         allocationBefore: data.allocationBefore,
         allocationAfter: data.allocationAfter,
         variantPerformance: data.variantPerformance,
@@ -231,7 +231,7 @@ export default function Simulator() {
         description: `Simulated ${data.impressions} visitors in real-time`,
       });
 
-      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/optimizations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       
       eventSource.close();
@@ -273,7 +273,7 @@ export default function Simulator() {
   };
 
   const isSimulating = batchSimulation.isPending || isStreaming;
-  const canSimulate = !!selectedTestId && !isSimulating;
+  const canSimulate = !!selectedOptimizationId && !isSimulating;
 
   // Calculate allocation percentages
   const calculateAllocationPercentage = (control: number, variant: number) => {
@@ -288,64 +288,64 @@ export default function Simulator() {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold" data-testid="text-page-title">Test Simulator</h1>
+        <h1 className="text-3xl font-bold" data-testid="text-page-title">Optimization Simulator</h1>
         <p className="text-muted-foreground" data-testid="text-page-description">
-          Simulate traffic and conversions to verify A/B test allocation and performance tracking
+          Simulate traffic and conversions to verify A/B optimization allocation and performance tracking
         </p>
       </div>
 
-      {/* Test Selection */}
-      <Card data-testid="card-test-selection">
+      {/* Optimization Selection */}
+      <Card data-testid="card-optimization-selection">
         <CardHeader>
-          <CardTitle>Select Active Test</CardTitle>
-          <CardDescription>Choose a test to simulate traffic and conversions</CardDescription>
+          <CardTitle>Select Active Optimization</CardTitle>
+          <CardDescription>Choose an optimization to simulate traffic and conversions</CardDescription>
         </CardHeader>
         <CardContent>
-          {testsLoading ? (
-            <div className="text-sm text-muted-foreground">Loading tests...</div>
-          ) : enrichedTests.length === 0 ? (
-            <div className="text-sm text-muted-foreground" data-testid="text-no-tests">
-              No active tests available. Create and activate a test from the Dashboard first.
+          {optimizationsLoading ? (
+            <div className="text-sm text-muted-foreground">Loading optimizations...</div>
+          ) : enrichedOptimizations.length === 0 ? (
+            <div className="text-sm text-muted-foreground" data-testid="text-no-optimizations">
+              No active optimizations available. Create and activate an optimization from the Dashboard first.
             </div>
           ) : (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="test-select">Active Test</Label>
-                <Select value={selectedTestId} onValueChange={setSelectedTestId}>
-                  <SelectTrigger id="test-select" data-testid="select-test">
-                    <SelectValue placeholder="Select a test" />
+                <Label htmlFor="test-select">Active Optimization</Label>
+                <Select value={selectedOptimizationId} onValueChange={setSelectedOptimizationId}>
+                  <SelectTrigger id="test-select" data-testid="select-optimization">
+                    <SelectValue placeholder="Select an optimization" />
                   </SelectTrigger>
                   <SelectContent>
-                    {enrichedTests.map((test) => (
-                      <SelectItem key={test.id} value={test.id} data-testid={`option-test-${test.id}`}>
-                        {test.productName} - {test.testType}
+                    {enrichedOptimizations.map((optimization) => (
+                      <SelectItem key={optimization.id} value={optimization.id} data-testid={`option-optimization-${optimization.id}`}>
+                        {optimization.productName} - {optimization.optimizationType}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              {selectedTest && (
-                <div className="p-4 bg-muted rounded-lg space-y-2" data-testid="card-test-info">
+              {selectedOptimization && (
+                <div className="p-4 bg-muted rounded-lg space-y-2" data-testid="card-optimization-info">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Product:</span>
-                    <span className="text-sm font-medium" data-testid="text-product-name">{selectedTest.productName}</span>
+                    <span className="text-sm font-medium" data-testid="text-product-name">{selectedOptimization.productName}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Test Type:</span>
-                    <span className="text-sm font-medium" data-testid="text-test-type">{selectedTest.testType}</span>
+                    <span className="text-sm text-muted-foreground">Optimization Type:</span>
+                    <span className="text-sm font-medium" data-testid="text-optimization-type">{selectedOptimization.optimizationType}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Current Impressions:</span>
-                    <span className="text-sm font-medium" data-testid="text-current-impressions">{selectedTest.impressions || 0}</span>
+                    <span className="text-sm font-medium" data-testid="text-current-impressions">{selectedOptimization.impressions || 0}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Current Conversions:</span>
-                    <span className="text-sm font-medium" data-testid="text-current-conversions">{selectedTest.conversions || 0}</span>
+                    <span className="text-sm font-medium" data-testid="text-current-conversions">{selectedOptimization.conversions || 0}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Current RPV:</span>
-                    <span className="text-sm font-medium" data-testid="text-current-rpv">${selectedTest.arpu || "0.00"}</span>
+                    <span className="text-sm font-medium" data-testid="text-current-rpv">${selectedOptimization.arpu || "0.00"}</span>
                   </div>
                 </div>
               )}
@@ -376,22 +376,22 @@ export default function Simulator() {
                   <div className="text-sm font-medium text-blue-900 dark:text-blue-100">Data Generation Summary</div>
                   <div className="space-y-1">
                     <div className="text-sm text-blue-700 dark:text-blue-300" data-testid="text-visitors-added">
-                      Added {lastSimulationResult.variantPerformance.control.impressions + lastSimulationResult.variantPerformance.variant.impressions} visitors to test
+                      Added {lastSimulationResult.variantPerformance.control.impressions + lastSimulationResult.variantPerformance.variant.impressions} visitors to optimization
                     </div>
-                    {selectedTest && (
+                    {selectedOptimization && (
                       <div className="text-sm text-blue-700 dark:text-blue-300" data-testid="text-total-impressions">
-                        Test now has {selectedTest.impressions || 0} total impressions
+                        Optimization now has {selectedOptimization.impressions || 0} total impressions
                       </div>
                     )}
                   </div>
                 </div>
               )}
 
-              {/* Test Info */}
+              {/* Optimization Info */}
               <div className="p-3 bg-muted rounded-lg">
-                <div className="text-sm font-medium mb-1">Test Product</div>
-                <div className="text-sm text-muted-foreground" data-testid="text-result-test-name">
-                  {lastSimulationResult.testName}
+                <div className="text-sm font-medium mb-1">Optimization Product</div>
+                <div className="text-sm text-muted-foreground" data-testid="text-result-optimization-name">
+                  {lastSimulationResult.optimizationName}
                 </div>
               </div>
 
@@ -544,7 +544,7 @@ export default function Simulator() {
               {/* OLD: Batch Simulation Results (fallback for old API response) */}
               {lastSimulationResult.type === "batch" && lastSimulationResult.allocation && !lastSimulationResult.variantPerformance && (
                 <div className="space-y-3">
-                  <div className="font-medium">A/B Test Allocation Verification</div>
+                  <div className="font-medium">A/B Optimization Allocation Verification</div>
                   
                   {/* Impressions Allocation */}
                   <div className="p-4 border rounded-lg space-y-3">
@@ -625,7 +625,7 @@ export default function Simulator() {
                   {/* Updated Metrics */}
                   {lastSimulationResult.metrics && (
                     <div className="p-4 border rounded-lg space-y-3">
-                      <div className="text-sm font-medium">Updated Test Metrics</div>
+                      <div className="text-sm font-medium">Updated Optimization Metrics</div>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="space-y-1">
                           <div className="text-xs text-muted-foreground">Total Impressions</div>
@@ -673,7 +673,7 @@ export default function Simulator() {
             <CardTitle>Batch Simulation</CardTitle>
           </div>
           <CardDescription>
-            Simulate realistic traffic and conversions in one click. Perfect for validating A/B test allocation.
+            Simulate realistic traffic and conversions in one click. Perfect for validating A/B optimization allocation.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -782,10 +782,10 @@ export default function Simulator() {
               </div>
             )}
 
-            {!selectedTestId && (
+            {!selectedOptimizationId && (
               <div className="flex items-center gap-2 text-sm text-yellow-600 bg-yellow-50 dark:bg-yellow-950 p-3 rounded-lg">
                 <AlertCircle className="w-4 h-4" />
-                Please select an active test above to run simulations
+                Please select an active optimization above to run simulations
               </div>
             )}
 
@@ -812,7 +812,7 @@ export default function Simulator() {
         <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
             <strong>Batch Simulation:</strong> Generates realistic traffic and conversions in one step. 
-            Visitors are allocated using the test's current Bayesian allocation (Thompson Sampling), and conversions are calculated based on your specified rates.
+            Visitors are allocated using the optimization's current Bayesian allocation (Thompson Sampling), and conversions are calculated based on your specified rates.
           </p>
           <p>
             <strong>Live Streaming Mode:</strong> Watch the simulation unfold in real-time! Charts update progressively every 100 visitors, 
@@ -823,7 +823,7 @@ export default function Simulator() {
             The x-axis shows impressions (every 100), while the y-axes show RPV and allocation percentages respectively.
           </p>
           <p>
-            <strong>Allocation Verification:</strong> The simulation uses the test's current allocation percentages, 
+            <strong>Allocation Verification:</strong> The simulation uses the optimization's current allocation percentages, 
             adapting dynamically based on performance. Results include detailed breakdowns to confirm proper distribution.
           </p>
         </CardContent>

@@ -33,7 +33,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Sparkles, Plus, Archive as ArchiveIcon, RotateCcw } from "lucide-react";
-import type { Product, Recommendation, Test } from "@shared/schema";
+import type { Product, Recommendation, Optimization } from "@shared/schema";
 
 export default function AIRecommendations() {
   const { toast } = useToast();
@@ -190,7 +190,7 @@ export default function AIRecommendations() {
     },
   });
 
-  // Helper function to build test payload (shared between draft and activate flows)
+  // Helper function to build optimization payload (shared between draft and activate flows)
   const buildTestPayload = (recommendationId: string, editedChanges?: Record<string, any>) => {
     const recommendation = recommendations.find(r => r.id === recommendationId);
     if (!recommendation) throw new Error("Recommendation not found");
@@ -204,7 +204,7 @@ export default function AIRecommendations() {
       price: product.price,
     };
 
-    if (recommendation.testType === "price") {
+    if (recommendation.optimizationType === "price") {
       controlData.variantPrices = product.variants.map((v: any) => ({
         id: v.id,
         price: v.price,
@@ -219,7 +219,7 @@ export default function AIRecommendations() {
       ...proposedChanges,
     };
 
-    if (recommendation.testType === "price" && controlData.variantPrices) {
+    if (recommendation.optimizationType === "price" && controlData.variantPrices) {
       const priceMultiplier = variantData.price / controlData.price;
       variantData.variantPrices = controlData.variantPrices.map((v: any) => ({
         id: v.id,
@@ -230,7 +230,7 @@ export default function AIRecommendations() {
     return {
       productId: product.id,
       recommendationId: recommendation.id,
-      testType: recommendation.testType,
+      optimizationType: recommendation.optimizationType,
       status: "draft",
       controlData,
       variantData,
@@ -242,13 +242,13 @@ export default function AIRecommendations() {
     };
   };
 
-  // Save test as draft (without activating)
-  const saveDraftMutation = useMutation({
+  // Save optimization as draft (without activating)
+  const saveDraftOptimizationMutation = useMutation({
     mutationFn: async ({ recommendationId, editedChanges }: { recommendationId: string; editedChanges?: Record<string, any> }) => {
-      const testData = buildTestPayload(recommendationId, editedChanges);
+      const optimizationData = buildTestPayload(recommendationId, editedChanges);
 
-      // Create the test as draft (without activating)
-      const createRes = await apiRequest("POST", "/api/tests", testData);
+      // Create the optimization as draft (without activating)
+      const createRes = await apiRequest("POST", "/api/optimizations", optimizationData);
       const createdTest = await createRes.json();
 
       return { test: createdTest, recommendationId };
@@ -260,12 +260,12 @@ export default function AIRecommendations() {
         description: "Test saved as draft. Activate it from the Tests page when ready.",
       });
       
-      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/optimizations"] });
     },
     onError: (error: Error) => {
       toast({
-        title: "Failed to Save Draft",
-        description: error.message || "Could not save test as draft",
+        title: "Failed to Save Optimization Draft",
+        description: error.message || "Could not save optimization as draft",
         variant: "destructive",
       });
     },
@@ -274,14 +274,14 @@ export default function AIRecommendations() {
   // Create and activate test from recommendation
   const createTestMutation = useMutation({
     mutationFn: async ({ recommendationId, editedChanges }: { recommendationId: string; editedChanges?: Record<string, any> }) => {
-      const testData = buildTestPayload(recommendationId, editedChanges);
+      const optimizationData = buildTestPayload(recommendationId, editedChanges);
 
       // Create the test
-      const createRes = await apiRequest("POST", "/api/tests", testData);
+      const createRes = await apiRequest("POST", "/api/optimizations", optimizationData);
       const createdTest = await createRes.json();
 
       // Immediately activate the test
-      const activateRes = await apiRequest("POST", `/api/tests/${createdTest.id}/activate`);
+      const activateRes = await apiRequest("POST", `/api/optimizations/${createdTest.id}/activate`);
       const activatedTest = await activateRes.json();
 
       return { test: activatedTest, recommendationId };
@@ -290,16 +290,16 @@ export default function AIRecommendations() {
       await apiRequest("PATCH", `/api/recommendations/${data.recommendationId}`, { status: "testing" });
       
       toast({
-        title: "Test Launched",
-        description: "Your A/B test is now live and collecting data",
+        title: "Optimization Launched",
+        description: "Your A/B optimization is now live and collecting data",
       });
       
-      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/optimizations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "pending"] });
     },
     onError: (error: Error) => {
       toast({
-        title: "Failed to Launch Test",
+        title: "Failed to Launch Optimization",
         description: error.message || "Could not create and activate test from recommendation",
         variant: "destructive",
       });
@@ -451,14 +451,14 @@ export default function AIRecommendations() {
 
   const handleSaveDraft = (id: string, editedVariant?: any) => {
     if (!editedVariant) {
-      saveDraftMutation.mutate({ recommendationId: id });
+      saveDraftOptimizationMutation.mutate({ recommendationId: id });
       return;
     }
 
     // Only extract fields that were actually changed in the recommendation
     const rec = recommendations.find(r => r.id === id);
     if (!rec) {
-      saveDraftMutation.mutate({ recommendationId: id });
+      saveDraftOptimizationMutation.mutate({ recommendationId: id });
       return;
     }
 
@@ -476,7 +476,7 @@ export default function AIRecommendations() {
       editedChanges.description = editedVariant.description;
     }
     
-    saveDraftMutation.mutate({ recommendationId: id, editedChanges });
+    saveDraftOptimizationMutation.mutate({ recommendationId: id, editedChanges });
   };
 
   const handleDismissClick = (id: string) => {
@@ -591,7 +591,7 @@ export default function AIRecommendations() {
                     description={rec.description}
                     productName={product?.title || 'Unknown Product'}
                     productImage={productImage}
-                    testType={rec.testType}
+                    optimizationType={rec.optimizationType}
                     impactScore={rec.impactScore}
                     onAccept={() => handleAccept(rec.id)}
                     onReject={() => handleDismissClick(rec.id)}
@@ -625,7 +625,7 @@ export default function AIRecommendations() {
                     description={rec.description}
                     productName={product?.title || 'Unknown Product'}
                     productImage={productImage}
-                    testType={rec.testType}
+                    optimizationType={rec.optimizationType}
                     impactScore={rec.impactScore}
                     borderColor="border-l-muted"
                     imageOpacity="opacity-60"

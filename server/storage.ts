@@ -3,18 +3,18 @@ import {
   type InsertProduct,
   type Recommendation,
   type InsertRecommendation,
-  type Test,
-  type InsertTest,
+  type Optimization,
+  type InsertOptimization,
   type Metric,
   type InsertMetric,
   type SessionAssignment,
   type InsertSessionAssignment,
-  type TestImpression,
-  type InsertTestImpression,
-  type TestConversion,
-  type InsertTestConversion,
-  type TestEvolutionSnapshot,
-  type InsertTestEvolutionSnapshot,
+  type OptimizationImpression,
+  type InsertOptimizationImpression,
+  type OptimizationConversion,
+  type InsertOptimizationConversion,
+  type OptimizationEvolutionSnapshot,
+  type InsertOptimizationEvolutionSnapshot,
   type Shop,
   type InsertShop,
   type PreviewSession,
@@ -46,14 +46,14 @@ export interface IStorage {
   updateRecommendation(shop: string, id: string, recommendation: Partial<InsertRecommendation>): Promise<Recommendation | undefined>;
   deleteRecommendation(shop: string, id: string): Promise<boolean>;
 
-  // Tests (shop-scoped)
-  getTest(shop: string, id: string): Promise<Test | undefined>;
-  getTests(shop: string, status?: string): Promise<Test[]>;
-  getTestsByProduct(shop: string, productId: string): Promise<Test[]>;
-  getActiveTestsByProduct(shop: string, productId: string, testType?: string): Promise<Test[]>;
-  createTest(shop: string, test: InsertTest): Promise<Test>;
-  updateTest(shop: string, id: string, test: Partial<InsertTest>): Promise<Test | undefined>;
-  deleteTest(shop: string, id: string): Promise<boolean>;
+  // Optimizations (shop-scoped)
+  getOptimization(shop: string, id: string): Promise<Optimization | undefined>;
+  getOptimizations(shop: string, status?: string): Promise<Optimization[]>;
+  getOptimizationsByProduct(shop: string, productId: string): Promise<Optimization[]>;
+  getActiveOptimizationsByProduct(shop: string, productId: string, optimizationType?: string): Promise<Optimization[]>;
+  createOptimization(shop: string, optimization: InsertOptimization): Promise<Optimization>;
+  updateOptimization(shop: string, id: string, optimization: Partial<InsertOptimization>): Promise<Optimization | undefined>;
+  deleteOptimization(shop: string, id: string): Promise<boolean>;
 
   // Metrics (shop-scoped)
   getMetrics(shop: string, limit?: number): Promise<Metric[]>;
@@ -64,18 +64,18 @@ export interface IStorage {
   getSessionAssignments(shop: string, sessionId: string): Promise<SessionAssignment[]>;
   createSessionAssignment(shop: string, assignment: InsertSessionAssignment): Promise<SessionAssignment>;
   
-  // Test Impressions (tracking individual impression events)
-  createTestImpression(impression: InsertTestImpression): Promise<TestImpression>;
-  createTestImpressionsBulk(impressions: InsertTestImpression[]): Promise<void>;
+  // Optimization Impressions (tracking individual impression events)
+  createOptimizationImpression(impression: InsertOptimizationImpression): Promise<OptimizationImpression>;
+  createOptimizationImpressionsBulk(impressions: InsertOptimizationImpression[]): Promise<void>;
   
-  // Test Conversions (tracking individual conversion events)
-  createTestConversion(conversion: InsertTestConversion): Promise<TestConversion>;
-  createTestConversionsBulk(conversions: InsertTestConversion[]): Promise<void>;
+  // Optimization Conversions (tracking individual conversion events)
+  createOptimizationConversion(conversion: InsertOptimizationConversion): Promise<OptimizationConversion>;
+  createOptimizationConversionsBulk(conversions: InsertOptimizationConversion[]): Promise<void>;
   
-  // Test Evolution Snapshots (periodic metric snapshots for charts)
-  getTestEvolutionSnapshots(testId: string): Promise<TestEvolutionSnapshot[]>;
-  createTestEvolutionSnapshot(snapshot: InsertTestEvolutionSnapshot): Promise<TestEvolutionSnapshot>;
-  createTestEvolutionSnapshotsBulk(snapshots: InsertTestEvolutionSnapshot[]): Promise<void>;
+  // Optimization Evolution Snapshots (periodic metric snapshots for charts)
+  getOptimizationEvolutionSnapshots(optimizationId: string): Promise<OptimizationEvolutionSnapshot[]>;
+  createOptimizationEvolutionSnapshot(snapshot: InsertOptimizationEvolutionSnapshot): Promise<OptimizationEvolutionSnapshot>;
+  createOptimizationEvolutionSnapshotsBulk(snapshots: InsertOptimizationEvolutionSnapshot[]): Promise<void>;
 
   // Preview Sessions (storefront overlay preview)
   getPreviewSession(token: string): Promise<PreviewSession | undefined>;
@@ -94,7 +94,7 @@ export class MemStorage implements IStorage {
   private shops: Map<string, Shop>;
   private products: Map<string, Map<string, Product>>;
   private recommendations: Map<string, Map<string, Recommendation>>;
-  private tests: Map<string, Map<string, Test>>;
+  private optimizations: Map<string, Map<string, Optimization>>;
   private metrics: Map<string, Map<string, Metric>>;
   private sessionAssignments: Map<string, Map<string, SessionAssignment>>;
   // Preview sessions stored by token (globally, not shop-scoped)
@@ -104,7 +104,7 @@ export class MemStorage implements IStorage {
     this.shops = new Map();
     this.products = new Map();
     this.recommendations = new Map();
-    this.tests = new Map();
+    this.optimizations = new Map();
     this.metrics = new Map();
     this.sessionAssignments = new Map();
     this.previewSessions = new Map();
@@ -155,7 +155,7 @@ export class MemStorage implements IStorage {
     // Ensure namespaces exist
     const products = this.ensureShopNamespace(this.products, shop);
     const recommendations = this.ensureShopNamespace(this.recommendations, shop);
-    const tests = this.ensureShopNamespace(this.tests, shop);
+    const optimizations = this.ensureShopNamespace(this.optimizations, shop);
     const metrics = this.ensureShopNamespace(this.metrics, shop);
     // Sample products
     const product1: Product = {
@@ -210,7 +210,7 @@ export class MemStorage implements IStorage {
       productId: product1.id,
       title: "Optimize Product Title for SEO",
       description: "Add power words like 'Premium' and 'Professional' to increase click-through rate by emphasizing quality and value proposition.",
-      testType: "title",
+      optimizationType: "title",
       impactScore: 8,
       proposedChanges: {
         title: "Premium Wireless Bluetooth Speaker - Professional Sound Quality",
@@ -242,9 +242,9 @@ export class MemStorage implements IStorage {
       id: randomUUID(),
       shop,
       productId: product2.id,
-      title: "Test Price Point Optimization",
+      title: "Optimize Price Point",
       description: "Reduce price from $49.99 to $44.99 to hit psychological pricing sweet spot. Competitor analysis shows this range performs better.",
-      testType: "price",
+      optimizationType: "price",
       impactScore: 9,
       proposedChanges: {
         price: "44.99",
@@ -274,16 +274,32 @@ export class MemStorage implements IStorage {
     recommendations.set(rec1.id, rec1);
     recommendations.set(rec2.id, rec2);
 
-    // Sample test
-    const test1: Test = {
+    // Sample optimization
+    const optimization1: Optimization = {
       id: randomUUID(),
+      shop,
+      scope: "product",
       productId: product1.id,
       recommendationId: null,
-      testType: "Title Optimization",
+      optimizationType: "title",
+      targetSelector: null,
       status: "active",
       controlData: { title: product1.title },
       variantData: { title: "Premium Wireless Speaker" },
-      performance: "15.4",
+      allocationStrategy: "bayesian",
+      controlAllocation: "50",
+      variantAllocation: "50",
+      confidenceThreshold: "0.95",
+      minSampleSize: 100,
+      bayesianConfig: null,
+      controlImpressions: 625,
+      variantImpressions: 625,
+      controlConversions: 20,
+      variantConversions: 25,
+      controlRevenue: "1000.00",
+      variantRevenue: "1247.55",
+      arpu: "15.4",
+      arpuLift: "0",
       impressions: 1250,
       conversions: 45,
       revenue: "2247.55",
@@ -293,7 +309,7 @@ export class MemStorage implements IStorage {
       updatedAt: new Date(),
     };
 
-    tests.set(test1.id, test1);
+    optimizations.set(optimization1.id, optimization1);
 
     // Sample metrics
     const dates = ["Oct 1", "Oct 5", "Oct 10", "Oct 15", "Oct 20", "Oct 23"];
@@ -307,7 +323,7 @@ export class MemStorage implements IStorage {
         avgOrderValue: "87.50",
         revenue: revenues[index].toString(),
         revenueLift: index > 0 ? ((revenues[index] - revenues[0]) / revenues[0] * 100).toFixed(2) : "0",
-        activeTests: index > 2 ? 8 : 5,
+        activeOptimizations: index > 2 ? 8 : 5,
         createdAt: new Date(),
       };
       metrics.set(metric.id, metric);
@@ -435,73 +451,87 @@ export class MemStorage implements IStorage {
     return shopRecommendations.delete(id);
   }
 
-  // Tests (shop-scoped)
-  async getTest(shop: string, id: string): Promise<Test | undefined> {
-    const shopTests = this.ensureShopNamespace(this.tests, shop);
-    return shopTests.get(id);
+  // Optimizations (shop-scoped)
+  async getOptimization(shop: string, id: string): Promise<Optimization | undefined> {
+    const shopOptimizations = this.ensureShopNamespace(this.optimizations, shop);
+    return shopOptimizations.get(id);
   }
 
-  async getTests(shop: string, status?: string): Promise<Test[]> {
-    const shopTests = this.ensureShopNamespace(this.tests, shop);
-    const all = Array.from(shopTests.values());
+  async getOptimizations(shop: string, status?: string): Promise<Optimization[]> {
+    const shopOptimizations = this.ensureShopNamespace(this.optimizations, shop);
+    const all = Array.from(shopOptimizations.values());
     if (status) {
-      return all.filter(t => t.status === status);
+      return all.filter(o => o.status === status);
     }
     return all;
   }
 
-  async getTestsByProduct(shop: string, productId: string): Promise<Test[]> {
-    const shopTests = this.ensureShopNamespace(this.tests, shop);
-    return Array.from(shopTests.values()).filter(t => t.productId === productId);
+  async getOptimizationsByProduct(shop: string, productId: string): Promise<Optimization[]> {
+    const shopOptimizations = this.ensureShopNamespace(this.optimizations, shop);
+    return Array.from(shopOptimizations.values()).filter(o => o.productId === productId);
   }
 
-  async getActiveTestsByProduct(shop: string, productId: string, testType?: string): Promise<Test[]> {
-    const shopTests = this.ensureShopNamespace(this.tests, shop);
-    return Array.from(shopTests.values()).filter(t => 
-      t.productId === productId && 
-      t.status === 'active' &&
-      (!testType || t.testType === testType)
+  async getActiveOptimizationsByProduct(shop: string, productId: string, optimizationType?: string): Promise<Optimization[]> {
+    const shopOptimizations = this.ensureShopNamespace(this.optimizations, shop);
+    return Array.from(shopOptimizations.values()).filter(o => 
+      o.productId === productId && 
+      o.status === 'active' &&
+      (!optimizationType || o.optimizationType === optimizationType)
     );
   }
 
-  async createTest(shop: string, insertTest: InsertTest): Promise<Test> {
-    const shopTests = this.ensureShopNamespace(this.tests, shop);
-    const id = insertTest.id || randomUUID();
-    const test: Test = {
-      ...insertTest,
+  async createOptimization(shop: string, insertOptimization: InsertOptimization): Promise<Optimization> {
+    const shopOptimizations = this.ensureShopNamespace(this.optimizations, shop);
+    const id = randomUUID();
+    const optimization: Optimization = {
+      ...insertOptimization,
       id,
-      status: insertTest.status || "draft",
-      performance: insertTest.performance?.toString() || "0",
-      revenue: insertTest.revenue?.toString() || "0",
-      recommendationId: insertTest.recommendationId || null,
-      startDate: insertTest.startDate || null,
-      endDate: insertTest.endDate || null,
-      impressions: insertTest.impressions || null,
-      conversions: insertTest.conversions || null,
+      shop,
+      status: insertOptimization.status || "draft",
+      arpu: insertOptimization.arpu?.toString() || "0",
+      arpuLift: insertOptimization.arpuLift?.toString() || "0",
+      revenue: insertOptimization.revenue?.toString() || "0",
+      controlRevenue: insertOptimization.controlRevenue?.toString() || "0",
+      variantRevenue: insertOptimization.variantRevenue?.toString() || "0",
+      controlAllocation: insertOptimization.controlAllocation?.toString() || "50",
+      variantAllocation: insertOptimization.variantAllocation?.toString() || "50",
+      confidenceThreshold: insertOptimization.confidenceThreshold?.toString() || "0.95",
+      recommendationId: insertOptimization.recommendationId || null,
+      productId: insertOptimization.productId || null,
+      targetSelector: insertOptimization.targetSelector || null,
+      bayesianConfig: insertOptimization.bayesianConfig || null,
+      startDate: insertOptimization.startDate || null,
+      endDate: insertOptimization.endDate || null,
+      impressions: insertOptimization.impressions || null,
+      conversions: insertOptimization.conversions || null,
+      controlImpressions: insertOptimization.controlImpressions || null,
+      variantImpressions: insertOptimization.variantImpressions || null,
+      controlConversions: insertOptimization.controlConversions || null,
+      variantConversions: insertOptimization.variantConversions || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    shopTests.set(id, test);
-    return test;
+    shopOptimizations.set(id, optimization);
+    return optimization;
   }
 
-  async updateTest(shop: string, id: string, updates: Partial<InsertTest>): Promise<Test | undefined> {
-    const shopTests = this.ensureShopNamespace(this.tests, shop);
-    const test = shopTests.get(id);
-    if (!test) return undefined;
+  async updateOptimization(shop: string, id: string, updates: Partial<InsertOptimization>): Promise<Optimization | undefined> {
+    const shopOptimizations = this.ensureShopNamespace(this.optimizations, shop);
+    const optimization = shopOptimizations.get(id);
+    if (!optimization) return undefined;
     
-    const updated: Test = {
-      ...test,
+    const updated: Optimization = {
+      ...optimization,
       ...updates,
       updatedAt: new Date(),
     };
-    shopTests.set(id, updated);
+    shopOptimizations.set(id, updated);
     return updated;
   }
 
-  async deleteTest(shop: string, id: string): Promise<boolean> {
-    const shopTests = this.ensureShopNamespace(this.tests, shop);
-    return shopTests.delete(id);
+  async deleteOptimization(shop: string, id: string): Promise<boolean> {
+    const shopOptimizations = this.ensureShopNamespace(this.optimizations, shop);
+    return shopOptimizations.delete(id);
   }
 
   // Metrics (shop-scoped)
@@ -528,7 +558,7 @@ export class MemStorage implements IStorage {
       avgOrderValue: insertMetric.avgOrderValue.toString(),
       revenue: insertMetric.revenue.toString(),
       revenueLift: insertMetric.revenueLift?.toString() || "0",
-      activeTests: insertMetric.activeTests || null,
+      activeOptimizations: insertMetric.activeOptimizations || null,
       createdAt: new Date(),
     };
     shopMetrics.set(id, metric);
@@ -554,9 +584,9 @@ export class MemStorage implements IStorage {
     return assignment;
   }
 
-  // Test Impressions (not persisted in MemStorage - for dev only)
-  async createTestImpression(impression: InsertTestImpression): Promise<TestImpression> {
-    console.warn("[MemStorage] Test impressions not persisted in memory - upgrade to DbStorage");
+  // Optimization Impressions (not persisted in MemStorage - for dev only)
+  async createOptimizationImpression(impression: InsertOptimizationImpression): Promise<OptimizationImpression> {
+    console.warn("[MemStorage] Optimization impressions not persisted in memory - upgrade to DbStorage");
     return {
       ...impression,
       id: randomUUID(),
@@ -564,13 +594,13 @@ export class MemStorage implements IStorage {
     };
   }
 
-  async createTestImpressionsBulk(impressions: InsertTestImpression[]): Promise<void> {
-    console.warn(`[MemStorage] ${impressions.length} test impressions not persisted in memory - upgrade to DbStorage`);
+  async createOptimizationImpressionsBulk(impressions: InsertOptimizationImpression[]): Promise<void> {
+    console.warn(`[MemStorage] ${impressions.length} optimization impressions not persisted in memory - upgrade to DbStorage`);
   }
 
-  // Test Conversions (not persisted in MemStorage - for dev only)
-  async createTestConversion(conversion: InsertTestConversion): Promise<TestConversion> {
-    console.warn("[MemStorage] Test conversions not persisted in memory - upgrade to DbStorage");
+  // Optimization Conversions (not persisted in MemStorage - for dev only)
+  async createOptimizationConversion(conversion: InsertOptimizationConversion): Promise<OptimizationConversion> {
+    console.warn("[MemStorage] Optimization conversions not persisted in memory - upgrade to DbStorage");
     return {
       ...conversion,
       id: randomUUID(),
@@ -578,18 +608,18 @@ export class MemStorage implements IStorage {
     };
   }
 
-  async createTestConversionsBulk(conversions: InsertTestConversion[]): Promise<void> {
-    console.warn(`[MemStorage] ${conversions.length} test conversions not persisted in memory - upgrade to DbStorage`);
+  async createOptimizationConversionsBulk(conversions: InsertOptimizationConversion[]): Promise<void> {
+    console.warn(`[MemStorage] ${conversions.length} optimization conversions not persisted in memory - upgrade to DbStorage`);
   }
 
-  // Test Evolution Snapshots (not persisted in MemStorage - for dev only)
-  async getTestEvolutionSnapshots(testId: string): Promise<TestEvolutionSnapshot[]> {
-    console.warn("[MemStorage] Test evolution snapshots not persisted in memory - upgrade to DbStorage");
+  // Optimization Evolution Snapshots (not persisted in MemStorage - for dev only)
+  async getOptimizationEvolutionSnapshots(optimizationId: string): Promise<OptimizationEvolutionSnapshot[]> {
+    console.warn("[MemStorage] Optimization evolution snapshots not persisted in memory - upgrade to DbStorage");
     return [];
   }
 
-  async createTestEvolutionSnapshot(snapshot: InsertTestEvolutionSnapshot): Promise<TestEvolutionSnapshot> {
-    console.warn("[MemStorage] Test evolution snapshots not persisted in memory - upgrade to DbStorage");
+  async createOptimizationEvolutionSnapshot(snapshot: InsertOptimizationEvolutionSnapshot): Promise<OptimizationEvolutionSnapshot> {
+    console.warn("[MemStorage] Optimization evolution snapshots not persisted in memory - upgrade to DbStorage");
     return {
       ...snapshot,
       id: randomUUID(),
@@ -597,8 +627,8 @@ export class MemStorage implements IStorage {
     };
   }
 
-  async createTestEvolutionSnapshotsBulk(snapshots: InsertTestEvolutionSnapshot[]): Promise<void> {
-    console.warn(`[MemStorage] ${snapshots.length} test evolution snapshots not persisted in memory - upgrade to DbStorage`);
+  async createOptimizationEvolutionSnapshotsBulk(snapshots: InsertOptimizationEvolutionSnapshot[]): Promise<void> {
+    console.warn(`[MemStorage] ${snapshots.length} optimization evolution snapshots not persisted in memory - upgrade to DbStorage`);
   }
 
   // Preview Sessions (NOT PERSISTENT - will be lost on restart!)

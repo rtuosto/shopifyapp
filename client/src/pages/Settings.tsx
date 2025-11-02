@@ -87,7 +87,7 @@ export default function Settings() {
         <CardHeader>
           <CardTitle>Installation Script</CardTitle>
           <CardDescription>
-            Add this script to your Shopify theme to enable A/B testing across all pages (product pages, collections, homepage, search)
+            Add this script to your Shopify theme to enable A/B optimization across all pages (product pages, collections, homepage, search)
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

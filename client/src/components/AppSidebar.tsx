@@ -24,8 +24,8 @@ const menuItems = [
     icon: FlaskConical,
   },
   {
-    title: "Tests",
-    url: "/tests",
+    title: "Optimizations",
+    url: "/optimizations",
     icon: Beaker,
   },
   {

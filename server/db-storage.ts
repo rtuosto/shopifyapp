@@ -3,12 +3,12 @@ import { db } from "./db";
 import { 
   products, 
   recommendations, 
-  tests, 
+  optimizations, 
   metrics, 
   sessionAssignments,
-  testImpressions,
-  testConversions,
-  testEvolutionSnapshots,
+  optimizationImpressions,
+  optimizationConversions,
+  optimizationEvolutionSnapshots,
   shops,
   previewSessions,
   themePositioningRules,
@@ -16,18 +16,18 @@ import {
   type InsertProduct,
   type Recommendation,
   type InsertRecommendation,
-  type Test,
-  type InsertTest,
+  type Optimization,
+  type InsertOptimization,
   type Metric,
   type InsertMetric,
   type SessionAssignment,
   type InsertSessionAssignment,
-  type TestImpression,
-  type InsertTestImpression,
-  type TestConversion,
-  type InsertTestConversion,
-  type TestEvolutionSnapshot,
-  type InsertTestEvolutionSnapshot,
+  type OptimizationImpression,
+  type InsertOptimizationImpression,
+  type OptimizationConversion,
+  type InsertOptimizationConversion,
+  type OptimizationEvolutionSnapshot,
+  type InsertOptimizationEvolutionSnapshot,
   type Shop,
   type InsertShop,
   type PreviewSession,
@@ -178,65 +178,65 @@ export class DbStorage implements IStorage {
     return result.length > 0;
   }
 
-  // Tests (shop-scoped)
-  async getTest(shop: string, id: string): Promise<Test | undefined> {
-    const result = await db.select().from(tests)
-      .where(and(eq(tests.shop, shop), eq(tests.id, id)))
+  // Optimizations (shop-scoped)
+  async getOptimization(shop: string, id: string): Promise<Optimization | undefined> {
+    const result = await db.select().from(optimizations)
+      .where(and(eq(optimizations.shop, shop), eq(optimizations.id, id)))
       .limit(1);
     return result[0];
   }
 
-  async getTests(shop: string, status?: string): Promise<Test[]> {
+  async getOptimizations(shop: string, status?: string): Promise<Optimization[]> {
     if (status) {
-      return await db.select().from(tests)
-        .where(and(eq(tests.shop, shop), eq(tests.status, status)))
-        .orderBy(desc(tests.createdAt));
+      return await db.select().from(optimizations)
+        .where(and(eq(optimizations.shop, shop), eq(optimizations.status, status)))
+        .orderBy(desc(optimizations.createdAt));
     }
-    return await db.select().from(tests)
-      .where(eq(tests.shop, shop))
-      .orderBy(desc(tests.createdAt));
+    return await db.select().from(optimizations)
+      .where(eq(optimizations.shop, shop))
+      .orderBy(desc(optimizations.createdAt));
   }
 
-  async getTestsByProduct(shop: string, productId: string): Promise<Test[]> {
-    return await db.select().from(tests)
-      .where(and(eq(tests.shop, shop), eq(tests.productId, productId)))
-      .orderBy(desc(tests.createdAt));
+  async getOptimizationsByProduct(shop: string, productId: string): Promise<Optimization[]> {
+    return await db.select().from(optimizations)
+      .where(and(eq(optimizations.shop, shop), eq(optimizations.productId, productId)))
+      .orderBy(desc(optimizations.createdAt));
   }
 
-  async getActiveTestsByProduct(shop: string, productId: string, testType?: string): Promise<Test[]> {
+  async getActiveOptimizationsByProduct(shop: string, productId: string, optimizationType?: string): Promise<Optimization[]> {
     const conditions = [
-      eq(tests.shop, shop),
-      eq(tests.productId, productId),
-      eq(tests.status, 'active')
+      eq(optimizations.shop, shop),
+      eq(optimizations.productId, productId),
+      eq(optimizations.status, 'active')
     ];
     
-    if (testType) {
-      conditions.push(eq(tests.testType, testType));
+    if (optimizationType) {
+      conditions.push(eq(optimizations.optimizationType, optimizationType));
     }
     
-    return await db.select().from(tests)
+    return await db.select().from(optimizations)
       .where(and(...conditions))
-      .orderBy(desc(tests.createdAt));
+      .orderBy(desc(optimizations.createdAt));
   }
 
-  async createTest(shop: string, test: InsertTest): Promise<Test> {
-    const [result] = await db.insert(tests).values({ ...test, shop }).returning();
+  async createOptimization(shop: string, optimization: InsertOptimization): Promise<Optimization> {
+    const [result] = await db.insert(optimizations).values({ ...optimization, shop }).returning();
     return result;
   }
 
-  async updateTest(shop: string, id: string, updates: Partial<InsertTest>): Promise<Test | undefined> {
+  async updateOptimization(shop: string, id: string, updates: Partial<InsertOptimization>): Promise<Optimization | undefined> {
     // Remove shop from updates to prevent cross-tenant reassignment
     const { shop: _, ...safeUpdates } = updates as any;
-    const [result] = await db.update(tests)
+    const [result] = await db.update(optimizations)
       .set({ ...safeUpdates, updatedAt: new Date() })
-      .where(and(eq(tests.shop, shop), eq(tests.id, id)))
+      .where(and(eq(optimizations.shop, shop), eq(optimizations.id, id)))
       .returning();
     return result;
   }
 
-  async deleteTest(shop: string, id: string): Promise<boolean> {
-    const result = await db.delete(tests)
-      .where(and(eq(tests.shop, shop), eq(tests.id, id)))
+  async deleteOptimization(shop: string, id: string): Promise<boolean> {
+    const result = await db.delete(optimizations)
+      .where(and(eq(optimizations.shop, shop), eq(optimizations.id, id)))
       .returning();
     return result.length > 0;
   }
@@ -276,43 +276,43 @@ export class DbStorage implements IStorage {
     return result;
   }
 
-  // Test Impressions (NOT shop-scoped - global tracking)
-  async createTestImpression(impression: InsertTestImpression): Promise<TestImpression> {
-    const [result] = await db.insert(testImpressions).values(impression).returning();
+  // Optimization Impressions (NOT shop-scoped - global tracking)
+  async createOptimizationImpression(impression: InsertOptimizationImpression): Promise<OptimizationImpression> {
+    const [result] = await db.insert(optimizationImpressions).values(impression).returning();
     return result;
   }
 
-  async createTestImpressionsBulk(impressions: InsertTestImpression[]): Promise<void> {
+  async createOptimizationImpressionsBulk(impressions: InsertOptimizationImpression[]): Promise<void> {
     if (impressions.length === 0) return;
-    await db.insert(testImpressions).values(impressions);
+    await db.insert(optimizationImpressions).values(impressions);
   }
 
-  // Test Conversions (NOT shop-scoped - global tracking)
-  async createTestConversion(conversion: InsertTestConversion): Promise<TestConversion> {
-    const [result] = await db.insert(testConversions).values(conversion).returning();
+  // Optimization Conversions (NOT shop-scoped - global tracking)
+  async createOptimizationConversion(conversion: InsertOptimizationConversion): Promise<OptimizationConversion> {
+    const [result] = await db.insert(optimizationConversions).values(conversion).returning();
     return result;
   }
 
-  async createTestConversionsBulk(conversions: InsertTestConversion[]): Promise<void> {
+  async createOptimizationConversionsBulk(conversions: InsertOptimizationConversion[]): Promise<void> {
     if (conversions.length === 0) return;
-    await db.insert(testConversions).values(conversions);
+    await db.insert(optimizationConversions).values(conversions);
   }
 
-  // Test Evolution Snapshots
-  async getTestEvolutionSnapshots(testId: string): Promise<TestEvolutionSnapshot[]> {
-    return await db.select().from(testEvolutionSnapshots)
-      .where(eq(testEvolutionSnapshots.testId, testId))
-      .orderBy(testEvolutionSnapshots.impressions);
+  // Optimization Evolution Snapshots
+  async getOptimizationEvolutionSnapshots(optimizationId: string): Promise<OptimizationEvolutionSnapshot[]> {
+    return await db.select().from(optimizationEvolutionSnapshots)
+      .where(eq(optimizationEvolutionSnapshots.optimizationId, optimizationId))
+      .orderBy(optimizationEvolutionSnapshots.impressions);
   }
 
-  async createTestEvolutionSnapshot(snapshot: InsertTestEvolutionSnapshot): Promise<TestEvolutionSnapshot> {
-    const [result] = await db.insert(testEvolutionSnapshots).values(snapshot).returning();
+  async createOptimizationEvolutionSnapshot(snapshot: InsertOptimizationEvolutionSnapshot): Promise<OptimizationEvolutionSnapshot> {
+    const [result] = await db.insert(optimizationEvolutionSnapshots).values(snapshot).returning();
     return result;
   }
 
-  async createTestEvolutionSnapshotsBulk(snapshots: InsertTestEvolutionSnapshot[]): Promise<void> {
+  async createOptimizationEvolutionSnapshotsBulk(snapshots: InsertOptimizationEvolutionSnapshot[]): Promise<void> {
     if (snapshots.length === 0) return;
-    await db.insert(testEvolutionSnapshots).values(snapshots);
+    await db.insert(optimizationEvolutionSnapshots).values(snapshots);
   }
 
   // Preview Sessions (storefront overlay preview)

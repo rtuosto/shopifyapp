@@ -5,12 +5,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import DashboardHeader from "@/components/DashboardHeader";
 import MetricCard from "@/components/MetricCard";
-import TestHistoryTable from "@/components/TestHistoryTable";
+import OptimizationHistoryTable from "@/components/OptimizationHistoryTable";
 import PerformanceChart from "@/components/PerformanceChart";
 import SetupGuide from "@/components/SetupGuide";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Product, Recommendation, Test, Metric } from "@shared/schema";
+import type { Product, Recommendation, Optimization, Metric } from "@shared/schema";
 
 interface SyncStatus {
   syncing: boolean;
@@ -21,7 +21,7 @@ interface SyncStatus {
 }
 
 interface IncrementalMetrics {
-  testCount: number;
+  optimizationCount: number;
   incrementalRPV: number;
   incrementalRevenue: number;
   totalRevenue: number;
@@ -32,14 +32,14 @@ interface IncrementalMetrics {
 interface DashboardData {
   totalProducts: number;
   pendingRecommendations: number;
-  activeTests: number;
+  activeOptimizations: number;
   latestMetric?: Metric;
   syncStatus?: SyncStatus;
   allTimeMetrics: IncrementalMetrics;
   activeMetrics: IncrementalMetrics;
 }
 
-interface EnrichedTest extends Test {
+interface EnrichedOptimization extends Optimization {
   productName: string;
 }
 
@@ -106,8 +106,8 @@ export default function Dashboard() {
     },
   });
 
-  // Create test from recommendation mutation
-  const createTestMutation = useMutation({
+  // Create optimization from recommendation mutation
+  const createOptimizationMutation = useMutation({
     mutationFn: async ({ recommendationId, productId }: { recommendationId: string; productId: string }) => {
       const recommendation = recommendations.find(r => r.id === recommendationId);
       const product = products.find(p => p.id === productId);
@@ -123,8 +123,8 @@ export default function Dashboard() {
         price: parseFloat(product.price),
       };
 
-      // For price tests, store all variant prices in control and variant data
-      if (recommendation.testType === "price" && product.variants && product.variants.length > 0) {
+      // For price optimizations, store all variant prices in control and variant data
+      if (recommendation.optimizationType === "price" && product.variants && product.variants.length > 0) {
         controlData.variantPrices = product.variants.map((v: any) => ({
           id: v.id,
           price: v.price,
@@ -137,8 +137,8 @@ export default function Dashboard() {
         ...recommendation.proposedChanges,
       };
 
-      // For price tests, calculate proportional price changes for all variants
-      if (recommendation.testType === "price" && controlData.variantPrices) {
+      // For price optimizations, calculate proportional price changes for all variants
+      if (recommendation.optimizationType === "price" && controlData.variantPrices) {
         const priceMultiplier = variantData.price / controlData.price;
         variantData.variantPrices = controlData.variantPrices.map((v: any) => ({
           id: v.id,
@@ -146,10 +146,10 @@ export default function Dashboard() {
         }));
       }
 
-      const testData = {
+      const optimizationData = {
         productId: product.id,
         recommendationId: recommendation.id,
-        testType: recommendation.testType,
+        optimizationType: recommendation.optimizationType,
         status: "draft",
         controlData,
         variantData,
@@ -160,7 +160,7 @@ export default function Dashboard() {
         revenue: "0",
       };
 
-      const res = await apiRequest("POST", "/api/tests", testData);
+      const res = await apiRequest("POST", "/api/optimizations", optimizationData);
       return res.json();
     },
     onSuccess: async (data, variables) => {
@@ -168,67 +168,67 @@ export default function Dashboard() {
       await apiRequest("PATCH", `/api/recommendations/${variables.recommendationId}`, { status: "testing" });
       
       toast({
-        title: "Test Created",
-        description: "Your A/B test has been created successfully",
+        title: "Optimization Created",
+        description: "Your A/B optimization has been created successfully",
       });
       
       // Invalidate queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/optimizations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/recommendations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
     },
     onError: (error: Error) => {
       toast({
-        title: "Failed to Create Test",
-        description: error.message || "Could not create test from recommendation",
+        title: "Failed to Create Optimization",
+        description: error.message || "Could not create optimization from recommendation",
         variant: "destructive",
       });
     },
   });
 
-  // Activate test mutation
-  const activateTestMutation = useMutation({
-    mutationFn: async (testId: string) => {
-      const res = await apiRequest("POST", `/api/tests/${testId}/activate`);
+  // Activate optimization mutation
+  const activateOptimizationMutation = useMutation({
+    mutationFn: async (optimizationId: string) => {
+      const res = await apiRequest("POST", `/api/optimizations/${optimizationId}/activate`);
       return res.json();
     },
     onSuccess: () => {
       toast({
-        title: "Test Activated",
-        description: "Test is now live in your Shopify store",
+        title: "Optimization Activated",
+        description: "Optimization is now live in your Shopify store",
       });
       
-      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/optimizations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
     },
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to activate test",
+        description: error.message || "Failed to activate optimization",
         variant: "destructive",
       });
     },
   });
 
-  // Deactivate test mutation
-  const deactivateTestMutation = useMutation({
-    mutationFn: async (testId: string) => {
-      const res = await apiRequest("POST", `/api/tests/${testId}/deactivate`);
+  // Deactivate optimization mutation
+  const deactivateOptimizationMutation = useMutation({
+    mutationFn: async (optimizationId: string) => {
+      const res = await apiRequest("POST", `/api/optimizations/${optimizationId}/deactivate`);
       return res.json();
     },
     onSuccess: () => {
       toast({
-        title: "Test Deactivated",
+        title: "Optimization Deactivated",
         description: "Product reverted to original values",
       });
       
-      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/optimizations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
     },
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to deactivate test",
+        description: error.message || "Failed to deactivate optimization",
         variant: "destructive",
       });
     },
@@ -270,9 +270,9 @@ export default function Dashboard() {
     },
   });
 
-  // Fetch tests
-  const { data: tests = [] } = useQuery<EnrichedTest[]>({
-    queryKey: ["/api/tests"],
+  // Fetch optimizations
+  const { data: optimizations = [] } = useQuery<EnrichedOptimization[]>({
+    queryKey: ["/api/optimizations"],
   });
 
   // Fetch metrics for chart
@@ -340,21 +340,21 @@ export default function Dashboard() {
       revenue: parseFloat(m.revenue),
     }));
 
-  // Calculate metrics from latest data and active tests
-  const activeTests = tests.filter(t => t.status === 'active');
-  const totalRevenue = activeTests.reduce((sum, t) => sum + parseFloat(t.revenue || "0"), 0);
-  const totalConversions = activeTests.reduce((sum, t) => sum + (t.conversions || 0), 0);
+  // Calculate metrics from latest data and active optimizations
+  const activeOptimizations = optimizations.filter(t => t.status === 'active');
+  const totalRevenue = activeOptimizations.reduce((sum, t) => sum + parseFloat(t.revenue || "0"), 0);
+  const totalConversions = activeOptimizations.reduce((sum, t) => sum + (t.conversions || 0), 0);
   const currentArpu = totalConversions > 0 ? totalRevenue / totalConversions : 0;
   
   const revenueLift = latestMetric?.revenueLift ? '$' + parseFloat(latestMetric.revenueLift).toFixed(0) : '$0';
-  const activeTestsCount = dashboardData?.activeTests || activeTests.length;
+  const activeOptimizationsCount = dashboardData?.activeOptimizations || activeOptimizations.length;
 
-  // Format tests for table - show only completed tests on dashboard
-  const completedTests = tests.filter(t => t.status === 'completed');
-  const formattedTests = completedTests.map(test => ({
+  // Format optimizations for table - show only completed optimizations on dashboard
+  const completedOptimizations = optimizations.filter(t => t.status === 'completed');
+  const formattedOptimizations = completedOptimizations.map(test => ({
     id: test.id,
     productName: test.productName,
-    testType: test.testType,
+    optimizationType: test.optimizationType,
     status: test.status as "active" | "completed" | "draft",
     arpu: test.arpu ? parseFloat(test.arpu) : 0,
     arpuLift: test.arpuLift ? parseFloat(test.arpuLift) : 0,
@@ -415,7 +415,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <DashboardHeader 
-        activeTests={activeTestsCount} 
+        activeOptimizations={activeOptimizationsCount} 
         lastSync={getLastSyncText()}
         quotaUsed={quotaData?.used}
         quotaTotal={quotaData?.quota}
@@ -428,10 +428,10 @@ export default function Dashboard() {
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard 
-            title="Tests Run" 
-            value={dashboardData?.allTimeMetrics?.testCount?.toString() || '0'}
+            title="Optimizations Run" 
+            value={dashboardData?.allTimeMetrics?.optimizationCount?.toString() || '0'}
             subtitle="total experiments"
-            data-testid="card-all-time-tests"
+            data-testid="card-all-time-optimizations"
           />
           <MetricCard 
             title="Incremental RPV" 
@@ -458,7 +458,7 @@ export default function Dashboard() {
               const { incrementalRevenue } = dashboardData.allTimeMetrics;
               return formatIncrementalValue(incrementalRevenue, 0).className;
             })()}
-            subtitle="lift from tests"
+            subtitle="lift from optimizations"
             data-testid="card-all-time-revenue"
           />
           <MetricCard 
@@ -473,7 +473,7 @@ export default function Dashboard() {
               const { incrementalConversions } = dashboardData.allTimeMetrics;
               return formatIncrementalConversions(incrementalConversions).className;
             })()}
-            subtitle="lift from tests"
+            subtitle="lift from optimizations"
             data-testid="card-all-time-conversions"
           />
         </div>
@@ -486,10 +486,10 @@ export default function Dashboard() {
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard 
-            title="Active Tests" 
-            value={dashboardData?.activeMetrics?.testCount?.toString() || '0'}
+            title="Active Optimizations" 
+            value={dashboardData?.activeMetrics?.optimizationCount?.toString() || '0'}
             subtitle="running now"
-            data-testid="card-active-tests"
+            data-testid="card-active-optimizations"
           />
           <MetricCard 
             title="Incremental RPV" 
@@ -516,7 +516,7 @@ export default function Dashboard() {
               const { incrementalRevenue } = dashboardData.activeMetrics;
               return formatIncrementalValue(incrementalRevenue, 0).className;
             })()}
-            subtitle="lift from tests"
+            subtitle="lift from optimizations"
             data-testid="card-active-revenue"
           />
           <MetricCard 
@@ -531,13 +531,13 @@ export default function Dashboard() {
               const { incrementalConversions } = dashboardData.activeMetrics;
               return formatIncrementalConversions(incrementalConversions).className;
             })()}
-            subtitle="lift from tests"
+            subtitle="lift from optimizations"
             data-testid="card-active-conversions"
           />
         </div>
       </div>
 
-      {activeTestsCount === 0 && completedTests.length === 0 && (
+      {activeOptimizationsCount === 0 && completedOptimizations.length === 0 && (
         <SetupGuide />
       )}
 
@@ -545,19 +545,19 @@ export default function Dashboard() {
         <PerformanceChart data={chartData} />
       )}
 
-      {activeTestsCount > 0 && (
+      {activeOptimizationsCount > 0 && (
         <Card className="mb-6">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold mb-1">Active Tests</h3>
+                <h3 className="text-lg font-semibold mb-1">Active Optimizations</h3>
                 <p className="text-sm text-muted-foreground">
-                  You have {activeTestsCount} test{activeTestsCount === 1 ? '' : 's'} running live in your store
+                  You have {activeOptimizationsCount} optimization{activeOptimizationsCount === 1 ? '' : 's'} running live in your store
                 </p>
               </div>
-              <Link href="/tests">
-                <Button variant="outline" data-testid="button-view-tests">
-                  View All Tests
+              <Link href="/optimizations">
+                <Button variant="outline" data-testid="button-view-optimizations">
+                  View All Optimizations
                 </Button>
               </Link>
             </div>
@@ -565,13 +565,13 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {formattedTests.length > 0 && (
+      {formattedOptimizations.length > 0 && (
         <div>
-          <h2 className="text-xl font-semibold mb-4">Completed Tests</h2>
-          <TestHistoryTable 
-            tests={formattedTests} 
-            onStartTest={(testId) => activateTestMutation.mutate(testId)}
-            onStopTest={(testId) => deactivateTestMutation.mutate(testId)}
+          <h2 className="text-xl font-semibold mb-4">Completed Optimizations</h2>
+          <OptimizationHistoryTable 
+            optimizations={formattedOptimizations} 
+            onStartOptimization={(optimizationId) => activateOptimizationMutation.mutate(optimizationId)}
+            onStopOptimization={(optimizationId) => deactivateOptimizationMutation.mutate(optimizationId)}
           />
         </div>
       )}

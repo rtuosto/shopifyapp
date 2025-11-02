@@ -1,34 +1,34 @@
 /**
  * Assignment Service
  * 
- * Centralized logic for assigning visitors to test variants.
+ * Centralized logic for assigning visitors to optimization variants.
  * Used by both the SDK HTTP endpoint and the batch simulator to ensure
  * consistent behavior across production and testing environments.
  */
 
 import type { IStorage } from './storage';
-import type { Test } from '../shared/schema';
+import type { Optimization } from '../shared/schema';
 
 export interface AssignmentResult {
   variant: 'control' | 'variant';
   sessionId: string;
-  testId: string;
+  optimizationId: string;
 }
 
 export interface AssignVisitorParams {
   shop: string;
-  testId: string;
+  optimizationId: string;
   sessionId: string;
-  test?: Test; // Optional: pass if already fetched to avoid double lookup
-  seed?: number; // Optional: for deterministic assignment in tests
+  optimization?: Optimization; // Optional: pass if already fetched to avoid double lookup
+  seed?: number; // Optional: for deterministic assignment in testing
 }
 
 /**
- * Assign a visitor to a variant using the test's current allocation percentages.
+ * Assign a visitor to a variant using the optimization's current allocation percentages.
  * This is the SINGLE source of truth for variant assignment logic.
  * 
  * Flow:
- * 1. Fetch test (or use provided test object)
+ * 1. Fetch optimization (or use provided optimization object)
  * 2. Use weighted random selection based on current controlAllocation/variantAllocation
  * 3. Create session assignment record
  * 4. Return assigned variant
@@ -37,22 +37,22 @@ export async function assignVisitor(
   storage: IStorage,
   params: AssignVisitorParams
 ): Promise<AssignmentResult> {
-  const { shop, testId, sessionId, test: providedTest, seed } = params;
+  const { shop, optimizationId, sessionId, optimization: providedOptimization, seed } = params;
   
-  // Fetch test if not provided
-  const test = providedTest || await storage.getTest(shop, testId);
+  // Fetch optimization if not provided
+  const optimization = providedOptimization || await storage.getOptimization(shop, optimizationId);
   
-  if (!test) {
-    throw new Error(`Test ${testId} not found for shop ${shop}`);
+  if (!optimization) {
+    throw new Error(`Optimization ${optimizationId} not found for shop ${shop}`);
   }
   
-  if (test.status !== 'active') {
-    throw new Error(`Test ${testId} is not active (status: ${test.status})`);
+  if (optimization.status !== 'active') {
+    throw new Error(`Optimization ${optimizationId} is not active (status: ${optimization.status})`);
   }
   
   // Get current allocation percentages (which Bayesian engine may have updated)
-  const controlAllocation = parseFloat(test.controlAllocation || '50') / 100;
-  const variantAllocation = parseFloat(test.variantAllocation || '50') / 100;
+  const controlAllocation = parseFloat(optimization.controlAllocation || '50') / 100;
+  const variantAllocation = parseFloat(optimization.variantAllocation || '50') / 100;
   const totalAllocation = controlAllocation + variantAllocation;
   
   // Normalize allocations to ensure they sum to 1.0
@@ -68,7 +68,7 @@ export async function assignVisitor(
   
   await storage.createSessionAssignment(shop, {
     sessionId,
-    testId,
+    optimizationId,
     variant,
     expiresAt,
   });
@@ -76,7 +76,7 @@ export async function assignVisitor(
   return {
     variant,
     sessionId,
-    testId,
+    optimizationId,
   };
 }
 
@@ -92,70 +92,70 @@ function seededRandom(seed: number): number {
 }
 
 /**
- * Record an impression for a test variant.
- * Increments the appropriate counters in the test record.
+ * Record an impression for an optimization variant.
+ * Increments the appropriate counters in the optimization record.
  */
 export async function recordImpression(
   storage: IStorage,
   params: {
     shop: string;
-    testId: string;
+    optimizationId: string;
     variant: 'control' | 'variant';
   }
 ): Promise<void> {
-  const { shop, testId, variant } = params;
+  const { shop, optimizationId, variant } = params;
   
-  const test = await storage.getTest(shop, testId);
-  if (!test || test.status !== 'active') {
-    throw new Error(`Active test ${testId} not found for shop ${shop}`);
+  const optimization = await storage.getOptimization(shop, optimizationId);
+  if (!optimization || optimization.status !== 'active') {
+    throw new Error(`Active optimization ${optimizationId} not found for shop ${shop}`);
   }
   
   // Increment the appropriate impression counter
   const updates: any = {
-    impressions: (test.impressions || 0) + 1,
+    impressions: (optimization.impressions || 0) + 1,
   };
   
   if (variant === 'control') {
-    updates.controlImpressions = (test.controlImpressions || 0) + 1;
+    updates.controlImpressions = (optimization.controlImpressions || 0) + 1;
   } else {
-    updates.variantImpressions = (test.variantImpressions || 0) + 1;
+    updates.variantImpressions = (optimization.variantImpressions || 0) + 1;
   }
   
-  await storage.updateTest(shop, testId, updates);
+  await storage.updateOptimization(shop, optimizationId, updates);
 }
 
 /**
- * Record a conversion for a test variant.
+ * Record a conversion for an optimization variant.
  * Increments conversion counters and adds revenue.
  */
 export async function recordConversion(
   storage: IStorage,
   params: {
     shop: string;
-    testId: string;
+    optimizationId: string;
     variant: 'control' | 'variant';
     revenue: number;
   }
 ): Promise<void> {
-  const { shop, testId, variant, revenue } = params;
+  const { shop, optimizationId, variant, revenue } = params;
   
-  const test = await storage.getTest(shop, testId);
-  if (!test) {
-    throw new Error(`Test ${testId} not found for shop ${shop}`);
+  const optimization = await storage.getOptimization(shop, optimizationId);
+  if (!optimization) {
+    throw new Error(`Optimization ${optimizationId} not found for shop ${shop}`);
   }
   
   // Increment conversion counters and add revenue
   const updates: any = {
-    conversions: (test.conversions || 0) + 1,
-    revenue: (parseFloat(test.revenue || '0') + revenue).toString(),
+    conversions: (optimization.conversions || 0) + 1,
+    revenue: (parseFloat(optimization.revenue || '0') + revenue).toString(),
   };
   
   if (variant === 'control') {
-    updates.controlConversions = (test.controlConversions || 0) + 1;
-    updates.controlRevenue = (parseFloat(test.controlRevenue || '0') + revenue).toString();
+    updates.controlConversions = (optimization.controlConversions || 0) + 1;
+    updates.controlRevenue = (parseFloat(optimization.controlRevenue || '0') + revenue).toString();
   } else {
-    updates.variantConversions = (test.variantConversions || 0) + 1;
-    updates.variantRevenue = (parseFloat(test.variantRevenue || '0') + revenue).toString();
+    updates.variantConversions = (optimization.variantConversions || 0) + 1;
+    updates.variantRevenue = (parseFloat(optimization.variantRevenue || '0') + revenue).toString();
   }
   
   // Recalculate ARPU
@@ -163,5 +163,5 @@ export async function recordConversion(
   const newRevenue = parseFloat(updates.revenue);
   updates.arpu = newConversions > 0 ? (newRevenue / newConversions).toString() : '0';
   
-  await storage.updateTest(shop, testId, updates);
+  await storage.updateOptimization(shop, optimizationId, updates);
 }

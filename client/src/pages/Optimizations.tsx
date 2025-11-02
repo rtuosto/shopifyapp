@@ -43,23 +43,23 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import type { Test, Product, TestEvolutionSnapshot } from "@shared/schema";
-import { formatTestType } from "@/lib/testTypeFormatter";
+import type { Optimization, Product, OptimizationEvolutionSnapshot } from "@shared/schema";
+import { formatOptimizationType } from "@/lib/optimizationTypeFormatter";
 
-interface EnrichedTest extends Test {
+interface EnrichedOptimization extends Optimization {
   productName: string;
 }
 
-interface TestEvolutionChartsProps {
-  testId: string;
+interface OptimizationEvolutionChartsProps {
+  optimizationId: string;
 }
 
-function TestEvolutionCharts({ testId }: TestEvolutionChartsProps) {
-  const { data: snapshots = [], isLoading } = useQuery<TestEvolutionSnapshot[]>(
+function OptimizationEvolutionCharts({ optimizationId }: OptimizationEvolutionChartsProps) {
+  const { data: snapshots = [], isLoading } = useQuery<OptimizationEvolutionSnapshot[]>(
     {
-      queryKey: ["/api/tests", testId, "evolution"],
+      queryKey: ["/api/optimizations", optimizationId, "evolution"],
       queryFn: async () => {
-        const res = await fetch(`/api/tests/${testId}/evolution`);
+        const res = await fetch(`/api/optimizations/${optimizationId}/evolution`);
         if (!res.ok) throw new Error("Failed to fetch evolution data");
         return res.json();
       },
@@ -96,7 +96,7 @@ function TestEvolutionCharts({ testId }: TestEvolutionChartsProps) {
       {/* RPV Evolution Chart */}
       <div
         className="p-4 border rounded-lg space-y-3"
-        data-testid={`chart-rpv-evolution-${testId}`}
+        data-testid={`chart-rpv-evolution-${optimizationId}`}
       >
         <div>
           <div className="text-sm font-medium">RPV Evolution Over Time</div>
@@ -113,7 +113,7 @@ function TestEvolutionCharts({ testId }: TestEvolutionChartsProps) {
             <XAxis
               dataKey="impressions"
               label={{
-                value: "Total Test Impressions",
+                value: "Total Optimization Impressions",
                 position: "insideBottom",
                 offset: -10,
               }}
@@ -155,7 +155,7 @@ function TestEvolutionCharts({ testId }: TestEvolutionChartsProps) {
       {/* Allocation Evolution Chart */}
       <div
         className="p-4 border rounded-lg space-y-3"
-        data-testid={`chart-allocation-evolution-${testId}`}
+        data-testid={`chart-allocation-evolution-${optimizationId}`}
       >
         <div>
           <div className="text-sm font-medium">
@@ -175,7 +175,7 @@ function TestEvolutionCharts({ testId }: TestEvolutionChartsProps) {
             <XAxis
               dataKey="impressions"
               label={{
-                value: "Total Test Impressions",
+                value: "Total Optimization Impressions",
                 position: "insideBottom",
                 offset: -10,
               }}
@@ -216,7 +216,7 @@ function TestEvolutionCharts({ testId }: TestEvolutionChartsProps) {
   );
 }
 
-export default function Tests() {
+export default function Optimizations() {
   const { toast } = useToast();
 
   // Filter state
@@ -224,9 +224,9 @@ export default function Tests() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [productSearch, setProductSearch] = useState<string>("");
 
-  // Fetch all tests with auto-refresh using refetchInterval
-  const { data: tests = [], isLoading: testsLoading } = useQuery<Test[]>({
-    queryKey: ["/api/tests"],
+  // Fetch all optimizations with auto-refresh using refetchInterval
+  const { data: optimizations = [], isLoading: optimizationsLoading } = useQuery<Optimization[]>({
+    queryKey: ["/api/optimizations"],
     refetchInterval: 2000,
   });
 
@@ -235,65 +235,65 @@ export default function Tests() {
     queryKey: ["/api/products"],
   });
 
-  // Enrich all tests with product names
-  const allTestsWithNames: EnrichedTest[] = tests.map((test: Test) => ({
-    ...test,
+  // Enrich all optimizations with product names
+  const allOptimizationsWithNames: EnrichedOptimization[] = optimizations.map((optimization: Optimization) => ({
+    ...optimization,
     productName:
-      products.find((p: Product) => p.id === test.productId)?.title ||
+      products.find((p: Product) => p.id === optimization.productId)?.title ||
       "Unknown Product",
   }));
 
   // Apply filters
-  const filteredTests = allTestsWithNames.filter((test) => {
+  const filteredOptimizations = allOptimizationsWithNames.filter((optimization) => {
     // Status filter
-    if (statusFilter !== "all" && test.status !== statusFilter) {
+    if (statusFilter !== "all" && optimization.status !== statusFilter) {
       return false;
     }
 
     // Type filter
-    if (typeFilter !== "all" && test.testType !== typeFilter) {
+    if (typeFilter !== "all" && optimization.optimizationType !== typeFilter) {
       return false;
     }
 
     // Product search
-    if (productSearch && !test.productName.toLowerCase().includes(productSearch.toLowerCase())) {
+    if (productSearch && !optimization.productName.toLowerCase().includes(productSearch.toLowerCase())) {
       return false;
     }
 
     return true;
   });
 
-  // For displaying - show all filtered tests
-  const activeAndDraftTests = filteredTests;
+  // For displaying - show all filtered optimizations
+  const activeAndDraftOptimizations = filteredOptimizations;
 
-  // Filter only truly active tests for metrics (exclude drafts and paused)
-  const trulyActiveTests = activeAndDraftTests.filter(
+  // Filter only truly active optimizations for metrics (exclude drafts and paused)
+  const trulyActiveOptimizations = activeAndDraftOptimizations.filter(
     (t) => t.status === "active",
   );
 
-  // Activate test mutation
-  const activateTestMutation = useMutation({
-    mutationFn: async (testId: string) => {
-      const res = await apiRequest("POST", `/api/tests/${testId}/activate`);
+  // Activate optimization mutation
+  const activateOptimizationMutation = useMutation({
+    mutationFn: async (optimizationId: string) => {
+      const res = await apiRequest("POST", `/api/optimizations/${optimizationId}/activate`);
       return res.json();
     },
     onSuccess: () => {
       toast({
-        title: "Test Activated",
-        description: "Test is now live and collecting data",
+        title: "Optimization Activated",
+        description: "Optimization is now live and collecting data",
       });
 
-      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/optimizations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
     },
     onError: (error: Error) => {
       // Provide more helpful error messages
       let title = "Activation Failed";
-      let description = error.message || "Failed to activate test";
+      let description = error.message || "Failed to activate optimization";
       
       // Handle specific error cases
-      if (description.includes("active") && description.includes("test")) {
-        title = "Conflicting Test Active";
+      if (description.includes("active") && description.includes("optimization")) {
+        title = "Conflicting Optimization Active";
       }
       
       toast({
@@ -304,89 +304,89 @@ export default function Tests() {
     },
   });
 
-  // Pause test mutation
-  const pauseTestMutation = useMutation({
-    mutationFn: async (testId: string) => {
-      const res = await apiRequest("POST", `/api/tests/${testId}/pause`);
+  // Pause optimization mutation
+  const pauseOptimizationMutation = useMutation({
+    mutationFn: async (optimizationId: string) => {
+      const res = await apiRequest("POST", `/api/optimizations/${optimizationId}/pause`);
       return res.json();
     },
     onSuccess: () => {
       toast({
-        title: "Test Paused",
-        description: "Test stopped collecting data but can be resumed",
+        title: "Optimization Paused",
+        description: "Optimization stopped collecting data but can be resumed",
       });
 
-      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/optimizations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
     },
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to pause test",
+        description: error.message || "Failed to pause optimization",
         variant: "destructive",
       });
     },
   });
 
-  // Resume test mutation
-  const resumeTestMutation = useMutation({
-    mutationFn: async (testId: string) => {
-      const res = await apiRequest("POST", `/api/tests/${testId}/resume`);
+  // Resume optimization mutation
+  const resumeOptimizationMutation = useMutation({
+    mutationFn: async (optimizationId: string) => {
+      const res = await apiRequest("POST", `/api/optimizations/${optimizationId}/resume`);
       return res.json();
     },
     onSuccess: () => {
       toast({
-        title: "Test Resumed",
-        description: "Test is now live and collecting data again",
+        title: "Optimization Resumed",
+        description: "Optimization is now live and collecting data again",
       });
 
-      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/optimizations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
     },
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to resume test",
+        description: error.message || "Failed to resume optimization",
         variant: "destructive",
       });
     },
   });
 
-  // Deactivate test mutation (renamed to Cancel Test in UI)
-  const deactivateTestMutation = useMutation({
-    mutationFn: async (testId: string) => {
-      const res = await apiRequest("POST", `/api/tests/${testId}/deactivate`);
+  // Deactivate optimization mutation (renamed to Cancel Optimization in UI)
+  const deactivateOptimizationMutation = useMutation({
+    mutationFn: async (optimizationId: string) => {
+      const res = await apiRequest("POST", `/api/optimizations/${optimizationId}/deactivate`);
       return res.json();
     },
     onSuccess: () => {
       toast({
-        title: "Test Cancelled",
-        description: "Test has been cancelled and original values restored",
+        title: "Optimization Cancelled",
+        description: "Optimization has been cancelled and original values restored",
       });
 
-      queryClient.invalidateQueries({ queryKey: ["/api/tests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/optimizations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
     },
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to cancel test",
+        description: error.message || "Failed to cancel optimization",
         variant: "destructive",
       });
     },
   });
 
-  // Calculate summary metrics ONLY from truly active tests (exclude drafts)
+  // Calculate summary metrics ONLY from truly active optimizations (exclude drafts)
   // Sum control and variant impressions/conversions separately to avoid string concatenation
-  const totalImpressions = trulyActiveTests.reduce(
+  const totalImpressions = trulyActiveOptimizations.reduce(
     (sum, t) => sum + (Number(t.controlImpressions) || 0) + (Number(t.variantImpressions) || 0),
     0,
   );
-  const totalConversions = trulyActiveTests.reduce(
+  const totalConversions = trulyActiveOptimizations.reduce(
     (sum, t) => sum + (Number(t.controlConversions) || 0) + (Number(t.variantConversions) || 0),
     0,
   );
-  const totalRevenue = trulyActiveTests.reduce((sum, t) => {
+  const totalRevenue = trulyActiveOptimizations.reduce((sum, t) => {
     const revenue = t.revenue ? parseFloat(t.revenue) : 0;
     return sum + (isNaN(revenue) ? 0 : revenue);
   }, 0);
@@ -402,13 +402,13 @@ export default function Tests() {
     <div className="container mx-auto p-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold" data-testid="text-page-title">
-          Tests
+          Optimizations
         </h1>
         <p
           className="text-muted-foreground"
           data-testid="text-page-description"
         >
-          Manage all your A/B tests - draft, active, paused, and completed
+          Manage all your A/B optimizations - draft, active, paused, and completed
         </p>
       </div>
 
@@ -442,7 +442,7 @@ export default function Tests() {
 
               {/* Type Filter */}
               <div className="space-y-2">
-                <label className="text-xs text-muted-foreground">Test Type</label>
+                <label className="text-xs text-muted-foreground">Optimization Type</label>
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
                   <SelectTrigger data-testid="select-type-filter">
                     <SelectValue placeholder="All types" />
@@ -492,13 +492,13 @@ export default function Tests() {
       </Card>
 
       {/* Summary Metrics */}
-      {trulyActiveTests.length > 0 && (
+      {trulyActiveOptimizations.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card data-testid="card-metric-tests">
+          <Card data-testid="card-metric-optimizations">
             <CardHeader className="pb-3">
-              <CardDescription>Active Tests</CardDescription>
+              <CardDescription>Active Optimizations</CardDescription>
               <CardTitle className="text-3xl">
-                {trulyActiveTests.length}
+                {trulyActiveOptimizations.length}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -550,23 +550,23 @@ export default function Tests() {
         </div>
       )}
 
-      {/* Active Tests List */}
-      {testsLoading ? (
+      {/* Active Optimizations List */}
+      {optimizationsLoading ? (
         <Card data-testid="card-loading">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <div className="text-center space-y-2">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-              <p className="text-sm text-muted-foreground">Loading tests...</p>
+              <p className="text-sm text-muted-foreground">Loading optimizations...</p>
             </div>
           </CardContent>
         </Card>
-      ) : activeAndDraftTests.length === 0 ? (
-        <Card data-testid="card-no-tests">
+      ) : activeAndDraftOptimizations.length === 0 ? (
+        <Card data-testid="card-no-optimizations">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <div className="text-center space-y-2">
-              <h3 className="text-lg font-semibold">No Tests Yet</h3>
+              <h3 className="text-lg font-semibold">No Optimizations Yet</h3>
               <p className="text-sm text-muted-foreground max-w-md">
-                Create a test from an AI recommendation to get started
+                Create an optimization from an AI recommendation to get started
               </p>
             </div>
           </CardContent>
@@ -575,33 +575,33 @@ export default function Tests() {
         <div className="space-y-4">
           <h2
             className="text-xl font-semibold"
-            data-testid="text-tests-heading"
+            data-testid="text-optimizations-heading"
           >
-            Tests
+            Optimizations
           </h2>
           <div className="grid grid-cols-1 gap-4">
-            {activeAndDraftTests.map((test, index) => {
-              const impressions = test.impressions || 0;
-              const conversions = test.conversions || 0;
+            {activeAndDraftOptimizations.map((optimization, index) => {
+              const impressions = optimization.impressions || 0;
+              const conversions = optimization.conversions || 0;
               const conversionRate =
                 impressions > 0 ? (conversions / impressions) * 100 : 0;
-              const arpuLift = parseFloat(test.arpuLift || "0");
+              const arpuLift = parseFloat(optimization.arpuLift || "0");
 
               // 2-State Badge System: "Still Learning" vs "Ready to Decide"
-              // All tests now use Bayesian allocation - check if we have sufficient data per variant
+              // All optimizations now use Bayesian allocation - check if we have sufficient data per variant
               const hasSufficientData =
                 impressions >= 2000 && // Matches Bayesian promotion criteria
-                (test.controlConversions || 0) >= 30 && // Control has meaningful data
-                (test.variantConversions || 0) >= 30; // Variant has meaningful data
+                (optimization.controlConversions || 0) >= 30 && // Control has meaningful data
+                (optimization.variantConversions || 0) >= 30; // Variant has meaningful data
 
               // Check if we have a clear winner (probability >80% or <20%)
               const CONFIDENCE_THRESHOLD = 0.8;
               let hasClearWinner = false;
               if (
-                test.bayesianConfig &&
-                typeof test.bayesianConfig === "object"
+                optimization.bayesianConfig &&
+                typeof optimization.bayesianConfig === "object"
               ) {
-                const config = test.bayesianConfig as any;
+                const config = optimization.bayesianConfig as any;
                 const prob = config.probVariantBetter || 0.5;
                 hasClearWinner =
                   prob > CONFIDENCE_THRESHOLD ||
@@ -613,10 +613,10 @@ export default function Tests() {
 
               // Helper to render change preview
               const renderChangePreview = () => {
-                const { controlData, variantData, testType } = test;
+                const { controlData, variantData, optimizationType } = optimization;
                 
-                if (testType === "price") {
-                  // For price tests, show the first variant price change
+                if (optimizationType === "price") {
+                  // For price optimizations, show the first variant price change
                   const controlPrice = controlData.variantPrices?.[0]?.price || controlData.price;
                   const variantPrice = variantData.variantPrices?.[0]?.price || variantData.price;
                   return (
@@ -626,7 +626,7 @@ export default function Tests() {
                       <span className="font-medium text-green-600">${variantPrice}</span>
                     </div>
                   );
-                } else if (testType === "title") {
+                } else if (optimizationType === "title") {
                   return (
                     <div className="flex items-center gap-2 text-sm">
                       <span className="font-medium truncate max-w-[200px]">{controlData.title}</span>
@@ -634,7 +634,7 @@ export default function Tests() {
                       <span className="font-medium text-green-600 truncate max-w-[200px]">{variantData.title}</span>
                     </div>
                   );
-                } else if (testType === "description") {
+                } else if (optimizationType === "description") {
                   return (
                     <div className="flex items-center gap-2 text-sm">
                       <span className="truncate max-w-[200px]">{controlData.description?.substring(0, 30)}...</span>
@@ -647,7 +647,7 @@ export default function Tests() {
               };
 
               return (
-                <Card key={test.id} data-testid={`card-test-${index}`}>
+                <Card key={optimization.id} data-testid={`card-test-${index}`}>
                   <CardHeader>
                     {/* Top Section: Title, Status, Dates, and Controls */}
                     <div className="space-y-4">
@@ -659,24 +659,24 @@ export default function Tests() {
                               className="text-lg"
                               data-testid={`text-product-name-${index}`}
                             >
-                              {test.productName}
+                              {optimization.productName}
                             </CardTitle>
                             <Badge
                               variant={
-                                test.status === "draft" ? "secondary" : 
-                                test.status === "paused" ? "outline" : "default"
+                                optimization.status === "draft" ? "secondary" : 
+                                optimization.status === "paused" ? "outline" : "default"
                               }
                               data-testid={`badge-status-${index}`}
                             >
-                              {test.status === "draft" ? "Draft" : 
-                               test.status === "paused" ? "Paused" : "Live"}
+                              {optimization.status === "draft" ? "Draft" : 
+                               optimization.status === "paused" ? "Paused" : "Live"}
                             </Badge>
-                            {isReadyToDecide && test.status === "active" && (
+                            {isReadyToDecide && optimization.status === "active" && (
                               <Badge variant="default" className="bg-green-600">
                                 Ready to Decide
                               </Badge>
                             )}
-                            {!isReadyToDecide && test.status === "active" && (
+                            {!isReadyToDecide && optimization.status === "active" && (
                               <Badge variant="outline">
                                 Still Learning
                               </Badge>
@@ -688,18 +688,18 @@ export default function Tests() {
                       {/* Change Preview and Test Info */}
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <span className="font-medium">{formatTestType(test.testType)}</span>
+                          <span className="font-medium">{formatOptimizationType(optimization.optimizationType)}</span>
                           <span>•</span>
                           {renderChangePreview()}
                         </div>
                         
                         {/* Dates */}
-                        {test.startDate && (
+                        {optimization.startDate && (
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <Calendar className="w-3 h-3" />
-                            <span>Started {new Date(test.startDate).toLocaleDateString()}</span>
-                            {test.endDate && (
-                              <span>• Ended {new Date(test.endDate).toLocaleDateString()}</span>
+                            <span>Started {new Date(optimization.startDate).toLocaleDateString()}</span>
+                            {optimization.endDate && (
+                              <span>• Ended {new Date(optimization.endDate).toLocaleDateString()}</span>
                             )}
                           </div>
                         )}
@@ -707,27 +707,27 @@ export default function Tests() {
 
                       {/* Action Buttons */}
                       <div className="flex items-center gap-2 flex-wrap">
-                        {test.status === "draft" && (
+                        {optimization.status === "draft" && (
                           <Button
                             variant="default"
                             size="sm"
-                            onClick={() => activateTestMutation.mutate(test.id)}
-                            disabled={activateTestMutation.isPending}
+                            onClick={() => activateTestMutation.mutate(optimization.id)}
+                            disabled={activateOptimizationMutation.isPending}
                             data-testid={`button-activate-test-${index}`}
                             className="gap-1"
                           >
                             <Play className="w-4 h-4" />
-                            {activateTestMutation.isPending ? "Activating..." : "Activate Test"}
+                            {activateOptimizationMutation.isPending ? "Activating..." : "Activate Optimization"}
                           </Button>
                         )}
                         
-                        {test.status === "active" && (
+                        {optimization.status === "active" && (
                           <>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => pauseTestMutation.mutate(test.id)}
-                              disabled={pauseTestMutation.isPending}
+                              onClick={() => pauseTestMutation.mutate(optimization.id)}
+                              disabled={pauseOptimizationMutation.isPending}
                               data-testid={`button-pause-test-${index}`}
                               className="gap-1"
                             >
@@ -737,8 +737,8 @@ export default function Tests() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => deactivateTestMutation.mutate(test.id)}
-                              disabled={deactivateTestMutation.isPending}
+                              onClick={() => deactivateTestMutation.mutate(optimization.id)}
+                              disabled={deactivateOptimizationMutation.isPending}
                               data-testid={`button-cancel-test-${index}`}
                               className="gap-1"
                             >
@@ -748,24 +748,24 @@ export default function Tests() {
                           </>
                         )}
 
-                        {test.status === "paused" && (
+                        {optimization.status === "paused" && (
                           <>
                             <Button
                               variant="default"
                               size="sm"
-                              onClick={() => resumeTestMutation.mutate(test.id)}
-                              disabled={resumeTestMutation.isPending}
+                              onClick={() => resumeTestMutation.mutate(optimization.id)}
+                              disabled={resumeOptimizationMutation.isPending}
                               data-testid={`button-resume-test-${index}`}
                               className="gap-1"
                             >
                               <Play className="w-4 h-4" />
-                              {resumeTestMutation.isPending ? "Resuming..." : "Resume"}
+                              {resumeOptimizationMutation.isPending ? "Resuming..." : "Resume"}
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => deactivateTestMutation.mutate(test.id)}
-                              disabled={deactivateTestMutation.isPending}
+                              onClick={() => deactivateTestMutation.mutate(optimization.id)}
+                              disabled={deactivateOptimizationMutation.isPending}
                               data-testid={`button-cancel-test-${index}`}
                               className="gap-1"
                             >
@@ -796,7 +796,7 @@ export default function Tests() {
                               className="text-xl font-bold"
                               data-testid={`text-control-impressions-${index}`}
                             >
-                              {(test.controlImpressions || 0).toLocaleString()}
+                              {(optimization.controlImpressions || 0).toLocaleString()}
                             </p>
                           </div>
 
@@ -808,13 +808,13 @@ export default function Tests() {
                               className="text-xl font-bold"
                               data-testid={`text-control-conversions-${index}`}
                             >
-                              {test.controlConversions || 0}
+                              {optimization.controlConversions || 0}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {(test.controlImpressions || 0) > 0
+                              {(optimization.controlImpressions || 0) > 0
                                 ? (
-                                    ((test.controlConversions || 0) /
-                                      (test.controlImpressions || 1)) *
+                                    ((optimization.controlConversions || 0) /
+                                      (optimization.controlImpressions || 1)) *
                                     100
                                   ).toFixed(2)
                                 : "0.00"}
@@ -833,9 +833,9 @@ export default function Tests() {
                               $
                               {(() => {
                                 const impressions =
-                                  test.controlImpressions || 0;
-                                const revenue = test.controlRevenue
-                                  ? parseFloat(test.controlRevenue)
+                                  optimization.controlImpressions || 0;
+                                const revenue = optimization.controlRevenue
+                                  ? parseFloat(optimization.controlRevenue)
                                   : 0;
                                 const rpv =
                                   impressions > 0 ? revenue / impressions : 0;
@@ -846,9 +846,9 @@ export default function Tests() {
                               AOV: $
                               {(() => {
                                 const conversions =
-                                  test.controlConversions || 0;
-                                const revenue = test.controlRevenue
-                                  ? parseFloat(test.controlRevenue)
+                                  optimization.controlConversions || 0;
+                                const revenue = optimization.controlRevenue
+                                  ? parseFloat(optimization.controlRevenue)
                                   : 0;
                                 const aov =
                                   conversions > 0 ? revenue / conversions : 0;
@@ -875,7 +875,7 @@ export default function Tests() {
                               className="text-xl font-bold"
                               data-testid={`text-variant-impressions-${index}`}
                             >
-                              {(test.variantImpressions || 0).toLocaleString()}
+                              {(optimization.variantImpressions || 0).toLocaleString()}
                             </p>
                           </div>
 
@@ -887,13 +887,13 @@ export default function Tests() {
                               className="text-xl font-bold"
                               data-testid={`text-variant-conversions-${index}`}
                             >
-                              {test.variantConversions || 0}
+                              {optimization.variantConversions || 0}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {(test.variantImpressions || 0) > 0
+                              {(optimization.variantImpressions || 0) > 0
                                 ? (
-                                    ((test.variantConversions || 0) /
-                                      (test.variantImpressions || 1)) *
+                                    ((optimization.variantConversions || 0) /
+                                      (optimization.variantImpressions || 1)) *
                                     100
                                   ).toFixed(2)
                                 : "0.00"}
@@ -912,9 +912,9 @@ export default function Tests() {
                               $
                               {(() => {
                                 const impressions =
-                                  test.variantImpressions || 0;
-                                const revenue = test.variantRevenue
-                                  ? parseFloat(test.variantRevenue)
+                                  optimization.variantImpressions || 0;
+                                const revenue = optimization.variantRevenue
+                                  ? parseFloat(optimization.variantRevenue)
                                   : 0;
                                 const rpv =
                                   impressions > 0 ? revenue / impressions : 0;
@@ -924,9 +924,9 @@ export default function Tests() {
                             {(() => {
                               // Calculate RPV lift (what Bayesian optimizes)
                               const controlImpressions =
-                                test.controlImpressions || 0;
-                              const controlRevenue = test.controlRevenue
-                                ? parseFloat(test.controlRevenue)
+                                optimization.controlImpressions || 0;
+                              const controlRevenue = optimization.controlRevenue
+                                ? parseFloat(optimization.controlRevenue)
                                 : 0;
                               const controlRpv =
                                 controlImpressions > 0
@@ -934,9 +934,9 @@ export default function Tests() {
                                   : 0;
 
                               const variantImpressions =
-                                test.variantImpressions || 0;
-                              const variantRevenue = test.variantRevenue
-                                ? parseFloat(test.variantRevenue)
+                                optimization.variantImpressions || 0;
+                              const variantRevenue = optimization.variantRevenue
+                                ? parseFloat(optimization.variantRevenue)
                                 : 0;
                               const variantRpv =
                                 variantImpressions > 0
@@ -949,8 +949,8 @@ export default function Tests() {
                                     100
                                   : 0;
                               const hasData =
-                                (test.controlConversions || 0) >= 3 &&
-                                (test.variantConversions || 0) >= 3;
+                                (optimization.controlConversions || 0) >= 3 &&
+                                (optimization.variantConversions || 0) >= 3;
 
                               return (
                                 hasData && (
@@ -975,9 +975,9 @@ export default function Tests() {
                               AOV: $
                               {(() => {
                                 const conversions =
-                                  test.variantConversions || 0;
-                                const revenue = test.variantRevenue
-                                  ? parseFloat(test.variantRevenue)
+                                  optimization.variantConversions || 0;
+                                const revenue = optimization.variantRevenue
+                                  ? parseFloat(optimization.variantRevenue)
                                   : 0;
                                 const aov =
                                   conversions > 0 ? revenue / conversions : 0;
@@ -999,16 +999,16 @@ export default function Tests() {
       {/* Info Card */}
       <Card data-testid="card-info">
         <CardHeader>
-          <CardTitle>About Tests</CardTitle>
+          <CardTitle>About Optimizations</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
-            This page shows all your A/B tests across all statuses - drafts waiting to be activated,
-            live tests collecting data, paused tests, and completed experiments. Use the filters above
-            to find specific tests. Metrics update automatically every 2 seconds.
+            This page shows all your A/B optimizations across all statuses - drafts waiting to be activated,
+            live optimizations collecting data, paused optimizations, and completed experiments. Use the filters above
+            to find specific optimizations. Metrics update automatically every 2 seconds.
           </p>
           <p>
-            <strong>Control vs Variant:</strong> Each test shows side-by-side
+            <strong>Control vs Variant:</strong> Each optimization shows side-by-side
             performance metrics. The Control represents your original product,
             while the Variant shows the proposed changes.
           </p>
@@ -1020,7 +1020,7 @@ export default function Tests() {
             Value) is shown as a secondary metric.
           </p>
           <p>
-            <strong>Stopping a test:</strong> Deactivates the test and stops
+            <strong>Stopping an optimization:</strong> Deactivates the optimization and stops
             showing variants to customers. All collected metrics are preserved
             for analysis.
           </p>

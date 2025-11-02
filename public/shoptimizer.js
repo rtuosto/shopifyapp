@@ -1,10 +1,10 @@
 /**
- * Shoptimizer A/B Testing SDK v2.0
+ * Shoptimizer A/B Optimization SDK v2.0
  * 
- * Persistent session-based A/B testing with accurate conversion attribution.
+ * Persistent session-based A/B optimization with accurate conversion attribution.
  * - Generates UUID session ID, stored in localStorage
  * - Persistent variant assignments (90-day expiry) - same user always sees same variant
- * - Fetches all active tests from backend
+ * - Fetches all active optimizations from backend
  * - Dynamically modifies product page content (title, price, description)
  * - Tracks impressions with session ID
  * - Injects session ID into cart for conversion attribution
@@ -73,10 +73,10 @@
       
       // Filter out expired assignments
       const validAssignments = {};
-      for (const testId in assignments) {
-        const assignment = assignments[testId];
+      for (const optimizationId in assignments) {
+        const assignment = assignments[optimizationId];
         if (assignment.expiresAt > now) {
-          validAssignments[testId] = assignment;
+          validAssignments[optimizationId] = assignment;
         }
       }
       
@@ -87,36 +87,36 @@
     }
   }
 
-  function saveLocalAssignment(testId, variant) {
+  function saveLocalAssignment(optimizationId, variant) {
     try {
       const assignments = getLocalAssignments();
       const expiresAt = Date.now() + (SHOPTIMIZER_CONFIG.sessionExpireDays * 24 * 60 * 60 * 1000);
       
-      assignments[testId] = {
+      assignments[optimizationId] = {
         variant,
         assignedAt: Date.now(),
         expiresAt,
       };
       
       localStorage.setItem(SHOPTIMIZER_CONFIG.assignmentsKey, JSON.stringify(assignments));
-      console.log(`[Shoptimizer] Saved ${variant} assignment for test ${testId} (expires in 90 days)`);
+      console.log(`[Shoptimizer] Saved ${variant} assignment for optimization ${optimizationId} (expires in 90 days)`);
     } catch (e) {
       console.error('[Shoptimizer] Failed to save assignment:', e);
     }
   }
 
-  function getLocalAssignment(testId) {
+  function getLocalAssignment(optimizationId) {
     const assignments = getLocalAssignments();
-    return assignments[testId]?.variant;
+    return assignments[optimizationId]?.variant;
   }
 
   // ============================================
   // Variant Assignment (with backend sync)
   // ============================================
 
-  async function assignUserToVariant(sessionId, testId, controlAllocation, variantAllocation) {
+  async function assignUserToVariant(sessionId, optimizationId, controlAllocation, variantAllocation) {
     // Check if user already has a local assignment
-    const existing = getLocalAssignment(testId);
+    const existing = getLocalAssignment(optimizationId);
     if (existing) {
       console.log(`[Shoptimizer] Using existing assignment: ${existing}`);
       return existing;
@@ -140,7 +140,7 @@
     console.log(`[Shoptimizer] Assigned to ${variant} (allocation: control=${controlPct}%, variant=${variantPct}%)`);
     
     // Save locally
-    saveLocalAssignment(testId, variant);
+    saveLocalAssignment(optimizationId, variant);
     
     // Sync to backend for conversion attribution
     try {
@@ -152,7 +152,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId,
-          testId,
+          optimizationId,
           variant,
           shop: SHOPTIMIZER_CONFIG.shop,
         }),
@@ -333,9 +333,9 @@
     return false;
   }
 
-  function applyVariant(test, variant) {
-    const data = variant === 'control' ? test.controlData : test.variantData;
-    console.log(`[Shoptimizer] Applying ${variant} for test ${test.id}`, data);
+  function applyVariant(optimization, variant) {
+    const data = variant === 'control' ? optimization.controlData : optimization.variantData;
+    console.log(`[Shoptimizer] Applying ${variant} for optimization ${optimization.id}`, data);
 
     // Use shared helper functions
     updateTitle(data.title, { logPrefix: '[Shoptimizer]' });
@@ -364,14 +364,14 @@
    * Apply variant to a product card on collection/listing pages
    * Scoped to the card element to avoid affecting PDP elements
    */
-  function applyVariantToCard(cardElement, test, variant) {
+  function applyVariantToCard(cardElement, optimization, variant) {
     // Double-check: skip if already processed with the same variant
     if (cardElement.dataset.shoptimizerProcessed === 'true' && 
         cardElement.dataset.shoptimizerVariant === variant) {
       return;
     }
 
-    const data = variant === 'control' ? test.controlData : test.variantData;
+    const data = variant === 'control' ? optimization.controlData : optimization.variantData;
     const productId = getProductIdFromCard(cardElement);
 
     console.log(`[Shoptimizer] Applying ${variant} to product card:`, productId);
@@ -428,7 +428,7 @@
       return id.includes('gid://') ? id : `gid://shopify/Product/${id}`;
     }
 
-    // Method 2: data-product-handle (need to match with test data)
+    // Method 2: data-product-handle (need to match with optimization data)
     if (cardElement.dataset.productHandle) {
       return cardElement.dataset.productHandle;
     }
@@ -438,7 +438,7 @@
     if (productLink) {
       const match = productLink.href.match(/\/products\/([^?/#]+)/);
       if (match) {
-        return match[1]; // Return handle, will match against test data
+        return match[1]; // Return handle, will match against optimization data
       }
     }
 
@@ -446,27 +446,27 @@
   }
 
   /**
-   * Find product test by ID or handle
+   * Find product optimization by ID or handle
    */
-  function findTestForProduct(tests, productIdentifier) {
+  function findOptimizationForProduct(optimizations, productIdentifier) {
     if (!productIdentifier) return null;
 
-    return tests.find(test => {
+    return optimizations.find(optimization => {
       // Direct GID match
-      if (test.shopifyProductId === productIdentifier) {
+      if (optimization.shopifyProductId === productIdentifier) {
         return true;
       }
 
       // Handle match (extract from GID)
-      if (test.shopifyProductId && test.shopifyProductId.includes('Product/')) {
-        const testId = test.shopifyProductId.split('Product/')[1];
-        if (testId === productIdentifier || testId === productIdentifier.replace('gid://shopify/Product/', '')) {
+      if (optimization.shopifyProductId && optimization.shopifyProductId.includes('Product/')) {
+        const optimizationId = optimization.shopifyProductId.split('Product/')[1];
+        if (optimizationId === productIdentifier || optimizationId === productIdentifier.replace('gid://shopify/Product/', '')) {
           return true;
         }
       }
 
-      // Handle-based match (if test stores handle)
-      if (test.productHandle === productIdentifier) {
+      // Handle-based match (if optimization stores handle)
+      if (optimization.productHandle === productIdentifier) {
         return true;
       }
 
@@ -478,8 +478,8 @@
    * Process all product cards on collection/listing pages
    * Returns true if any cards were modified (to signal observer to disconnect/reconnect)
    */
-  async function processCollectionPageProducts(sessionId, tests) {
-    if (!tests || tests.length === 0) return false;
+  async function processCollectionPageProducts(sessionId, optimizations) {
+    if (!optimizations || optimizations.length === 0) return false;
 
     // Common product card selectors across Shopify themes
     const cardSelectors = [
@@ -512,24 +512,24 @@
         continue;
       }
 
-      // Find active test for this product
-      const productTest = findTestForProduct(tests, productId);
-      if (!productTest) {
-        continue; // No test for this product, skip
+      // Find active optimization for this product
+      const productOptimization = findOptimizationForProduct(optimizations, productId);
+      if (!productOptimization) {
+        continue; // No optimization for this product, skip
       }
 
       // Assign variant (reuse existing logic with dynamic allocations)
-      const variant = await assignUserToVariant(sessionId, productTest.id, productTest.controlAllocation, productTest.variantAllocation);
+      const variant = await assignUserToVariant(sessionId, productOptimization.id, productOptimization.controlAllocation, productOptimization.variantAllocation);
       
       // Apply variant to this card
-      applyVariantToCard(card, productTest, variant);
+      applyVariantToCard(card, productOptimization, variant);
       modifiedCount++;
       newCardsProcessed++;
 
       // Track collection page impression (once per card)
-      const cardKey = `${productTest.id}-${productId}`;
+      const cardKey = `${productOptimization.id}-${productId}`;
       if (!processedProductCards.has(cardKey)) {
-        trackImpression(sessionId, productTest.id, variant, 'collection');
+        trackImpression(sessionId, productOptimization.id, variant, 'collection');
         processedProductCards.add(cardKey);
       }
     }
@@ -544,8 +544,8 @@
   /**
    * Watch for lazy-loaded product cards (infinite scroll, AJAX)
    */
-  function watchForLazyLoadedProducts(sessionId, tests) {
-    if (!tests || tests.length === 0) return null;
+  function watchForLazyLoadedProducts(sessionId, optimizations) {
+    if (!optimizations || optimizations.length === 0) return null;
 
     let debounceTimer;
     let isProcessing = false;
@@ -565,7 +565,7 @@
         needsRecheck = false;
 
         try {
-          const modified = await processCollectionPageProducts(sessionId, tests);
+          const modified = await processCollectionPageProducts(sessionId, optimizations);
           
           if (modified) {
             console.log('[Shoptimizer] Applied variants to new product cards');
@@ -575,7 +575,7 @@
           if (needsRecheck) {
             console.log('[Shoptimizer] New cards detected during processing, rechecking...');
             needsRecheck = false;
-            await processCollectionPageProducts(sessionId, tests);
+            await processCollectionPageProducts(sessionId, optimizations);
           }
         } catch (err) {
           console.error('[Shoptimizer] Error processing cards:', err);
@@ -590,7 +590,7 @@
                 isProcessing = true;
                 needsRecheck = false;
                 try {
-                  await processCollectionPageProducts(sessionId, tests);
+                  await processCollectionPageProducts(sessionId, optimizations);
                 } finally {
                   isProcessing = false;
                 }
@@ -615,12 +615,12 @@
   // Impression Tracking
   // ============================================
 
-  function trackImpression(sessionId, testId, variant, context = 'product') {
+  function trackImpression(sessionId, optimizationId, variant, context = 'product') {
     fetch(`${SHOPTIMIZER_CONFIG.apiUrl}/api/storefront/impression`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        testId,
+        optimizationId,
         variant,
         sessionId,
         shop: SHOPTIMIZER_CONFIG.shop,
@@ -855,7 +855,7 @@
             Close
           </button>
           <button class="shoptimizer-preview-btn shoptimizer-preview-btn-primary" id="shoptimizer-preview-approve">
-            Accept & Test
+            Accept & Launch
           </button>
         </div>
       </div>
@@ -1302,26 +1302,26 @@
         return;
       }
 
-      // Fetch all active tests from backend (once for all page types)
-      const testUrl = `${SHOPTIMIZER_CONFIG.apiUrl}/api/storefront/tests?shop=${SHOPTIMIZER_CONFIG.shop}`;
-      console.log('[Shoptimizer] Fetching active tests from:', testUrl);
+      // Fetch all active optimizations from backend (once for all page types)
+      const optimizationUrl = `${SHOPTIMIZER_CONFIG.apiUrl}/api/storefront/optimizations?shop=${SHOPTIMIZER_CONFIG.shop}`;
+      console.log('[Shoptimizer] Fetching active optimizations from:', optimizationUrl);
       
-      const response = await fetch(testUrl);
+      const response = await fetch(optimizationUrl);
       
       if (!response.ok) {
-        console.error('[Shoptimizer] Failed to fetch tests:', response.status, response.statusText);
+        console.error('[Shoptimizer] Failed to fetch optimizations:', response.status, response.statusText);
         return;
       }
       
       const data = await response.json();
       
-      if (!data.tests || data.tests.length === 0) {
-        console.log('[Shoptimizer] No active tests found');
+      if (!data.optimizations || data.optimizations.length === 0) {
+        console.log('[Shoptimizer] No active optimizations found');
         console.log('[Shoptimizer] Initialized successfully (session tracking only)');
         return;
       }
       
-      console.log(`[Shoptimizer] Found ${data.tests.length} active test(s)`);
+      console.log(`[Shoptimizer] Found ${data.optimizations.length} active optimization(s)`);
       
       // Check if this is a product detail page
       const shopifyProductId = getShopifyProductId();
@@ -1330,39 +1330,39 @@
         // PRODUCT DETAIL PAGE LOGIC
         console.log('[Shoptimizer] Product page detected:', shopifyProductId);
         
-        const productTest = data.tests.find(t => t.shopifyProductId === shopifyProductId);
+        const productOptimization = data.optimizations.find(o => o.shopifyProductId === shopifyProductId);
         
-        if (!productTest) {
-          console.log('[Shoptimizer] No test for this specific product on PDP');
+        if (!productOptimization) {
+          console.log('[Shoptimizer] No optimization for this specific product on PDP');
           // Still check for collection cards below
         } else {
-          console.log('[Shoptimizer] Active test found for this product:', productTest.id);
+          console.log('[Shoptimizer] Active optimization found for this product:', productOptimization.id);
           
           // Assign user to variant (or retrieve existing assignment with dynamic allocations)
-          const variant = await assignUserToVariant(sessionId, productTest.id, productTest.controlAllocation, productTest.variantAllocation);
+          const variant = await assignUserToVariant(sessionId, productOptimization.id, productOptimization.controlAllocation, productOptimization.variantAllocation);
           console.log('[Shoptimizer] User assigned to:', variant);
           
           // Apply variant changes to product page
-          applyVariant(productTest, variant);
+          applyVariant(productOptimization, variant);
           
           // Track impression
-          trackImpression(sessionId, productTest.id, variant, 'product');
+          trackImpression(sessionId, productOptimization.id, variant, 'product');
           
           // Store for potential JS access
           window.shoptimizerSession = sessionId;
           window.shoptimizerVariant = variant;
-          window.shoptimizerTestId = productTest.id;
+          window.shoptimizerOptimizationId = productOptimization.id;
           
-          console.log('[Shoptimizer] Initialized successfully (PDP A/B testing active)');
+          console.log('[Shoptimizer] Initialized successfully (PDP A/B optimization active)');
         }
       }
       
       // COLLECTION/LISTING PAGE LOGIC (runs on all pages including PDP)
       // Process product cards on collection/listing/homepage/search results
-      await processCollectionPageProducts(sessionId, data.tests);
+      await processCollectionPageProducts(sessionId, data.optimizations);
       
       // Watch for lazy-loaded products (infinite scroll, AJAX pagination)
-      watchForLazyLoadedProducts(sessionId, data.tests);
+      watchForLazyLoadedProducts(sessionId, data.optimizations);
       
       console.log('[Shoptimizer] Initialized successfully (all page types)');
       
