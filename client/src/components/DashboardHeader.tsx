@@ -17,17 +17,18 @@ export default function DashboardHeader({
   // Beta testing: Always show secondary variant (unlimited usage)
   
   return (
-    <div className="mb-6">
-      <h1 className="text-3xl font-bold" data-testid="text-dashboard-title">Dashboard</h1>
-      <div className="flex items-center gap-3 mt-2 flex-wrap">
-        <Badge variant="secondary" data-testid="badge-active-optimizations">
-          {activeOptimizations} Active Optimizations
+    <div className="mb-4 md:mb-6">
+      <h1 className="text-2xl md:text-3xl font-bold" data-testid="text-dashboard-title">Dashboard</h1>
+      <div className="flex items-center gap-2 md:gap-3 mt-2 flex-wrap">
+        <Badge variant="secondary" className="text-xs" data-testid="badge-active-optimizations">
+          {activeOptimizations} Active
         </Badge>
-        <Badge variant="secondary" className="gap-1" data-testid="badge-quota">
+        <Badge variant="secondary" className="gap-1 text-xs" data-testid="badge-quota">
           <Sparkles className="w-3 h-3" />
-          {quotaUsed} AI Ideas Used · Beta: Unlimited
+          <span className="hidden sm:inline">{quotaUsed} AI Ideas Used · Beta: Unlimited</span>
+          <span className="sm:hidden">{quotaUsed} Ideas</span>
         </Badge>
-        <span className="text-sm text-muted-foreground" data-testid="text-last-sync">
+        <span className="text-xs md:text-sm text-muted-foreground" data-testid="text-last-sync">
           Last synced {lastSync}
         </span>
       </div>

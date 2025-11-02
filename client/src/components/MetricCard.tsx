@@ -24,17 +24,17 @@ export default function MetricCard({ title, value, change, trend = "neutral", su
   };
 
   return (
-    <Card className="p-6" data-testid={`card-metric-${title.toLowerCase().replace(/\s+/g, '-')}`}>
-      <div className="space-y-2">
-        <p className="text-sm text-muted-foreground font-medium" data-testid="text-metric-title">
+    <Card className="p-4 md:p-6" data-testid={`card-metric-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+      <div className="space-y-1.5 md:space-y-2">
+        <p className="text-xs md:text-sm text-muted-foreground font-medium" data-testid="text-metric-title">
           {title}
         </p>
         <div className="flex items-baseline justify-between gap-2">
-          <h3 className={`text-2xl font-bold tabular-nums ${valueClassName || ''}`} data-testid="text-metric-value">
+          <h3 className={`text-xl md:text-2xl font-bold tabular-nums ${valueClassName || ''}`} data-testid="text-metric-value">
             {value}
           </h3>
           {change !== undefined && (
-            <div className={`flex items-center gap-1 text-sm font-semibold ${getTrendColor()}`} data-testid="text-metric-change">
+            <div className={`flex items-center gap-1 text-xs md:text-sm font-semibold ${getTrendColor()}`} data-testid="text-metric-change">
               {getTrendIcon()}
               <span>{Math.abs(change)}%</span>
             </div>

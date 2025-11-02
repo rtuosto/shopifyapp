@@ -104,10 +104,10 @@ function OptimizationEvolutionCharts({ optimizationId }: OptimizationEvolutionCh
             Cumulative revenue per visitor tracked at 100-impression intervals
           </p>
         </div>
-        <ResponsiveContainer width="100%" height={200}>
+        <ResponsiveContainer width="100%" height={200} className="text-xs md:text-sm">
           <LineChart
             data={chartData}
-            margin={{ top: 5, right: 30, left: 20, bottom: -10 }}
+            margin={{ top: 5, right: 10, left: 0, bottom: -10 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
@@ -399,13 +399,13 @@ export default function Optimizations() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold" data-testid="text-page-title">
+        <h1 className="text-2xl md:text-3xl font-bold" data-testid="text-page-title">
           Optimizations
         </h1>
         <p
-          className="text-muted-foreground"
+          className="text-sm md:text-base text-muted-foreground"
           data-testid="text-page-description"
         >
           Manage all your A/B optimizations - draft, active, paused, and completed
@@ -414,14 +414,32 @@ export default function Optimizations() {
 
       {/* Filter Controls */}
       <Card data-testid="card-filters">
-        <CardContent className="pt-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center">
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Filters:</span>
+        <CardContent className="p-4 md:p-6">
+          <div className="space-y-3 md:space-y-0 md:flex md:flex-row md:items-center md:gap-4">
+            <div className="flex items-center justify-between md:justify-start">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Filters:</span>
+              </div>
+              {/* Clear Filters Button - mobile position */}
+              {(statusFilter !== "all" || typeFilter !== "all" || productSearch) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setStatusFilter("all");
+                    setTypeFilter("all");
+                    setProductSearch("");
+                  }}
+                  className="md:hidden"
+                  data-testid="button-clear-filters-mobile"
+                >
+                  Clear
+                </Button>
+              )}
             </div>
             
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
               {/* Status Filter */}
               <div className="space-y-2">
                 <label className="text-xs text-muted-foreground">Status</label>
@@ -472,7 +490,7 @@ export default function Optimizations() {
               </div>
             </div>
 
-            {/* Clear Filters Button */}
+            {/* Clear Filters Button - desktop position */}
             {(statusFilter !== "all" || typeFilter !== "all" || productSearch) && (
               <Button
                 variant="outline"
@@ -482,6 +500,7 @@ export default function Optimizations() {
                   setTypeFilter("all");
                   setProductSearch("");
                 }}
+                className="hidden md:flex"
                 data-testid="button-clear-filters"
               >
                 Clear
@@ -493,11 +512,11 @@ export default function Optimizations() {
 
       {/* Summary Metrics */}
       {trulyActiveOptimizations.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <Card data-testid="card-metric-optimizations">
-            <CardHeader className="pb-3">
-              <CardDescription>Active Optimizations</CardDescription>
-              <CardTitle className="text-3xl">
+            <CardHeader className="pb-2 md:pb-3">
+              <CardDescription className="text-xs">Active Optimizations</CardDescription>
+              <CardTitle className="text-2xl md:text-3xl">
                 {trulyActiveOptimizations.length}
               </CardTitle>
             </CardHeader>
@@ -509,9 +528,9 @@ export default function Optimizations() {
           </Card>
 
           <Card data-testid="card-metric-impressions">
-            <CardHeader className="pb-3">
-              <CardDescription>Total Impressions</CardDescription>
-              <CardTitle className="text-3xl">
+            <CardHeader className="pb-2 md:pb-3">
+              <CardDescription className="text-xs">Total Impressions</CardDescription>
+              <CardTitle className="text-2xl md:text-3xl">
                 {totalImpressions.toLocaleString()}
               </CardTitle>
             </CardHeader>
@@ -523,9 +542,9 @@ export default function Optimizations() {
           </Card>
 
           <Card data-testid="card-metric-conversions">
-            <CardHeader className="pb-3">
-              <CardDescription>Total Conversions</CardDescription>
-              <CardTitle className="text-3xl">{totalConversions}</CardTitle>
+            <CardHeader className="pb-2 md:pb-3">
+              <CardDescription className="text-xs">Total Conversions</CardDescription>
+              <CardTitle className="text-2xl md:text-3xl">{totalConversions}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-xs text-muted-foreground">
@@ -535,9 +554,9 @@ export default function Optimizations() {
           </Card>
 
           <Card data-testid="card-metric-rpv">
-            <CardHeader className="pb-3">
-              <CardDescription>Average RPV</CardDescription>
-              <CardTitle className="text-3xl">
+            <CardHeader className="pb-2 md:pb-3">
+              <CardDescription className="text-xs">Average RPV</CardDescription>
+              <CardTitle className="text-2xl md:text-3xl">
                 ${averageRpv.toFixed(2)}
               </CardTitle>
             </CardHeader>
@@ -572,14 +591,14 @@ export default function Optimizations() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3 md:space-y-4">
           <h2
-            className="text-xl font-semibold"
+            className="text-lg md:text-xl font-semibold"
             data-testid="text-optimizations-heading"
           >
             Optimizations
           </h2>
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-3 md:gap-4">
             {activeAndDraftOptimizations.map((optimization, index) => {
               const impressions = optimization.impressions || 0;
               const conversions = optimization.conversions || 0;
@@ -648,15 +667,15 @@ export default function Optimizations() {
 
               return (
                 <Card key={optimization.id} data-testid={`card-test-${index}`}>
-                  <CardHeader>
+                  <CardHeader className="p-4 md:p-6">
                     {/* Top Section: Title, Status, Dates, and Controls */}
-                    <div className="space-y-4">
+                    <div className="space-y-3 md:space-y-4">
                       {/* Title Row */}
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-start justify-between gap-2 md:gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
                             <CardTitle
-                              className="text-lg"
+                              className="text-base md:text-lg truncate"
                               data-testid={`text-product-name-${index}`}
                             >
                               {optimization.productName}
@@ -706,18 +725,19 @@ export default function Optimizations() {
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
                         {optimization.status === "draft" && (
                           <Button
                             variant="default"
                             size="sm"
-                            onClick={() => activateTestMutation.mutate(optimization.id)}
+                            onClick={() => activateOptimizationMutation.mutate(optimization.id)}
                             disabled={activateOptimizationMutation.isPending}
                             data-testid={`button-activate-test-${index}`}
-                            className="gap-1"
+                            className="gap-1 text-xs md:text-sm"
                           >
-                            <Play className="w-4 h-4" />
-                            {activateOptimizationMutation.isPending ? "Activating..." : "Activate Optimization"}
+                            <Play className="w-3 h-3 md:w-4 md:h-4" />
+                            <span className="hidden sm:inline">{activateOptimizationMutation.isPending ? "Activating..." : "Activate Optimization"}</span>
+                            <span className="sm:hidden">Activate</span>
                           </Button>
                         )}
                         
@@ -726,23 +746,23 @@ export default function Optimizations() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => pauseTestMutation.mutate(optimization.id)}
+                              onClick={() => pauseOptimizationMutation.mutate(optimization.id)}
                               disabled={pauseOptimizationMutation.isPending}
                               data-testid={`button-pause-test-${index}`}
-                              className="gap-1"
+                              className="gap-1 text-xs md:text-sm"
                             >
-                              <Pause className="w-4 h-4" />
+                              <Pause className="w-3 h-3 md:w-4 md:h-4" />
                               Pause
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => deactivateTestMutation.mutate(optimization.id)}
+                              onClick={() => deactivateOptimizationMutation.mutate(optimization.id)}
                               disabled={deactivateOptimizationMutation.isPending}
                               data-testid={`button-cancel-test-${index}`}
-                              className="gap-1"
+                              className="gap-1 text-xs md:text-sm"
                             >
-                              <X className="w-4 h-4" />
+                              <X className="w-3 h-3 md:w-4 md:h-4" />
                               Cancel
                             </Button>
                           </>
@@ -753,23 +773,23 @@ export default function Optimizations() {
                             <Button
                               variant="default"
                               size="sm"
-                              onClick={() => resumeTestMutation.mutate(optimization.id)}
+                              onClick={() => resumeOptimizationMutation.mutate(optimization.id)}
                               disabled={resumeOptimizationMutation.isPending}
                               data-testid={`button-resume-test-${index}`}
-                              className="gap-1"
+                              className="gap-1 text-xs md:text-sm"
                             >
-                              <Play className="w-4 h-4" />
+                              <Play className="w-3 h-3 md:w-4 md:h-4" />
                               {resumeOptimizationMutation.isPending ? "Resuming..." : "Resume"}
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => deactivateTestMutation.mutate(optimization.id)}
+                              onClick={() => deactivateOptimizationMutation.mutate(optimization.id)}
                               disabled={deactivateOptimizationMutation.isPending}
                               data-testid={`button-cancel-test-${index}`}
-                              className="gap-1"
+                              className="gap-1 text-xs md:text-sm"
                             >
-                              <X className="w-4 h-4" />
+                              <X className="w-3 h-3 md:w-4 md:h-4" />
                               Cancel
                             </Button>
                           </>

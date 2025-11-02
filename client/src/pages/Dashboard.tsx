@@ -413,7 +413,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <DashboardHeader 
         activeOptimizations={activeOptimizationsCount} 
         lastSync={getLastSyncText()}
@@ -423,10 +423,10 @@ export default function Dashboard() {
       
       {/* All-Time Performance */}
       <div>
-        <h3 className="text-sm font-semibold text-muted-foreground mb-3" data-testid="text-all-time-heading">
+        <h3 className="text-xs md:text-sm font-semibold text-muted-foreground mb-2 md:mb-3" data-testid="text-all-time-heading">
           All-Time Performance
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <MetricCard 
             title="Optimizations Run" 
             value={dashboardData?.allTimeMetrics?.optimizationCount?.toString() || '0'}
@@ -481,10 +481,10 @@ export default function Dashboard() {
 
       {/* Currently Active */}
       <div>
-        <h3 className="text-sm font-semibold text-muted-foreground mb-3" data-testid="text-active-heading">
+        <h3 className="text-xs md:text-sm font-semibold text-muted-foreground mb-2 md:mb-3" data-testid="text-active-heading">
           Currently Active
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <MetricCard 
             title="Active Optimizations" 
             value={dashboardData?.activeMetrics?.optimizationCount?.toString() || '0'}
@@ -546,18 +546,18 @@ export default function Dashboard() {
       )}
 
       {activeOptimizationsCount > 0 && (
-        <Card className="mb-6">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold mb-1">Active Optimizations</h3>
-                <p className="text-sm text-muted-foreground">
-                  You have {activeOptimizationsCount} optimization{activeOptimizationsCount === 1 ? '' : 's'} running live in your store
+                <h3 className="text-base md:text-lg font-semibold mb-1">Active Optimizations</h3>
+                <p className="text-xs md:text-sm text-muted-foreground">
+                  You have {activeOptimizationsCount} optimization{activeOptimizationsCount === 1 ? '' : 's'} running live
                 </p>
               </div>
               <Link href="/optimizations">
-                <Button variant="outline" data-testid="button-view-optimizations">
-                  View All Optimizations
+                <Button variant="outline" size="sm" className="w-full sm:w-auto" data-testid="button-view-optimizations">
+                  View All
                 </Button>
               </Link>
             </div>
@@ -567,7 +567,7 @@ export default function Dashboard() {
 
       {formattedOptimizations.length > 0 && (
         <div>
-          <h2 className="text-xl font-semibold mb-4">Completed Optimizations</h2>
+          <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4">Completed Optimizations</h2>
           <OptimizationHistoryTable 
             optimizations={formattedOptimizations} 
             onStartOptimization={(optimizationId) => activateOptimizationMutation.mutate(optimizationId)}
