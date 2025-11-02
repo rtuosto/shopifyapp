@@ -169,6 +169,172 @@
   // Product Page Content Modification
   // ============================================
 
+  // Shared helper functions for updating DOM elements
+  // These are used by all variant application functions to eliminate code duplication
+
+  /**
+   * Update product title with visibility checks
+   * @param {string} title - The new title text
+   * @param {Object} options - Configuration options
+   * @param {string} options.logPrefix - Prefix for console logs (e.g., '[Shoptimizer]')
+   * @param {HTMLElement} options.scope - Optional scope element (for card updates)
+   * @param {boolean} options.storeOriginal - Whether to store original value in dataset
+   * @returns {boolean} - Whether the update was successful
+   */
+  function updateTitle(title, options = {}) {
+    if (!title) return false;
+
+    const {
+      logPrefix = '[Shoptimizer]',
+      scope = document,
+      storeOriginal = false
+    } = options;
+
+    const titleSelectors = [
+      '.product-single__title',
+      '.product__title',
+      '[data-product-title]',
+      '.product-title',
+      'h1[itemprop="name"]',
+      'h1'
+    ];
+    
+    let titleUpdated = false;
+    for (const selector of titleSelectors) {
+      const titleElements = scope.querySelectorAll(selector);
+      for (const titleElement of titleElements) {
+        // Skip hidden elements (templates, etc.)
+        const isVisible = titleElement.offsetParent !== null && 
+                         window.getComputedStyle(titleElement).display !== 'none' &&
+                         window.getComputedStyle(titleElement).visibility !== 'hidden';
+        
+        if (isVisible) {
+          const oldTitle = titleElement.textContent;
+          
+          // Store original if requested
+          if (storeOriginal && !titleElement.dataset.originalText) {
+            titleElement.dataset.originalText = oldTitle;
+          }
+          
+          titleElement.textContent = title;
+          console.log(`${logPrefix} Updated title via ${selector}: "${oldTitle}" → "${title}"`);
+          titleUpdated = true;
+          break;
+        }
+      }
+      if (titleUpdated) break;
+    }
+    
+    if (!titleUpdated) {
+      console.error(`${logPrefix} Failed to update title - no visible title element found`);
+      console.log(`${logPrefix} Title data:`, title);
+      console.log(`${logPrefix} Tried selectors:`, titleSelectors);
+    }
+
+    return titleUpdated;
+  }
+
+  /**
+   * Format price for display
+   * @param {string|number} price - The price to format
+   * @returns {string} - Formatted price string
+   */
+  function formatPrice(price) {
+    const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+    return `$${numPrice.toFixed(2)}`;
+  }
+
+  /**
+   * Update product price
+   * @param {string|number} price - The new price
+   * @param {Object} options - Configuration options
+   * @param {string} options.logPrefix - Prefix for console logs
+   * @param {HTMLElement} options.scope - Optional scope element (for card updates)
+   * @param {boolean} options.storeOriginal - Whether to store original value in dataset
+   * @returns {boolean} - Whether the update was successful
+   */
+  function updatePrice(price, options = {}) {
+    if (!price) return false;
+
+    const {
+      logPrefix = '[Shoptimizer]',
+      scope = document,
+      storeOriginal = false
+    } = options;
+
+    const priceSelectors = [
+      '.product__price',
+      '.product-single__price',
+      '[data-product-price]',
+      '.price',
+      '[itemprop="price"]'
+    ];
+    
+    const formattedPrice = formatPrice(price);
+    const priceElements = scope.querySelectorAll(priceSelectors.join(', '));
+    
+    if (priceElements.length === 0) {
+      console.warn(`${logPrefix} No price elements found`);
+      return false;
+    }
+
+    priceElements.forEach(el => {
+      // Store original if requested
+      if (storeOriginal && !el.dataset.originalPrice) {
+        el.dataset.originalPrice = el.textContent;
+      }
+      
+      el.textContent = formattedPrice;
+    });
+
+    console.log(`${logPrefix} Updated ${priceElements.length} price element(s) to ${formattedPrice}`);
+    return true;
+  }
+
+  /**
+   * Update product description
+   * @param {string} description - The new description HTML
+   * @param {Object} options - Configuration options
+   * @param {string} options.logPrefix - Prefix for console logs
+   * @param {HTMLElement} options.scope - Optional scope element
+   * @param {boolean} options.storeOriginal - Whether to store original value in dataset
+   * @returns {boolean} - Whether the update was successful
+   */
+  function updateDescription(description, options = {}) {
+    if (!description) return false;
+
+    const {
+      logPrefix = '[Shoptimizer]',
+      scope = document,
+      storeOriginal = false
+    } = options;
+
+    const descSelectors = [
+      '.product-single__description',
+      '.product__description',
+      '[data-product-description]',
+      '.product-description',
+      '[itemprop="description"]'
+    ];
+    
+    for (const selector of descSelectors) {
+      const descElement = scope.querySelector(selector);
+      if (descElement) {
+        // Store original if requested
+        if (storeOriginal && !descElement.dataset.originalHtml) {
+          descElement.dataset.originalHtml = descElement.innerHTML;
+        }
+        
+        descElement.innerHTML = description;
+        console.log(`${logPrefix} Updated description via ${selector}`);
+        return true;
+      }
+    }
+
+    console.warn(`${logPrefix} No description element found`);
+    return false;
+  }
+
   function applyVariant(test, variant) {
     const data = variant === 'control' ? test.controlData : test.variantData;
 
