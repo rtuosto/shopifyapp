@@ -12,6 +12,7 @@ import { getSyncStatus, completeSyncSuccess } from "./sync-status";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { selectTopProducts } from "./recommendation-engine";
+import type { BayesianState } from "./statistics/allocation-service";
 
 // Helper function to analyze theme and store positioning rules
 async function analyzeThemeAndStoreRules(shopifySession: any, shop: string) {
@@ -406,7 +407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const activeTests = await storage.getTests(shop, 'active');
-      const activeProductIds = activeTests.map(t => t.productId);
+      const activeProductIds = activeTests.map(t => t.productId).filter((id): id is string => id !== null);
       
       console.log(`[Store Analysis] Found ${products.length} products, ${activeProductIds.length} with active tests`);
       
@@ -900,7 +901,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Enrich with product data
       const enrichedTests = await Promise.all(
         tests.map(async (test) => {
-          const product = await storage.getProduct(shop, test.productId);
+          const product = test.productId ? await storage.getProduct(shop, test.productId) : null;
           return {
             ...test,
             productName: product?.title || "Unknown Product",
@@ -944,14 +945,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Enrich with product data
-      const product = await storage.getProduct(shop, test.productId);
+      const product = test.productId ? await storage.getProduct(shop, test.productId) : null;
       
       // Calculate derived metrics
-      const controlARPU = test.controlConversions > 0 
-        ? parseFloat(test.controlRevenue) / test.controlConversions 
+      const controlConversions = test.controlConversions ?? 0;
+      const variantConversions = test.variantConversions ?? 0;
+      const controlImpressions = test.controlImpressions ?? 0;
+      const variantImpressions = test.variantImpressions ?? 0;
+      const controlRevenue = parseFloat(test.controlRevenue ?? '0');
+      const variantRevenue = parseFloat(test.variantRevenue ?? '0');
+      
+      const controlARPU = controlConversions > 0 
+        ? controlRevenue / controlConversions 
         : 0;
-      const variantARPU = test.variantConversions > 0 
-        ? parseFloat(test.variantRevenue) / test.variantConversions 
+      const variantARPU = variantConversions > 0 
+        ? variantRevenue / variantConversions 
         : 0;
       const arpuLift = controlARPU > 0 
         ? ((variantARPU - controlARPU) / controlARPU) * 100 
@@ -962,21 +970,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         productName: product?.title || "Unknown Product",
         metrics: {
           control: {
-            impressions: test.controlImpressions,
-            conversions: test.controlConversions,
-            revenue: parseFloat(test.controlRevenue),
+            impressions: controlImpressions,
+            conversions: controlConversions,
+            revenue: controlRevenue,
             arpu: controlARPU,
-            conversionRate: test.controlImpressions > 0 
-              ? (test.controlConversions / test.controlImpressions) * 100 
+            conversionRate: controlImpressions > 0 
+              ? (controlConversions / controlImpressions) * 100 
               : 0,
           },
           variant: {
-            impressions: test.variantImpressions,
-            conversions: test.variantConversions,
-            revenue: parseFloat(test.variantRevenue),
+            impressions: variantImpressions,
+            conversions: variantConversions,
+            revenue: variantRevenue,
             arpu: variantARPU,
-            conversionRate: test.variantImpressions > 0 
-              ? (test.variantConversions / test.variantImpressions) * 100 
+            conversionRate: variantImpressions > 0 
+              ? (variantConversions / variantImpressions) * 100 
               : 0,
           },
           arpuLift,
@@ -1031,6 +1039,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (test.status !== "draft") {
         return res.status(400).json({ error: "Only draft tests can be activated" });
+      }
+      
+      if (!test.productId) {
+        return res.status(400).json({ error: "Test has no associated product" });
       }
       
       // Check for conflicting active tests (same product + test type)
@@ -1132,6 +1144,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (test.status !== "active") {
         return res.status(400).json({ error: "Only active tests can be deactivated" });
+      }
+      
+      if (!test.productId) {
+        return res.status(400).json({ error: "Test has no associated product" });
       }
       
       // Get the product
@@ -1272,10 +1288,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Import allocation service
-      const { computeAllocationUpdate, updateBayesianState, BayesianState } = await import('./statistics/allocation-service');
+      const { computeAllocationUpdate, updateBayesianState } = await import('./statistics/allocation-service');
       
       // Update Bayesian state with current metrics
-      const bayesianConfig = test.bayesianConfig as BayesianState || {};
+      const bayesianConfig = test.bayesianConfig as BayesianState || {} as BayesianState;
       const metrics = {
         controlImpressions: test.controlImpressions || 0,
         variantImpressions: test.variantImpressions || 0,
@@ -1294,10 +1310,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedTest = await storage.updateTest(shop, testId, {
         controlAllocation: (result.allocation.control * 100).toFixed(2),
         variantAllocation: (result.allocation.variant * 100).toFixed(2),
-        bayesianConfig: {
-          ...result.bayesianState,
-          probVariantBetter: result.metrics.probabilityVariantWins,
-        },
+        bayesianConfig: result.bayesianState,
       });
       
       console.log(`[Bayesian Update] Test ${testId}: Control ${(result.allocation.control * 100).toFixed(1)}% / Variant ${(result.allocation.variant * 100).toFixed(1)}%`);
@@ -1336,9 +1349,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Import allocation service
-      const { computeAllocationUpdate, BayesianState } = await import('./statistics/allocation-service');
+      const { computeAllocationUpdate } = await import('./statistics/allocation-service');
       
-      const bayesianConfig = test.bayesianConfig as BayesianState || {};
+      const bayesianConfig = test.bayesianConfig as BayesianState || {} as BayesianState;
       const metrics = {
         controlImpressions: test.controlImpressions || 0,
         variantImpressions: test.variantImpressions || 0,
@@ -1360,7 +1373,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           endDate: new Date(),
           bayesianConfig: {
             ...result.bayesianState,
-            probVariantBetter: result.metrics.probabilityVariantWins,
             promotionCheckCount: (result.bayesianState.promotionCheckCount || 0) + 1,
           },
         });
@@ -1382,10 +1394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const updatedTest = await storage.updateTest(shop, testId, {
           status: "cancelled",
           endDate: new Date(),
-          bayesianConfig: {
-            ...result.bayesianState,
-            probVariantBetter: result.metrics.probabilityVariantWins,
-          },
+          bayesianConfig: result.bayesianState,
         });
         
         console.log(`[Auto-Stop] Test ${testId} stopped: safety budget exhausted`);
@@ -1853,6 +1862,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Test must be active to simulate orders" });
       }
 
+      if (!test.productId) {
+        return res.status(400).json({ error: "Test has no associated product" });
+      }
+
       // Get the product to use realistic pricing
       const product = await storage.getProduct(shop, test.productId);
       if (!product) {
@@ -1971,6 +1984,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (test.status !== "active") {
         return res.status(400).json({ error: "Test must be active to simulate batch" });
+      }
+
+      if (!test.productId) {
+        return res.status(400).json({ error: "Test has no associated product" });
       }
 
       // Get product for pricing
@@ -2150,9 +2167,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (updatedTest) {
         try {
-          const { computeAllocationUpdate, updateBayesianState, BayesianState } = await import('./statistics/allocation-service');
+          const { computeAllocationUpdate, updateBayesianState } = await import('./statistics/allocation-service');
           
-          const bayesianConfig = updatedTest.bayesianConfig as BayesianState || {};
+          const bayesianConfig = updatedTest.bayesianConfig as BayesianState || {} as BayesianState;
           const metrics = {
             controlImpressions: newControlImpressions,
             variantImpressions: newVariantImpressions,
@@ -2169,10 +2186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updateTest(shop, testId, {
             controlAllocation: (result.allocation.control * 100).toFixed(2),
             variantAllocation: (result.allocation.variant * 100).toFixed(2),
-            bayesianConfig: {
-              ...result.bayesianState,
-              probVariantBetter: result.metrics.probabilityVariantWins,
-            },
+            bayesianConfig: result.bayesianState,
           });
           
           allocationAfter = {
@@ -2243,7 +2257,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "testId is required" });
       }
       
-      // Convert query params to numbers and validate
+      // Convert query params to proper types and validate
+      const testIdStr = testId as string;
       const visitorsNum = parseInt(visitors as string);
       const controlCR = parseFloat(controlConversionRate as string);
       const variantCR = parseFloat(variantConversionRate as string);
@@ -2263,13 +2278,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid avgOrderValue parameter" });
       }
 
-      const test = await storage.getTest(shop, testId as string);
+      const test = await storage.getTest(shop, testIdStr);
       if (!test) {
         return res.status(404).json({ error: "Test not found" });
       }
 
       if (test.status !== "active") {
         return res.status(400).json({ error: "Test must be active to simulate batch" });
+      }
+
+      if (!test.productId) {
+        return res.status(400).json({ error: "Test has no associated product" });
       }
 
       // Get product for pricing
@@ -2317,7 +2336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let variantRevenue = 0;
 
       sendEvent('start', {
-        testId,
+        testId: testIdStr,
         totalVisitors: visitorsNum,
         allocationBefore,
       });
@@ -2330,13 +2349,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const assignment = await assignVisitor(storage, {
           shop,
-          testId,
+          testId: testIdStr,
           sessionId,
           test,
         });
         
         impressionRecords.push({
-          testId,
+          testId: testIdStr,
           sessionId,
           variant: assignment.variant,
         });
@@ -2358,7 +2377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const orderValue = basePrice * variance;
           
           conversionRecords.push({
-            testId,
+            testId: testIdStr,
             sessionId,
             variant: assignment.variant,
             revenue: orderValue.toFixed(2),
@@ -2391,7 +2410,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const cumulativeVariantRevenue = parseFloat(test.variantRevenue || "0") + variantRevenue;
 
           snapshotRecords.push({
-            testId,
+            testId: testIdStr,
             impressions: cumulativeImpressions,
             controlImpressions: cumulativeControlImpressions,
             variantImpressions: cumulativeVariantImpressions,
@@ -2417,7 +2436,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             variantRPV: parseFloat(variantRPV.toFixed(2)),
             controlAllocation: parseFloat(currentControlAlloc.toFixed(1)),
             variantAllocation: parseFloat(currentVariantAlloc.toFixed(1)),
-            percentage: ((i + 1) / visitors * 100).toFixed(1),
+            percentage: ((i + 1) / visitorsNum * 100).toFixed(1),
           });
           
           // Add actual time delay to force network flush (setImmediate doesn't flush buffers)
@@ -2426,7 +2445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Send final snapshot if not on 100-impression boundary
-      if (visitors % 100 !== 0) {
+      if (visitorsNum % 100 !== 0) {
         const totalImpressions = controlImpressions + variantImpressions;
         const controlRPV = controlImpressions > 0 ? controlRevenue / controlImpressions : 0;
         const variantRPV = variantImpressions > 0 ? variantRevenue / variantImpressions : 0;
@@ -2434,7 +2453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const currentVariantAlloc = totalImpressions > 0 ? (variantImpressions / totalImpressions) * 100 : 50;
 
         sendEvent('progress', {
-          impressions: visitors,
+          impressions: visitorsNum,
           controlImpressions,
           variantImpressions,
           controlConversions,
@@ -2474,7 +2493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newRevenue = parseFloat(test.revenue || "0") + totalRevenue;
       const arpu = newConversions > 0 ? newRevenue / newConversions : 0;
 
-      const updatedTest = await storage.updateTest(shop, testId, {
+      const updatedTest = await storage.updateTest(shop, testIdStr, {
         impressions: newImpressions,
         conversions: newConversions,
         revenue: newRevenue.toString(),
@@ -2493,9 +2512,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (updatedTest) {
         try {
-          const { computeAllocationUpdate, updateBayesianState, BayesianState } = await import('./statistics/allocation-service');
+          const { computeAllocationUpdate, updateBayesianState } = await import('./statistics/allocation-service');
           
-          const bayesianConfig = updatedTest.bayesianConfig as BayesianState || {};
+          const bayesianConfig = updatedTest.bayesianConfig as BayesianState || {} as BayesianState;
           const metrics = {
             controlImpressions: newControlImpressions,
             variantImpressions: newVariantImpressions,
@@ -2508,13 +2527,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const updatedState = updateBayesianState(bayesianConfig, metrics);
           const result = computeAllocationUpdate(updatedState, metrics);
           
-          await storage.updateTest(shop, testId, {
+          await storage.updateTest(shop, testIdStr, {
             controlAllocation: (result.allocation.control * 100).toFixed(2),
             variantAllocation: (result.allocation.variant * 100).toFixed(2),
-            bayesianConfig: {
-              ...result.bayesianState,
-              probVariantBetter: result.metrics.probabilityVariantWins,
-            },
+            bayesianConfig: result.bayesianState,
           });
           
           allocationAfter = {
@@ -2534,7 +2550,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Send completion event
       sendEvent('complete', {
-        testId,
+        testId: testIdStr,
         impressions: visitors,
         conversions: totalConversions,
         revenue: totalRevenue.toFixed(2),
@@ -2604,50 +2620,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching storefront tests:", error);
       res.status(500).json({ error: "Failed to fetch tests" });
-    }
-  });
-  
-  // Get active test data for a product (legacy endpoint - kept for backwards compatibility)
-  app.get("/api/storefront/test/:shopifyProductId", async (req, res) => {
-    try {
-      const shopifyProductId = req.params.shopifyProductId;
-      const shop = req.query.shop as string;
-      
-      if (!shop) {
-        return res.status(400).json({ error: "Missing shop parameter" });
-      }
-      
-      // Find the product
-      const products = await storage.getProducts(shop);
-      const product = products.find(p => p.shopifyProductId === shopifyProductId);
-      
-      if (!product) {
-        return res.json({ activeTest: null });
-      }
-      
-      // Find active test for this product
-      const tests = await storage.getTests(shop);
-      const activeTest = tests.find(t => 
-        t.productId === product.id && 
-        t.status === "active"
-      );
-      
-      if (!activeTest) {
-        return res.json({ activeTest: null });
-      }
-      
-      // Return test data for storefront use
-      res.json({
-        activeTest: {
-          id: activeTest.id,
-          testType: activeTest.testType,
-          controlData: activeTest.controlData,
-          variantData: activeTest.variantData,
-        },
-      });
-    } catch (error) {
-      console.error("Error fetching storefront test:", error);
-      res.status(500).json({ error: "Failed to fetch test" });
     }
   });
   

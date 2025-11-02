@@ -129,7 +129,9 @@
     
     // Normalize to ensure they sum to 100
     const total = controlPct + variantPct;
-    const normalizedControlPct = (controlPct / total) * 100;
+    
+    // Guard against 0/0 edge case (if both allocations are zero, default to 50/50)
+    const normalizedControlPct = total > 0 ? (controlPct / total) * 100 : 50;
     
     // Randomly assign based on allocation percentages
     const random = Math.random() * 100;
