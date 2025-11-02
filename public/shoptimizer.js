@@ -235,16 +235,6 @@
   }
 
   /**
-   * Format price for display
-   * @param {string|number} price - The price to format
-   * @returns {string} - Formatted price string
-   */
-  function formatPrice(price) {
-    const numPrice = typeof price === 'string' ? parseFloat(price) : price;
-    return `$${numPrice.toFixed(2)}`;
-  }
-
-  /**
    * Update product price
    * @param {string|number} price - The new price
    * @param {Object} options - Configuration options
@@ -337,83 +327,12 @@
 
   function applyVariant(test, variant) {
     const data = variant === 'control' ? test.controlData : test.variantData;
-
     console.log(`[Shoptimizer] Applying ${variant} for test ${test.id}`, data);
 
-    // Apply title change
-    if (data.title) {
-      const titleSelectors = [
-        '.product-single__title',
-        '.product__title',
-        '[data-product-title]',
-        '.product-title',
-        'h1[itemprop="name"]',
-        'h1'
-      ];
-      
-      let titleUpdated = false;
-      for (const selector of titleSelectors) {
-        const titleElements = document.querySelectorAll(selector);
-        for (const titleElement of titleElements) {
-          // Skip hidden elements (templates, etc.)
-          const isVisible = titleElement.offsetParent !== null && 
-                           window.getComputedStyle(titleElement).display !== 'none' &&
-                           window.getComputedStyle(titleElement).visibility !== 'hidden';
-          
-          if (isVisible) {
-            const oldTitle = titleElement.textContent;
-            titleElement.textContent = data.title;
-            console.log(`[Shoptimizer] Updated title via ${selector}: "${oldTitle}" → "${data.title}"`);
-            titleUpdated = true;
-            break;
-          }
-        }
-        if (titleUpdated) break;
-      }
-      
-      if (!titleUpdated) {
-        console.error('[Shoptimizer] Failed to update title - no visible title element found');
-        console.log('[Shoptimizer] Title data:', data.title);
-        console.log('[Shoptimizer] Tried selectors:', titleSelectors);
-      }
-    }
-
-    // Apply description change
-    if (data.description) {
-      const descSelectors = [
-        '.product-single__description',
-        '.product__description',
-        '[data-product-description]',
-        '.product-description',
-        '[itemprop="description"]'
-      ];
-      
-      for (const selector of descSelectors) {
-        const descElement = document.querySelector(selector);
-        if (descElement) {
-          descElement.innerHTML = data.description;
-          console.log(`[Shoptimizer] Updated description via ${selector}`);
-          break;
-        }
-      }
-    }
-
-    // Apply price change
-    if (data.price) {
-      const priceSelectors = [
-        '.product__price',
-        '.product-single__price',
-        '[data-product-price]',
-        '.price',
-        '[itemprop="price"]'
-      ];
-      
-      document.querySelectorAll(priceSelectors.join(', ')).forEach(el => {
-        const formattedPrice = formatPrice(data.price);
-        el.textContent = formattedPrice;
-        console.log(`[Shoptimizer] Updated price to ${formattedPrice}`);
-      });
-    }
+    // Use shared helper functions
+    updateTitle(data.title, { logPrefix: '[Shoptimizer]' });
+    updateDescription(data.description, { logPrefix: '[Shoptimizer]' });
+    updatePrice(data.price, { logPrefix: '[Shoptimizer]' });
   }
 
   function formatPrice(price) {
