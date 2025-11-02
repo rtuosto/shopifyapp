@@ -59,19 +59,19 @@ export default function OptimizationHistoryTable({ optimizations, onViewOptimiza
 
   return (
     <Card data-testid="card-optimization-history">
-      <div className="p-6">
-        <h3 className="text-lg font-semibold mb-4" data-testid="text-table-title">Recent Optimizations</h3>
+      <div className="p-4 md:p-6">
+        <h3 className="text-base md:text-lg font-semibold mb-3 md:mb-4" data-testid="text-table-title">Recent Optimizations</h3>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full table-fixed lg:table-auto">
             <thead>
-              <tr className="border-b text-left text-sm text-muted-foreground">
-                <th className="pb-3 font-medium">Product</th>
-                <th className="pb-3 font-medium">Optimization Type</th>
-                <th className="pb-3 font-medium">Status</th>
-                <th className="pb-3 font-medium text-right">ARPU</th>
-                <th className="pb-3 font-medium text-right">Conversions</th>
-                <th className="pb-3 font-medium">Started</th>
-                <th className="pb-3 font-medium text-right">Actions</th>
+              <tr className="border-b text-left text-xs md:text-sm text-muted-foreground">
+                <th className="pb-3 font-medium w-2/5 lg:w-auto">Product</th>
+                <th className="pb-3 font-medium hidden md:table-cell w-24 lg:w-auto">Type</th>
+                <th className="pb-3 font-medium w-20 lg:w-auto">Status</th>
+                <th className="pb-3 font-medium text-right w-20 lg:w-auto">ARPU</th>
+                <th className="pb-3 font-medium text-right hidden sm:table-cell w-24 lg:w-auto">Conversions</th>
+                <th className="pb-3 font-medium hidden lg:table-cell">Started</th>
+                <th className="pb-3 font-medium text-right w-16 lg:w-auto">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -81,38 +81,39 @@ export default function OptimizationHistoryTable({ optimizations, onViewOptimiza
                   className="border-b last:border-0 hover-elevate"
                   data-testid={`row-optimization-${index}`}
                 >
-                  <td className="py-3 font-medium" data-testid={`text-product-${index}`}>
-                    {optimization.productName}
+                  <td className="py-3 text-xs md:text-sm font-medium break-words" data-testid={`text-product-${index}`}>
+                    <div className="line-clamp-2">{optimization.productName}</div>
                   </td>
-                  <td className="py-3 text-sm text-muted-foreground" data-testid={`text-optimization-type-${index}`}>
+                  <td className="py-3 text-xs md:text-sm text-muted-foreground hidden md:table-cell" data-testid={`text-optimization-type-${index}`}>
                     {optimization.optimizationType}
                   </td>
                   <td className="py-3">
-                    <Badge variant={getStatusVariant(optimization.status)} data-testid={`badge-status-${index}`}>
+                    <Badge variant={getStatusVariant(optimization.status)} data-testid={`badge-status-${index}`} className="text-xs">
                       {optimization.status}
                     </Badge>
                   </td>
-                  <td className="py-3 text-right font-semibold tabular-nums" data-testid={`text-arpu-${index}`}>
+                  <td className="py-3 text-right text-xs md:text-sm font-semibold tabular-nums" data-testid={`text-arpu-${index}`}>
                     {optimization.arpu > 0 ? `$${optimization.arpu.toFixed(2)}` : '$0.00'}
                   </td>
-                  <td className="py-3 text-right tabular-nums text-muted-foreground" data-testid={`text-conversions-${index}`}>
+                  <td className="py-3 text-right text-xs md:text-sm tabular-nums text-muted-foreground hidden sm:table-cell" data-testid={`text-conversions-${index}`}>
                     {optimization.conversions}
                   </td>
-                  <td className="py-3 text-sm text-muted-foreground" data-testid={`text-date-${index}`}>
+                  <td className="py-3 text-xs md:text-sm text-muted-foreground hidden lg:table-cell" data-testid={`text-date-${index}`}>
                     {optimization.startDate}
                   </td>
                   <td className="py-3">
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-1 md:gap-2">
                       {optimization.status === "draft" && onStartOptimization && (
                         <Button 
                           variant="outline" 
                           size="sm" 
                           onClick={(e) => handleStartOptimization(optimization.id, e)}
                           data-testid={`button-start-optimization-${index}`}
-                          className="gap-1"
+                          className="gap-1 hidden sm:flex"
                         >
                           <Play className="w-3 h-3" />
-                          Start Optimization
+                          <span className="hidden lg:inline">Start Optimization</span>
+                          <span className="lg:hidden">Start</span>
                         </Button>
                       )}
                       {optimization.status === "active" && onStopOptimization && (
@@ -121,10 +122,11 @@ export default function OptimizationHistoryTable({ optimizations, onViewOptimiza
                           size="sm" 
                           onClick={(e) => handleStopOptimization(optimization.id, e)}
                           data-testid={`button-stop-optimization-${index}`}
-                          className="gap-1"
+                          className="gap-1 hidden sm:flex"
                         >
                           <StopCircle className="w-3 h-3" />
-                          Stop Optimization
+                          <span className="hidden lg:inline">Stop Optimization</span>
+                          <span className="lg:hidden">Stop</span>
                         </Button>
                       )}
                       <Button 
@@ -132,6 +134,7 @@ export default function OptimizationHistoryTable({ optimizations, onViewOptimiza
                         size="sm" 
                         onClick={() => handleViewOptimization(optimization.id)}
                         data-testid={`button-view-optimization-${index}`}
+                        className="h-8 w-8 p-0"
                       >
                         <Eye className="w-4 h-4" />
                       </Button>

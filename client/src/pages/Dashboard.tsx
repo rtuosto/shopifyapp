@@ -413,7 +413,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="space-y-4 md:space-y-6 max-w-full overflow-hidden">
       <DashboardHeader 
         activeOptimizations={activeOptimizationsCount} 
         lastSync={getLastSyncText()}
