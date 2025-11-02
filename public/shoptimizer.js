@@ -179,6 +179,7 @@
    * @param {string} options.logPrefix - Prefix for console logs (e.g., '[Shoptimizer]')
    * @param {HTMLElement} options.scope - Optional scope element (for card updates)
    * @param {boolean} options.storeOriginal - Whether to store original value in dataset
+   * @param {Array<string>} options.selectors - Optional custom selectors (defaults to product page selectors)
    * @returns {boolean} - Whether the update was successful
    */
   function updateTitle(title, options = {}) {
@@ -187,10 +188,12 @@
     const {
       logPrefix = '[Shoptimizer]',
       scope = document,
-      storeOriginal = false
+      storeOriginal = false,
+      selectors = null
     } = options;
 
-    const titleSelectors = [
+    // Use custom selectors if provided, otherwise use product page defaults
+    const titleSelectors = selectors || [
       '.product-single__title',
       '.product__title',
       '[data-product-title]',
@@ -241,6 +244,7 @@
    * @param {string} options.logPrefix - Prefix for console logs
    * @param {HTMLElement} options.scope - Optional scope element (for card updates)
    * @param {boolean} options.storeOriginal - Whether to store original value in dataset
+   * @param {Array<string>} options.selectors - Optional custom selectors (defaults to product page selectors)
    * @returns {boolean} - Whether the update was successful
    */
   function updatePrice(price, options = {}) {
@@ -249,10 +253,12 @@
     const {
       logPrefix = '[Shoptimizer]',
       scope = document,
-      storeOriginal = false
+      storeOriginal = false,
+      selectors = null
     } = options;
 
-    const priceSelectors = [
+    // Use custom selectors if provided, otherwise use product page defaults
+    const priceSelectors = selectors || [
       '.product__price',
       '.product-single__price',
       '[data-product-price]',
@@ -390,36 +396,20 @@
       '.money'
     ];
 
-    // Update title (scoped to card)
-    if (data.title) {
-      for (const selector of cardTitleSelectors) {
-        const titleElement = cardElement.querySelector(selector);
-        if (titleElement && titleElement.textContent !== data.title) {
-          if (!titleElement.dataset.originalTitle) {
-            titleElement.dataset.originalTitle = titleElement.textContent;
-          }
-          titleElement.textContent = data.title;
-          console.log(`[Shoptimizer] Updated card title via ${selector}`);
-          break;
-        }
-      }
-    }
+    // Use shared helpers with card-specific selectors and scope
+    updateTitle(data.title, {
+      logPrefix: '[Shoptimizer]',
+      scope: cardElement,
+      storeOriginal: true,
+      selectors: cardTitleSelectors
+    });
 
-    // Update price (scoped to card)
-    if (data.price) {
-      const formattedPrice = formatPrice(data.price);
-      const priceElements = cardElement.querySelectorAll(cardPriceSelectors.join(', '));
-      
-      priceElements.forEach(el => {
-        if (el.textContent !== formattedPrice) {
-          if (!el.dataset.originalPrice) {
-            el.dataset.originalPrice = el.textContent;
-          }
-          el.textContent = formattedPrice;
-          console.log(`[Shoptimizer] Updated card price to ${formattedPrice}`);
-        }
-      });
-    }
+    updatePrice(data.price, {
+      logPrefix: '[Shoptimizer]',
+      scope: cardElement,
+      storeOriginal: true,
+      selectors: cardPriceSelectors
+    });
 
     // Mark card as processed
     cardElement.dataset.shoptimizerProcessed = 'true';
