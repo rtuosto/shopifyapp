@@ -751,123 +751,187 @@
       <style>
         #shoptimizer-preview-overlay {
           position: fixed;
-          bottom: 20px;
-          right: 20px;
+          top: 0;
+          left: 0;
+          right: 0;
           z-index: 999999;
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
-        #shoptimizer-preview-card {
-          background: white;
-          border-radius: 12px;
-          box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-          padding: 20px;
-          max-width: 400px;
-          border: 2px solid #5C6AC4;
+        #shoptimizer-preview-toolbar {
+          background: linear-gradient(135deg, #5C6AC4 0%, #4959BD 100%);
+          border-bottom: 3px solid #3B4A9F;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          padding: 12px 20px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          flex-wrap: wrap;
         }
-        #shoptimizer-preview-card h3 {
-          margin: 0 0 12px 0;
-          font-size: 16px;
+        .shoptimizer-toolbar-left {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          flex-wrap: wrap;
+          flex: 1;
+          min-width: 200px;
+        }
+        .shoptimizer-toolbar-title {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: white;
+          font-size: 15px;
           font-weight: 600;
-          color: #202223;
+          letter-spacing: 0.3px;
         }
-        #shoptimizer-preview-card p {
-          margin: 0 0 16px 0;
-          font-size: 14px;
-          color: #6D7175;
-          line-height: 1.4;
+        .shoptimizer-preview-changes {
+          background: rgba(255, 255, 255, 0.15);
+          backdrop-filter: blur(10px);
+          border-radius: 6px;
+          padding: 6px 12px;
+          font-size: 13px;
+          color: white;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .shoptimizer-preview-changes strong {
+          font-weight: 600;
+        }
+        .shoptimizer-preview-changes span {
+          opacity: 0.9;
+        }
+        .shoptimizer-toolbar-right {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
         }
         .shoptimizer-preview-variant-toggle {
           display: flex;
-          gap: 8px;
-          margin-bottom: 16px;
+          gap: 4px;
+          background: rgba(255, 255, 255, 0.15);
+          border-radius: 8px;
+          padding: 4px;
         }
         .shoptimizer-preview-variant-btn {
-          flex: 1;
-          padding: 10px;
-          border: 2px solid #E1E3E5;
-          background: white;
-          border-radius: 8px;
+          padding: 8px 16px;
+          border: none;
+          background: transparent;
+          border-radius: 6px;
           cursor: pointer;
-          font-size: 14px;
-          font-weight: 500;
+          font-size: 13px;
+          font-weight: 600;
+          color: white;
           transition: all 0.2s;
+          white-space: nowrap;
         }
         .shoptimizer-preview-variant-btn.active {
-          background: #5C6AC4;
-          border-color: #5C6AC4;
-          color: white;
+          background: white;
+          color: #5C6AC4;
         }
         .shoptimizer-preview-variant-btn:hover:not(.active) {
-          border-color: #5C6AC4;
+          background: rgba(255, 255, 255, 0.1);
         }
         .shoptimizer-preview-actions {
           display: flex;
           gap: 8px;
         }
         .shoptimizer-preview-btn {
-          flex: 1;
-          padding: 12px;
-          border: none;
-          border-radius: 8px;
-          font-size: 14px;
+          padding: 8px 16px;
+          border: 2px solid white;
+          border-radius: 6px;
+          font-size: 13px;
           font-weight: 600;
           cursor: pointer;
           transition: all 0.2s;
+          white-space: nowrap;
         }
         .shoptimizer-preview-btn-primary {
-          background: #5C6AC4;
-          color: white;
+          background: white;
+          color: #5C6AC4;
+          border-color: white;
         }
         .shoptimizer-preview-btn-primary:hover {
-          background: #4959BD;
+          background: #F1F2F4;
+          transform: translateY(-1px);
         }
         .shoptimizer-preview-btn-secondary {
-          background: #F1F2F4;
-          color: #202223;
+          background: transparent;
+          color: white;
+          border-color: rgba(255, 255, 255, 0.5);
         }
         .shoptimizer-preview-btn-secondary:hover {
-          background: #E1E3E5;
+          background: rgba(255, 255, 255, 0.1);
+          border-color: white;
         }
-        .shoptimizer-preview-changes {
-          background: #F6F6F7;
-          border-radius: 8px;
-          padding: 12px;
-          margin-bottom: 16px;
-          font-size: 13px;
-        }
-        .shoptimizer-preview-changes strong {
-          color: #202223;
-          display: block;
-          margin-bottom: 4px;
-        }
-        .shoptimizer-preview-changes span {
-          color: #6D7175;
+        
+        @media (max-width: 768px) {
+          #shoptimizer-preview-toolbar {
+            padding: 10px 12px;
+            gap: 12px;
+          }
+          .shoptimizer-toolbar-left {
+            gap: 12px;
+            min-width: auto;
+            width: 100%;
+          }
+          .shoptimizer-toolbar-title {
+            font-size: 14px;
+          }
+          .shoptimizer-preview-changes {
+            font-size: 12px;
+            padding: 5px 10px;
+            width: 100%;
+          }
+          .shoptimizer-toolbar-right {
+            width: 100%;
+            justify-content: space-between;
+          }
+          .shoptimizer-preview-variant-toggle {
+            flex: 1;
+          }
+          .shoptimizer-preview-variant-btn {
+            padding: 6px 12px;
+            font-size: 12px;
+            flex: 1;
+          }
+          .shoptimizer-preview-btn {
+            padding: 6px 12px;
+            font-size: 12px;
+          }
         }
       </style>
-      <div id="shoptimizer-preview-card">
-        <h3>🔬 Preview Mode</h3>
-        <p>See how this optimization looks on your live store</p>
-        
-        <div class="shoptimizer-preview-variant-toggle">
-          <button class="shoptimizer-preview-variant-btn active" data-variant="control">
-            Current
-          </button>
-          <button class="shoptimizer-preview-variant-btn" data-variant="variant">
-            Optimized
-          </button>
+      <div id="shoptimizer-preview-toolbar">
+        <div class="shoptimizer-toolbar-left">
+          <div class="shoptimizer-toolbar-title">
+            <span>PREVIEW MODE</span>
+          </div>
+          <div class="shoptimizer-preview-changes" id="shoptimizer-preview-changes">
+            Loading changes...
+          </div>
         </div>
         
-        <div class="shoptimizer-preview-changes" id="shoptimizer-preview-changes">
-          Loading changes...
-        </div>
-        
-        <div class="shoptimizer-preview-actions">
-          <button class="shoptimizer-preview-btn shoptimizer-preview-btn-secondary" id="shoptimizer-preview-close">
-            Close
-          </button>
-          <button class="shoptimizer-preview-btn shoptimizer-preview-btn-primary" id="shoptimizer-preview-approve">
-            Accept & Launch
-          </button>
+        <div class="shoptimizer-toolbar-right">
+          <div class="shoptimizer-preview-variant-toggle">
+            <button class="shoptimizer-preview-variant-btn active" data-variant="control">
+              Current
+            </button>
+            <button class="shoptimizer-preview-variant-btn" data-variant="variant">
+              Optimized
+            </button>
+          </div>
+          
+          <div class="shoptimizer-preview-actions">
+            <button class="shoptimizer-preview-btn shoptimizer-preview-btn-secondary" id="shoptimizer-preview-close">
+              Close
+            </button>
+            <button class="shoptimizer-preview-btn shoptimizer-preview-btn-primary" id="shoptimizer-preview-approve">
+              Accept & Launch
+            </button>
+          </div>
         </div>
       </div>
     `;
@@ -920,16 +984,20 @@
     const changeParts = [];
 
     if (changes.includes('title')) {
-      changeParts.push('<strong>Title:</strong> <span>Updated</span>');
+      changeParts.push('<strong>Title</strong>');
     }
     if (changes.includes('price')) {
-      changeParts.push('<strong>Price:</strong> <span>Updated</span>');
+      changeParts.push('<strong>Price</strong>');
     }
     if (changes.includes('description')) {
-      changeParts.push('<strong>Description:</strong> <span>Enhanced</span>');
+      changeParts.push('<strong>Description</strong>');
     }
 
-    changesDiv.innerHTML = changeParts.join('<br>') || 'No changes detected';
+    if (changeParts.length > 0) {
+      changesDiv.innerHTML = '<span>Optimized:</span> ' + changeParts.join(' • ');
+    } else {
+      changesDiv.innerHTML = 'No changes detected';
+    }
   }
 
   function applyPreviewVariant(data) {
