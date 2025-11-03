@@ -1,4 +1,4 @@
-import { eq, and, desc, lt } from "drizzle-orm";
+import { eq, and, desc, lt, sql } from "drizzle-orm";
 import { db } from "./db";
 import { 
   products, 
@@ -12,6 +12,7 @@ import {
   shops,
   previewSessions,
   themePositioningRules,
+  editorSessions,
   type Product,
   type InsertProduct,
   type Recommendation,
@@ -34,6 +35,8 @@ import {
   type InsertPreviewSession,
   type ThemePositioningRules,
   type InsertThemePositioningRules,
+  type EditorSession,
+  type InsertEditorSession,
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -381,6 +384,53 @@ export class DbStorage implements IStorage {
       .where(eq(themePositioningRules.shop, shop))
       .returning();
     return result.length > 0;
+  }
+
+  // Editor Sessions (storefront live editing)
+  async createEditorSession(shop: string, session: InsertEditorSession): Promise<EditorSession> {
+    const [result] = await db.insert(editorSessions).values({ ...session, shop }).returning();
+    return result;
+  }
+
+  async getEditorSession(token: string): Promise<EditorSession | undefined> {
+    const result = await db.select().from(editorSessions)
+      .where(eq(editorSessions.token, token))
+      .limit(1);
+    return result[0];
+  }
+
+  async updateEditorSessionHeartbeat(token: string): Promise<EditorSession | undefined> {
+    const now = new Date();
+    const newExpiresAt = new Date(now.getTime() + 20 * 60 * 1000); // 20 minutes from now
+
+    const [result] = await db.update(editorSessions)
+      .set({ 
+        lastHeartbeat: sql`NOW()`,
+        expiresAt: newExpiresAt,
+      })
+      .where(eq(editorSessions.token, token))
+      .returning();
+    return result;
+  }
+
+  async deleteEditorSession(token: string): Promise<boolean> {
+    const result = await db.delete(editorSessions)
+      .where(eq(editorSessions.token, token))
+      .returning();
+    return result.length > 0;
+  }
+
+  async cleanupExpiredEditorSessions(): Promise<number> {
+    const now = new Date();
+    const result = await db.delete(editorSessions)
+      .where(lt(editorSessions.expiresAt, now))
+      .returning();
+    
+    const deleted = result.length;
+    if (deleted > 0) {
+      console.log(`[DbStorage] Cleaned up ${deleted} expired editor session(s)`);
+    }
+    return deleted;
   }
 }
 

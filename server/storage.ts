@@ -21,6 +21,8 @@ import {
   type InsertPreviewSession,
   type ThemePositioningRules,
   type InsertThemePositioningRules,
+  type EditorSession,
+  type InsertEditorSession,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -87,6 +89,13 @@ export interface IStorage {
   getThemePositioningRules(shop: string): Promise<ThemePositioningRules | undefined>;
   createOrUpdateThemePositioningRules(shop: string, rules: InsertThemePositioningRules): Promise<ThemePositioningRules>;
   deleteThemePositioningRules(shop: string): Promise<boolean>;
+
+  // Editor Sessions (storefront live editing)
+  createEditorSession(shop: string, session: InsertEditorSession): Promise<EditorSession>;
+  getEditorSession(token: string): Promise<EditorSession | undefined>;
+  updateEditorSessionHeartbeat(token: string): Promise<EditorSession | undefined>;
+  deleteEditorSession(token: string): Promise<boolean>;
+  cleanupExpiredEditorSessions(): Promise<number>;
 }
 
 export class MemStorage implements IStorage {

@@ -795,6 +795,146 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== EDITOR MODE API ====================
+  
+  // Create Editor Session - Initiates editor mode for browsing storefront
+  app.post("/api/editor/sessions", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+
+      // Generate session token
+      const token = randomUUID().replace(/-/g, '').substring(0, 24);
+
+      // Create session (expires in 20 minutes)
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + 20);
+
+      const session = await storage.createEditorSession(shop, {
+        token,
+        expiresAt,
+      });
+
+      // Build storefront URL with editor token
+      const shopDomain = shop.replace('.myshopify.com', '');
+      const editorUrl = `https://${shop}?shoptimizer_editor=${token}`;
+
+      console.log(`[Editor] Created session ${session.id} for shop: ${shop}`);
+      console.log(`[Editor] URL: ${editorUrl}`);
+
+      res.json({
+        sessionId: session.id,
+        token: session.token,
+        editorUrl,
+        expiresAt: session.expiresAt,
+      });
+    } catch (error) {
+      console.error("Error creating editor session:", error);
+      res.status(500).json({ error: "Failed to create editor session" });
+    }
+  });
+
+  // Validate Editor Session - Public endpoint for SDK to validate session
+  app.get("/api/storefront/editor/validate/:token", storefrontCors, async (req, res) => {
+    try {
+      const { token } = req.params;
+
+      const session = await storage.getEditorSession(token);
+      if (!session) {
+        return res.status(404).json({ error: "Editor session not found" });
+      }
+
+      // Check if expired
+      if (new Date() > new Date(session.expiresAt)) {
+        await storage.deleteEditorSession(token);
+        return res.status(401).json({ error: "Editor session expired" });
+      }
+
+      // Update heartbeat to keep session alive
+      const updated = await storage.updateEditorSessionHeartbeat(token);
+
+      res.json({
+        valid: true,
+        shop: session.shop,
+        expiresAt: updated?.expiresAt || session.expiresAt,
+      });
+    } catch (error) {
+      console.error("Error validating editor session:", error);
+      res.status(500).json({ error: "Failed to validate editor session" });
+    }
+  });
+
+  // Heartbeat Editor Session - Keep session alive
+  app.post("/api/storefront/editor/heartbeat/:token", storefrontCors, async (req, res) => {
+    try {
+      const { token } = req.params;
+
+      const updated = await storage.updateEditorSessionHeartbeat(token);
+      if (!updated) {
+        return res.status(404).json({ error: "Editor session not found" });
+      }
+
+      res.json({
+        success: true,
+        expiresAt: updated.expiresAt,
+      });
+    } catch (error) {
+      console.error("Error updating editor heartbeat:", error);
+      res.status(500).json({ error: "Failed to update heartbeat" });
+    }
+  });
+
+  // Delete Editor Session - Exit editor mode
+  app.delete("/api/storefront/editor/:token", storefrontCors, async (req, res) => {
+    try {
+      const { token } = req.params;
+
+      const deleted = await storage.deleteEditorSession(token);
+      if (!deleted) {
+        return res.status(404).json({ error: "Editor session not found" });
+      }
+
+      console.log(`[Editor] Session deleted: ${token}`);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting editor session:", error);
+      res.status(500).json({ error: "Failed to delete editor session" });
+    }
+  });
+
+  // Get Recommendations by Product - Public endpoint for SDK to fetch recommendations
+  app.get("/api/storefront/editor/recommendations", storefrontCors, async (req, res) => {
+    try {
+      const { productId, shop } = req.query;
+
+      if (!productId || !shop) {
+        return res.status(400).json({ error: "Missing productId or shop parameter" });
+      }
+
+      // Get all recommendations for this product (pending + active)
+      const recommendations = await storage.getRecommendationsByProduct(shop as string, productId as string);
+      
+      // Get active optimizations for conflict detection
+      const activeOptimizations = await storage.getActiveOptimizationsByProduct(shop as string, productId as string);
+
+      // Filter to only pending recommendations (not already in active optimizations)
+      const activeOptTypes = new Set(activeOptimizations.map(o => o.optimizationType));
+      const availableRecommendations = recommendations.filter(r => 
+        r.status === 'pending' && !activeOptTypes.has(r.optimizationType)
+      );
+
+      res.json({
+        recommendations: availableRecommendations,
+        activeOptimizations,
+      });
+    } catch (error) {
+      console.error("Error fetching recommendations for product:", error);
+      res.status(500).json({ error: "Failed to fetch recommendations" });
+    }
+  });
+
+  // ==================== THEME ANALYSIS API ====================
+
   // Theme Analysis API - Analyzes theme structure for accurate preview positioning
   app.post("/api/theme/analyze", requireShopifySessionOrDev, async (req, res) => {
     try {

@@ -15,6 +15,7 @@
 
   const SHOPTIMIZER_CONFIG = {
     apiUrl: window.ShoptimizerConfig?.apiUrl || 'https://your-app.replit.app',
+    dashboardUrl: window.ShoptimizerConfig?.dashboardUrl || '',
     shop: window.ShoptimizerConfig?.shop || window.Shopify?.shop || '',
     sessionKey: 'shoptimizer_session_id',
     assignmentsKey: 'shoptimizer_assignments',
@@ -1356,6 +1357,433 @@
   }
 
   // ============================================
+  // Editor Mode (Storefront Navigation & Testing)
+  // ============================================
+
+  // Editor mode state
+  let editorState = {
+    token: null,
+    session: null,
+    currentProduct: null,
+    recommendations: {},
+    heartbeatInterval: null,
+  };
+
+  function getEditorToken() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('shoptimizer_editor');
+  }
+
+  async function initEditorMode(token) {
+    console.log('[Shoptimizer Editor] ========================================');
+    console.log('[Shoptimizer Editor] Initializing editor mode');
+    console.log('[Shoptimizer Editor] Token:', token.substring(0, 12) + '...');
+    console.log('[Shoptimizer Editor] API URL:', SHOPTIMIZER_CONFIG.apiUrl);
+    console.log('[Shoptimizer Editor] ========================================');
+
+    // Store token
+    editorState.token = token;
+
+    // Validate session
+    try {
+      const validateUrl = `${SHOPTIMIZER_CONFIG.apiUrl}/api/storefront/editor/validate/${token}`;
+      console.log('[Shoptimizer Editor] Validating session:', validateUrl);
+      
+      const response = await fetch(validateUrl);
+      
+      if (!response.ok) {
+        console.error('[Shoptimizer Editor] ❌ Session validation failed:', response.status);
+        showEditorError('Session expired or invalid. Please restart from the dashboard.');
+        return;
+      }
+
+      const session = await response.json();
+      editorState.session = session;
+      
+      console.log('[Shoptimizer Editor] ✅ Session validated successfully');
+      console.log('[Shoptimizer Editor] Shop:', session.shop);
+      console.log('[Shoptimizer Editor] Expires:', new Date(session.expiresAt).toLocaleString());
+
+      // Render editor toolbar
+      renderEditorToolbar();
+
+      // Start heartbeat system
+      startHeartbeat();
+
+      // Detect current product and load recommendations
+      await detectAndLoadProduct();
+
+      // Set up navigation handling
+      setupNavigationHandling();
+
+    } catch (error) {
+      console.error('[Shoptimizer Editor] Error initializing editor mode:', error);
+      showEditorError('Failed to initialize editor mode. Please try again.');
+    }
+  }
+
+  function showEditorError(message) {
+    const errorDiv = document.createElement('div');
+    errorDiv.innerHTML = `
+      <div style="position: fixed; top: 0; left: 0; right: 0; background: #D72C0D; color: white; padding: 16px; text-align: center; z-index: 999999; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <strong>Editor Mode Error:</strong> ${message}
+      </div>
+    `;
+    document.body.appendChild(errorDiv);
+  }
+
+  function startHeartbeat() {
+    // Send heartbeat every 5 minutes (300000ms)
+    editorState.heartbeatInterval = setInterval(async () => {
+      try {
+        console.log('[Shoptimizer Editor] Sending heartbeat...');
+        
+        const response = await fetch(`${SHOPTIMIZER_CONFIG.apiUrl}/api/storefront/editor/heartbeat/${editorState.token}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!response.ok) {
+          console.error('[Shoptimizer Editor] Heartbeat failed:', response.status);
+          exitEditorMode('Session expired');
+          return;
+        }
+
+        const data = await response.json();
+        editorState.session.expiresAt = data.expiresAt;
+        console.log('[Shoptimizer Editor] Heartbeat successful, new expiry:', new Date(data.expiresAt).toLocaleString());
+
+      } catch (error) {
+        console.error('[Shoptimizer Editor] Heartbeat error:', error);
+        exitEditorMode('Connection lost');
+      }
+    }, 300000); // 5 minutes
+
+    console.log('[Shoptimizer Editor] Heartbeat system started (5 min intervals)');
+  }
+
+  async function detectAndLoadProduct() {
+    const product = detectCurrentProduct();
+    
+    if (!product) {
+      console.log('[Shoptimizer Editor] No product detected on current page');
+      updateEditorToolbar({ productName: 'Navigate to a product page' });
+      return;
+    }
+
+    editorState.currentProduct = product;
+    console.log('[Shoptimizer Editor] Product detected:', product);
+
+    // Update toolbar with product name
+    updateEditorToolbar({ productName: product.title || product.handle });
+
+    // Fetch recommendations for this product
+    await fetchRecommendations(product);
+  }
+
+  function detectCurrentProduct() {
+    // Method 1: Extract handle from URL
+    const urlMatch = window.location.pathname.match(/\/products\/([^?/#]+)/);
+    if (!urlMatch) {
+      return null;
+    }
+
+    const handle = urlMatch[1];
+    
+    // Method 2: Try to get Shopify product ID
+    let productId = null;
+    
+    if (window.ShopifyAnalytics?.meta?.product?.gid) {
+      productId = window.ShopifyAnalytics.meta.product.gid;
+    } else if (window.meta?.product?.id) {
+      productId = `gid://shopify/Product/${window.meta.product.id}`;
+    } else {
+      // Try to extract from product JSON
+      const productJsonScript = document.querySelector('script[data-product-json]');
+      if (productJsonScript) {
+        try {
+          const productData = JSON.parse(productJsonScript.textContent);
+          if (productData.id) {
+            productId = `gid://shopify/Product/${productData.id}`;
+          }
+        } catch (e) {
+          console.warn('[Shoptimizer Editor] Failed to parse product JSON:', e);
+        }
+      }
+    }
+
+    // Method 3: Try to get product title from page
+    let title = null;
+    const titleSelectors = [
+      '.product-single__title',
+      '.product__title',
+      '[data-product-title]',
+      '.product-title',
+      'h1[itemprop="name"]',
+      'h1'
+    ];
+    
+    for (const selector of titleSelectors) {
+      const titleElement = document.querySelector(selector);
+      if (titleElement && titleElement.offsetParent !== null) {
+        title = titleElement.textContent.trim();
+        break;
+      }
+    }
+
+    return {
+      handle,
+      productId,
+      title,
+    };
+  }
+
+  async function fetchRecommendations(product) {
+    // Check cache first
+    const cacheKey = product.productId || product.handle;
+    if (editorState.recommendations[cacheKey]) {
+      console.log('[Shoptimizer Editor] Using cached recommendations for:', cacheKey);
+      return editorState.recommendations[cacheKey];
+    }
+
+    try {
+      const params = new URLSearchParams({
+        shop: editorState.session.shop,
+      });
+
+      if (product.productId) {
+        params.set('productId', product.productId);
+      } else if (product.handle) {
+        params.set('handle', product.handle);
+      }
+
+      const url = `${SHOPTIMIZER_CONFIG.apiUrl}/api/storefront/editor/recommendations?${params}`;
+      console.log('[Shoptimizer Editor] Fetching recommendations:', url);
+
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        console.warn('[Shoptimizer Editor] Failed to fetch recommendations:', response.status);
+        return null;
+      }
+
+      const recommendations = await response.json();
+      
+      // Cache the recommendations
+      editorState.recommendations[cacheKey] = recommendations;
+      
+      console.log('[Shoptimizer Editor] Recommendations loaded:', recommendations);
+      return recommendations;
+
+    } catch (error) {
+      console.error('[Shoptimizer Editor] Error fetching recommendations:', error);
+      return null;
+    }
+  }
+
+  function renderEditorToolbar() {
+    const toolbar = document.createElement('div');
+    toolbar.id = 'shoptimizer-editor-toolbar';
+    toolbar.innerHTML = `
+      <style>
+        #shoptimizer-editor-toolbar {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          z-index: 999999;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        #shoptimizer-editor-bar {
+          background: linear-gradient(135deg, #5C6AC4 0%, #4959BD 100%);
+          border-bottom: 3px solid #3B4A9F;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          padding: 12px 20px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          flex-wrap: wrap;
+        }
+        .shoptimizer-editor-left {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          flex-wrap: wrap;
+          flex: 1;
+          min-width: 200px;
+        }
+        .shoptimizer-editor-title {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: white;
+          font-size: 15px;
+          font-weight: 600;
+          letter-spacing: 0.3px;
+        }
+        .shoptimizer-editor-product {
+          background: rgba(255, 255, 255, 0.15);
+          backdrop-filter: blur(10px);
+          border-radius: 6px;
+          padding: 6px 12px;
+          font-size: 13px;
+          color: white;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .shoptimizer-editor-product strong {
+          font-weight: 600;
+        }
+        .shoptimizer-editor-product span {
+          opacity: 0.9;
+        }
+        .shoptimizer-editor-right {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .shoptimizer-editor-btn {
+          padding: 8px 16px;
+          border: 2px solid white;
+          border-radius: 6px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+          white-space: nowrap;
+          background: transparent;
+          color: white;
+        }
+        .shoptimizer-editor-btn:hover {
+          background: rgba(255, 255, 255, 0.1);
+          border-color: white;
+        }
+        
+        @media (max-width: 768px) {
+          #shoptimizer-editor-bar {
+            padding: 10px 12px;
+            gap: 12px;
+          }
+          .shoptimizer-editor-left {
+            gap: 12px;
+            min-width: auto;
+            width: 100%;
+          }
+          .shoptimizer-editor-title {
+            font-size: 14px;
+          }
+          .shoptimizer-editor-product {
+            font-size: 12px;
+            padding: 5px 10px;
+            width: 100%;
+          }
+          .shoptimizer-editor-right {
+            width: 100%;
+            justify-content: flex-end;
+          }
+          .shoptimizer-editor-btn {
+            padding: 6px 12px;
+            font-size: 12px;
+          }
+        }
+      </style>
+      <div id="shoptimizer-editor-bar">
+        <div class="shoptimizer-editor-left">
+          <div class="shoptimizer-editor-title">
+            <span>EDITOR MODE</span>
+          </div>
+          <div class="shoptimizer-editor-product" id="shoptimizer-editor-product">
+            <span id="shoptimizer-product-name">Loading...</span>
+          </div>
+        </div>
+        
+        <div class="shoptimizer-editor-right">
+          <button class="shoptimizer-editor-btn" id="shoptimizer-editor-exit">
+            Exit
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(toolbar);
+
+    // Set up exit button
+    document.getElementById('shoptimizer-editor-exit').addEventListener('click', async () => {
+      await exitEditorMode('User clicked exit');
+    });
+
+    console.log('[Shoptimizer Editor] Toolbar rendered');
+  }
+
+  function updateEditorToolbar(updates) {
+    if (updates.productName !== undefined) {
+      const productNameEl = document.getElementById('shoptimizer-product-name');
+      if (productNameEl) {
+        productNameEl.textContent = updates.productName;
+      }
+    }
+  }
+
+  function setupNavigationHandling() {
+    // Listen for popstate (back/forward navigation)
+    window.addEventListener('popstate', async () => {
+      console.log('[Shoptimizer Editor] Navigation detected (popstate)');
+      await detectAndLoadProduct();
+    });
+
+    // Listen for clicks on internal links
+    const handleLinkClick = async (e) => {
+      const link = e.target.closest('a[href]');
+      if (!link) return;
+
+      const url = link.href;
+      
+      // Check if it's an internal link to a product page
+      if (url && url.includes(window.location.origin) && url.includes('/products/')) {
+        // Let the navigation happen naturally, then detect the new product
+        setTimeout(async () => {
+          console.log('[Shoptimizer Editor] Navigation detected (link click)');
+          await detectAndLoadProduct();
+        }, 100);
+      }
+    };
+
+    document.addEventListener('click', handleLinkClick);
+
+    console.log('[Shoptimizer Editor] Navigation handling set up');
+  }
+
+  async function exitEditorMode(reason) {
+    console.log('[Shoptimizer Editor] Exiting editor mode:', reason);
+
+    // Stop heartbeat
+    if (editorState.heartbeatInterval) {
+      clearInterval(editorState.heartbeatInterval);
+      editorState.heartbeatInterval = null;
+    }
+
+    // Delete session
+    try {
+      await fetch(`${SHOPTIMIZER_CONFIG.apiUrl}/api/storefront/editor/${editorState.token}`, {
+        method: 'DELETE',
+      });
+      console.log('[Shoptimizer Editor] Session deleted');
+    } catch (error) {
+      console.error('[Shoptimizer Editor] Error deleting session:', error);
+    }
+
+    // Redirect to dashboard
+    const dashboardUrl = SHOPTIMIZER_CONFIG.dashboardUrl || 
+                        SHOPTIMIZER_CONFIG.apiUrl.replace(/\/api$/, '') || 
+                        SHOPTIMIZER_CONFIG.apiUrl;
+    
+    console.log('[Shoptimizer Editor] Redirecting to dashboard:', dashboardUrl);
+    window.location.href = dashboardUrl;
+  }
+
+  // ============================================
   // Main Initialization
   // ============================================
 
@@ -1365,6 +1793,14 @@
     console.log('[Shoptimizer SDK] Shop:', SHOPTIMIZER_CONFIG.shop);
     console.log('[Shoptimizer SDK] Page URL:', window.location.href);
     
+    // Check if editor mode
+    const editorToken = getEditorToken();
+    if (editorToken) {
+      console.log('[Shoptimizer SDK] ✅ Editor mode detected - token:', editorToken.substring(0, 8) + '...');
+      await initEditorMode(editorToken);
+      return; // Don't run normal A/B testing in editor mode
+    }
+    
     // Check if preview mode
     const previewToken = getPreviewToken();
     if (previewToken) {
@@ -1373,7 +1809,7 @@
       return; // Don't run normal A/B testing in preview mode
     }
     
-    console.log('[Shoptimizer SDK] No preview token found, running normal A/B optimization mode');
+    console.log('[Shoptimizer SDK] No editor or preview token found, running normal A/B optimization mode');
     try {
       // Get or create persistent session ID
       const sessionId = getSessionId();

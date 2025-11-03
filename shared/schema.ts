@@ -360,3 +360,25 @@ export const insertThemePositioningRulesSchema = createInsertSchema(themePositio
 
 export type InsertThemePositioningRules = z.infer<typeof insertThemePositioningRulesSchema>;
 export type ThemePositioningRules = typeof themePositioningRules.$inferSelect;
+
+// Editor Sessions table - Stores active editor mode sessions for storefront live editing (multi-tenant)
+export const editorSessions = pgTable("editor_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  token: varchar("token").notNull().unique(), // Session token for validation
+  shop: varchar("shop").notNull().default("default-shop"), // Shopify store identifier
+  
+  // Session state
+  lastHeartbeat: timestamp("last_heartbeat").notNull().defaultNow(), // Last activity timestamp
+  expiresAt: timestamp("expires_at").notNull(), // Session expiry (20 minutes, renewable via heartbeat)
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertEditorSessionSchema = createInsertSchema(editorSessions).omit({
+  id: true,
+  shop: true, // Shop is automatically added by storage layer
+  createdAt: true,
+});
+
+export type InsertEditorSession = z.infer<typeof insertEditorSessionSchema>;
+export type EditorSession = typeof editorSessions.$inferSelect;
