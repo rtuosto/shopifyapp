@@ -1370,8 +1370,33 @@
   };
 
   function getEditorToken() {
+    // First check URL parameter
     const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('shoptimizer_editor');
+    const urlToken = urlParams.get('shoptimizer_editor');
+    
+    if (urlToken) {
+      // Save to sessionStorage for persistence across password redirects
+      try {
+        sessionStorage.setItem('shoptimizer_editor_token', urlToken);
+        console.log('[Shoptimizer Editor] Token saved to sessionStorage');
+      } catch (e) {
+        console.warn('[Shoptimizer Editor] Could not save token to sessionStorage:', e);
+      }
+      return urlToken;
+    }
+    
+    // Fallback to sessionStorage (for password-protected stores)
+    try {
+      const storedToken = sessionStorage.getItem('shoptimizer_editor_token');
+      if (storedToken) {
+        console.log('[Shoptimizer Editor] Token retrieved from sessionStorage');
+        return storedToken;
+      }
+    } catch (e) {
+      console.warn('[Shoptimizer Editor] Could not access sessionStorage:', e);
+    }
+    
+    return null;
   }
 
   async function initEditorMode(token) {
@@ -1772,6 +1797,14 @@
       console.log('[Shoptimizer Editor] Session deleted');
     } catch (error) {
       console.error('[Shoptimizer Editor] Error deleting session:', error);
+    }
+
+    // Clear sessionStorage token
+    try {
+      sessionStorage.removeItem('shoptimizer_editor_token');
+      console.log('[Shoptimizer Editor] Token cleared from sessionStorage');
+    } catch (e) {
+      console.warn('[Shoptimizer Editor] Could not clear sessionStorage:', e);
     }
 
     // Redirect to dashboard
