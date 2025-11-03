@@ -696,19 +696,30 @@
   }
 
   async function initPreviewMode(token) {
-    console.log('[Shoptimizer Preview] Initializing preview mode with token:', token);
+    console.log('[Shoptimizer Preview] ========================================');
+    console.log('[Shoptimizer Preview] Initializing preview mode');
+    console.log('[Shoptimizer Preview] Token:', token.substring(0, 12) + '...');
+    console.log('[Shoptimizer Preview] API URL:', SHOPTIMIZER_CONFIG.apiUrl);
+    console.log('[Shoptimizer Preview] ========================================');
 
     // Fetch preview session data from backend
     try {
-      const response = await fetch(`${SHOPTIMIZER_CONFIG.apiUrl}/api/preview/sessions/${token}`);
+      const sessionUrl = `${SHOPTIMIZER_CONFIG.apiUrl}/api/preview/sessions/${token}`;
+      console.log('[Shoptimizer Preview] Fetching session from:', sessionUrl);
+      
+      const response = await fetch(sessionUrl);
+      console.log('[Shoptimizer Preview] Response status:', response.status, response.statusText);
       
       if (!response.ok) {
-        console.error('[Shoptimizer Preview] Failed to fetch session:', response.status);
+        console.error('[Shoptimizer Preview] ❌ Failed to fetch session:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('[Shoptimizer Preview] Error response:', errorText);
         return;
       }
 
       const session = await response.json();
-      console.log('[Shoptimizer Preview] Session loaded:', session);
+      console.log('[Shoptimizer Preview] ✅ Session loaded successfully');
+      console.log('[Shoptimizer Preview] Session data:', session);
 
       // Fetch theme positioning rules from backend
       try {
@@ -1281,13 +1292,20 @@
   // ============================================
 
   async function initShoptimizer() {
+    console.log('[Shoptimizer SDK] Starting initialization...');
+    console.log('[Shoptimizer SDK] API URL:', SHOPTIMIZER_CONFIG.apiUrl);
+    console.log('[Shoptimizer SDK] Shop:', SHOPTIMIZER_CONFIG.shop);
+    console.log('[Shoptimizer SDK] Page URL:', window.location.href);
+    
     // Check if preview mode
     const previewToken = getPreviewToken();
     if (previewToken) {
-      console.log('[Shoptimizer] Preview mode detected');
+      console.log('[Shoptimizer SDK] ✅ Preview mode detected - token:', previewToken.substring(0, 8) + '...');
       await initPreviewMode(previewToken);
       return; // Don't run normal A/B testing in preview mode
     }
+    
+    console.log('[Shoptimizer SDK] No preview token found, running normal A/B optimization mode');
     try {
       // Get or create persistent session ID
       const sessionId = getSessionId();
