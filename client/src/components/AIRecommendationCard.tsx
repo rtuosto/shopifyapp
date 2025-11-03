@@ -81,15 +81,15 @@ export default function AIRecommendationCard({
                 {headerBadge}
               </div>
             )}
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1 min-w-0">
               <span data-testid={`text-product-name-${id}`} className="font-medium truncate">{productName}</span>
-              <span>•</span>
-              <span data-testid={`text-optimization-type-${id}`}>{formatOptimizationType(optimizationType)}</span>
+              <span className="flex-shrink-0">•</span>
+              <span data-testid={`text-optimization-type-${id}`} className="flex-shrink-0">{formatOptimizationType(optimizationType)}</span>
             </div>
-            <h3 className="text-sm font-semibold mb-1" data-testid={`text-recommendation-title-${id}`}>
+            <h3 className="text-sm font-semibold mb-1 line-clamp-2 break-words" data-testid={`text-recommendation-title-${id}`}>
               {title}
             </h3>
-            <p className="text-xs text-muted-foreground line-clamp-2" data-testid={`text-recommendation-description-${id}`}>
+            <p className="text-xs text-muted-foreground line-clamp-2 break-words" data-testid={`text-recommendation-description-${id}`}>
               {description}
             </p>
           </div>

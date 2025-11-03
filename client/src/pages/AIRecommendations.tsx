@@ -495,19 +495,23 @@ export default function AIRecommendations() {
   const quotaTotal = quotaData?.quota ?? 20;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold" data-testid="text-page-title">AI Recommendations</h1>
-          <p className="text-muted-foreground mt-1">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl md:text-3xl font-bold" data-testid="text-page-title">AI Recommendations</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">
             AI-powered optimization ideas for your products
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Badge variant="secondary" className="gap-1">
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <Badge variant="secondary" className="gap-1 hidden sm:flex">
             <Sparkles className="w-3 h-3" />
-            {quotaUsed} AI Ideas Used · Beta: Unlimited
+            <span className="whitespace-nowrap">{quotaUsed} AI Ideas Used · Beta: Unlimited</span>
+          </Badge>
+          <Badge variant="secondary" className="gap-1 sm:hidden">
+            <Sparkles className="w-3 h-3" />
+            <span>{quotaUsed}</span>
           </Badge>
         </div>
       </div>

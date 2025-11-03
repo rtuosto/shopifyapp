@@ -399,7 +399,7 @@ export default function Optimizations() {
   };
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="space-y-4 md:space-y-6 max-w-full overflow-hidden">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold" data-testid="text-page-title">
           Optimizations
@@ -647,18 +647,18 @@ export default function Optimizations() {
                   );
                 } else if (optimizationType === "title") {
                   return (
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="font-medium truncate max-w-[200px]">{controlData.title}</span>
+                    <div className="flex items-center gap-2 text-sm min-w-0">
+                      <span className="font-medium truncate flex-1 min-w-0">{controlData.title}</span>
                       <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                      <span className="font-medium text-green-600 truncate max-w-[200px]">{variantData.title}</span>
+                      <span className="font-medium text-green-600 truncate flex-1 min-w-0">{variantData.title}</span>
                     </div>
                   );
                 } else if (optimizationType === "description") {
                   return (
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="truncate max-w-[200px]">{controlData.description?.substring(0, 30)}...</span>
+                    <div className="flex items-center gap-2 text-sm min-w-0">
+                      <span className="truncate flex-1 min-w-0">{controlData.description?.substring(0, 30)}...</span>
                       <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                      <span className="text-green-600 truncate max-w-[200px]">{variantData.description?.substring(0, 30)}...</span>
+                      <span className="text-green-600 truncate flex-1 min-w-0">{variantData.description?.substring(0, 30)}...</span>
                     </div>
                   );
                 }
@@ -706,10 +706,12 @@ export default function Optimizations() {
 
                       {/* Change Preview and Test Info */}
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <span className="font-medium">{formatOptimizationType(optimization.optimizationType)}</span>
-                          <span>•</span>
-                          {renderChangePreview()}
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
+                          <span className="font-medium flex-shrink-0">{formatOptimizationType(optimization.optimizationType)}</span>
+                          <span className="flex-shrink-0">•</span>
+                          <div className="flex-1 min-w-0">
+                            {renderChangePreview()}
+                          </div>
                         </div>
                         
                         {/* Dates */}
