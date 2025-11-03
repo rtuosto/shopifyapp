@@ -2850,7 +2850,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const shop = (req as any).shop;
       
       // Check if we have any products to test with
-      const products = await storage.listProducts(shop);
+      const products = await storage.getProducts(shop);
       if (products.length === 0) {
         return res.json({
           installed: false,
