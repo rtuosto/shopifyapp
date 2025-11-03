@@ -933,6 +933,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get Optimizations by Product - Public endpoint for SDK editor to fetch optimizations
+  app.get("/api/storefront/editor/optimizations", storefrontCors, async (req, res) => {
+    try {
+      const { productId, shop } = req.query;
+
+      if (!productId || !shop) {
+        return res.status(400).json({ error: "Missing productId or shop parameter" });
+      }
+
+      // Get all active optimizations for this product (Live + Paused)
+      const optimizations = await storage.getOptimizationsByProduct(shop as string, productId as string);
+      
+      // Filter to only active optimizations that should be displayed in editor
+      const activeOptimizations = optimizations.filter(o => 
+        o.status === 'live' || o.status === 'paused'
+      );
+
+      res.json({
+        optimizations: activeOptimizations,
+      });
+    } catch (error) {
+      console.error("Error fetching optimizations for product:", error);
+      res.status(500).json({ error: "Failed to fetch optimizations" });
+    }
+  });
+
   // ==================== THEME ANALYSIS API ====================
 
   // Theme Analysis API - Analyzes theme structure for accurate preview positioning

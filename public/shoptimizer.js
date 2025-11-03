@@ -1492,7 +1492,8 @@
     
     if (!product) {
       console.log('[Shoptimizer Editor] No product detected on current page');
-      updateEditorToolbar({ productName: 'Navigate to a product page' });
+      updateEditorToolbar({ productName: 'Navigate to a product page', optimizationsCount: 0 });
+      renderOptimizations([]);
       return;
     }
 
@@ -1504,6 +1505,17 @@
 
     // Fetch recommendations for this product
     await fetchRecommendations(product);
+
+    // Fetch and render optimizations for this product
+    if (product.productId) {
+      const optimizations = await fetchOptimizationsForProduct(product.productId);
+      renderOptimizations(optimizations);
+      updateEditorToolbar({ optimizationsCount: optimizations.length });
+    } else {
+      console.warn('[Shoptimizer Editor] No productId available, cannot fetch optimizations');
+      renderOptimizations([]);
+      updateEditorToolbar({ optimizationsCount: 0 });
+    }
   }
 
   function detectCurrentProduct() {
@@ -1685,6 +1697,144 @@
           background: rgba(255, 255, 255, 0.1);
           border-color: white;
         }
+        .shoptimizer-opt-count {
+          background: rgba(255, 255, 255, 0.25);
+          padding: 2px 8px;
+          border-radius: 12px;
+          font-size: 12px;
+          font-weight: 600;
+          margin-left: 6px;
+        }
+
+        /* Optimizations Panel */
+        #shoptimizer-opt-panel {
+          background: white;
+          border-bottom: 2px solid #E0E0E0;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+          max-height: 0;
+          overflow: hidden;
+          transition: max-height 0.3s ease;
+        }
+        #shoptimizer-opt-panel.expanded {
+          max-height: 500px;
+          overflow-y: auto;
+        }
+        .shoptimizer-opt-content {
+          padding: 16px 20px;
+        }
+        .shoptimizer-opt-empty {
+          color: #666;
+          text-align: center;
+          padding: 20px;
+          font-size: 14px;
+        }
+        .shoptimizer-opt-item {
+          background: #F9F9F9;
+          border: 1px solid #E0E0E0;
+          border-radius: 8px;
+          padding: 12px;
+          margin-bottom: 12px;
+        }
+        .shoptimizer-opt-item:last-child {
+          margin-bottom: 0;
+        }
+        .shoptimizer-opt-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 8px;
+          gap: 12px;
+        }
+        .shoptimizer-opt-info {
+          flex: 1;
+        }
+        .shoptimizer-opt-type {
+          font-size: 13px;
+          font-weight: 600;
+          color: #333;
+          margin-bottom: 4px;
+        }
+        .shoptimizer-opt-badges {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+        .shoptimizer-opt-badge {
+          display: inline-block;
+          padding: 2px 8px;
+          border-radius: 4px;
+          font-size: 11px;
+          font-weight: 600;
+          text-transform: uppercase;
+        }
+        .shoptimizer-opt-badge.live {
+          background: #D4EDDA;
+          color: #155724;
+        }
+        .shoptimizer-opt-badge.paused {
+          background: #FFF3CD;
+          color: #856404;
+        }
+        .shoptimizer-opt-preview {
+          display: flex;
+          gap: 8px;
+          margin-top: 8px;
+          padding: 8px;
+          background: white;
+          border-radius: 6px;
+          font-size: 12px;
+        }
+        .shoptimizer-opt-preview-label {
+          color: #666;
+          font-weight: 600;
+          min-width: 60px;
+        }
+        .shoptimizer-opt-preview-value {
+          color: #333;
+          flex: 1;
+        }
+        .shoptimizer-opt-preview-value.variant {
+          color: #5C6AC4;
+          font-weight: 600;
+        }
+        .shoptimizer-opt-actions {
+          display: flex;
+          gap: 6px;
+          flex-shrink: 0;
+          flex-wrap: wrap;
+        }
+        .shoptimizer-opt-action-btn {
+          padding: 4px 12px;
+          border: 1px solid #CCC;
+          border-radius: 4px;
+          font-size: 11px;
+          font-weight: 600;
+          cursor: pointer;
+          background: white;
+          color: #333;
+          transition: all 0.2s;
+        }
+        .shoptimizer-opt-action-btn:hover {
+          background: #F0F0F0;
+          border-color: #999;
+        }
+        .shoptimizer-opt-action-btn.active {
+          background: #5C6AC4;
+          color: white;
+          border-color: #5C6AC4;
+        }
+        .shoptimizer-opt-action-btn.pause {
+          color: #856404;
+          border-color: #FFC107;
+        }
+        .shoptimizer-opt-action-btn.resume {
+          color: #155724;
+          border-color: #28A745;
+        }
+        .shoptimizer-opt-action-btn.cancel {
+          color: #721C24;
+          border-color: #DC3545;
+        }
         
         @media (max-width: 768px) {
           #shoptimizer-editor-bar {
@@ -1712,6 +1862,15 @@
             padding: 6px 12px;
             font-size: 12px;
           }
+          .shoptimizer-opt-header {
+            flex-direction: column;
+          }
+          .shoptimizer-opt-actions {
+            width: 100%;
+          }
+          .shoptimizer-opt-action-btn {
+            flex: 1;
+          }
         }
       </style>
       <div id="shoptimizer-editor-bar">
@@ -1725,14 +1884,30 @@
         </div>
         
         <div class="shoptimizer-editor-right">
+          <button class="shoptimizer-editor-btn" id="shoptimizer-toggle-optimizations">
+            <span id="shoptimizer-opt-toggle-text">Show Optimizations</span>
+            <span class="shoptimizer-opt-count" id="shoptimizer-opt-count" style="display:none;">0</span>
+          </button>
           <button class="shoptimizer-editor-btn" id="shoptimizer-editor-exit">
             Exit
           </button>
         </div>
       </div>
+      <div id="shoptimizer-opt-panel">
+        <div class="shoptimizer-opt-content">
+          <div class="shoptimizer-opt-empty" id="shoptimizer-opt-list">
+            Loading optimizations...
+          </div>
+        </div>
+      </div>
     `;
 
     document.body.appendChild(toolbar);
+
+    // Set up toggle button
+    document.getElementById('shoptimizer-toggle-optimizations').addEventListener('click', () => {
+      toggleOptimizationsPanel();
+    });
 
     // Set up exit button
     document.getElementById('shoptimizer-editor-exit').addEventListener('click', async () => {
@@ -1749,6 +1924,214 @@
         productNameEl.textContent = updates.productName;
       }
     }
+    if (updates.optimizationsCount !== undefined) {
+      const countEl = document.getElementById('shoptimizer-opt-count');
+      if (countEl) {
+        if (updates.optimizationsCount > 0) {
+          countEl.textContent = updates.optimizationsCount;
+          countEl.style.display = 'inline-block';
+        } else {
+          countEl.style.display = 'none';
+        }
+      }
+    }
+  }
+
+  async function fetchOptimizationsForProduct(productId) {
+    try {
+      const params = new URLSearchParams({
+        productId: productId,
+        shop: SHOPTIMIZER_CONFIG.shop,
+      });
+
+      const url = `${SHOPTIMIZER_CONFIG.apiUrl}/api/storefront/editor/optimizations?${params}`;
+      console.log('[Shoptimizer Editor] Fetching optimizations:', url);
+
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        console.warn('[Shoptimizer Editor] Failed to fetch optimizations:', response.status);
+        return [];
+      }
+
+      const data = await response.json();
+      console.log('[Shoptimizer Editor] Optimizations loaded:', data.optimizations);
+      
+      // Store optimizations in editor state
+      editorState.currentOptimizations = data.optimizations || [];
+      
+      return data.optimizations || [];
+    } catch (error) {
+      console.error('[Shoptimizer Editor] Error fetching optimizations:', error);
+      return [];
+    }
+  }
+
+  function toggleOptimizationsPanel() {
+    const panel = document.getElementById('shoptimizer-opt-panel');
+    const toggleText = document.getElementById('shoptimizer-opt-toggle-text');
+    
+    if (panel.classList.contains('expanded')) {
+      panel.classList.remove('expanded');
+      if (toggleText) toggleText.textContent = 'Show Optimizations';
+    } else {
+      panel.classList.add('expanded');
+      if (toggleText) toggleText.textContent = 'Hide Optimizations';
+    }
+  }
+
+  function renderOptimizations(optimizations) {
+    const listEl = document.getElementById('shoptimizer-opt-list');
+    if (!listEl) return;
+
+    if (!optimizations || optimizations.length === 0) {
+      listEl.innerHTML = '<div class="shoptimizer-opt-empty">No active optimizations for this product</div>';
+      return;
+    }
+
+    listEl.innerHTML = optimizations.map(opt => `
+      <div class="shoptimizer-opt-item" data-opt-id="${opt.id}">
+        <div class="shoptimizer-opt-header">
+          <div class="shoptimizer-opt-info">
+            <div class="shoptimizer-opt-type">${formatOptimizationType(opt.optimizationType)} Optimization</div>
+            <div class="shoptimizer-opt-badges">
+              <span class="shoptimizer-opt-badge ${opt.status}">${opt.status.toUpperCase()}</span>
+            </div>
+          </div>
+          <div class="shoptimizer-opt-actions">
+            <button class="shoptimizer-opt-action-btn preview-toggle" data-opt-id="${opt.id}">
+              Preview Variant
+            </button>
+            ${opt.status === 'live' ? `
+              <button class="shoptimizer-opt-action-btn pause" data-opt-id="${opt.id}" data-action="pause">
+                Pause
+              </button>
+            ` : opt.status === 'paused' ? `
+              <button class="shoptimizer-opt-action-btn resume" data-opt-id="${opt.id}" data-action="resume">
+                Resume
+              </button>
+            ` : ''}
+            <button class="shoptimizer-opt-action-btn cancel" data-opt-id="${opt.id}" data-action="cancel">
+              Cancel
+            </button>
+          </div>
+        </div>
+        <div class="shoptimizer-opt-preview">
+          <span class="shoptimizer-opt-preview-label">Control:</span>
+          <span class="shoptimizer-opt-preview-value">${formatOptimizationValue(opt.controlState, opt.optimizationType)}</span>
+        </div>
+        <div class="shoptimizer-opt-preview">
+          <span class="shoptimizer-opt-preview-label">Variant:</span>
+          <span class="shoptimizer-opt-preview-value variant">${formatOptimizationValue(opt.variantState, opt.optimizationType)}</span>
+        </div>
+      </div>
+    `).join('');
+
+    // Set up event listeners for action buttons
+    listEl.querySelectorAll('.shoptimizer-opt-action-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const optId = e.target.dataset.optId;
+        const action = e.target.dataset.action;
+        
+        if (e.target.classList.contains('preview-toggle')) {
+          await togglePreviewMode(optId);
+        } else if (action) {
+          await handleOptimizationAction(optId, action);
+        }
+      });
+    });
+  }
+
+  function formatOptimizationType(type) {
+    const typeMap = {
+      'price': 'Price',
+      'title': 'Title',
+      'description': 'Description'
+    };
+    return typeMap[type] || type;
+  }
+
+  function formatOptimizationValue(state, type) {
+    if (!state) return 'N/A';
+    
+    if (type === 'price') {
+      return `$${state.price || 'N/A'}`;
+    } else if (type === 'title') {
+      return state.title || 'N/A';
+    } else if (type === 'description') {
+      const desc = state.description || 'N/A';
+      return desc.length > 60 ? desc.substring(0, 60) + '...' : desc;
+    }
+    
+    return 'N/A';
+  }
+
+  async function togglePreviewMode(optId) {
+    const optimization = editorState.currentOptimizations?.find(o => o.id === optId);
+    if (!optimization) return;
+
+    const btn = document.querySelector(`[data-opt-id="${optId}"].preview-toggle`);
+    const isPreviewActive = btn && btn.classList.contains('active');
+
+    if (isPreviewActive) {
+      // Restore control state
+      btn.classList.remove('active');
+      btn.textContent = 'Preview Variant';
+      applyOptimizationToDOM(optimization, 'control');
+      console.log('[Shoptimizer Editor] Preview mode OFF - showing control');
+    } else {
+      // Show variant state
+      btn.classList.add('active');
+      btn.textContent = 'Show Control';
+      applyOptimizationToDOM(optimization, 'variant');
+      console.log('[Shoptimizer Editor] Preview mode ON - showing variant');
+    }
+  }
+
+  function applyOptimizationToDOM(optimization, version) {
+    const state = version === 'variant' ? optimization.variantState : optimization.controlState;
+    if (!state) return;
+
+    const type = optimization.optimizationType;
+    
+    if (type === 'title') {
+      const titleSelectors = ['h1.product-title', 'h1.product__title', '.product-single__title', 'h1[itemprop="name"]', 'h1'];
+      for (const selector of titleSelectors) {
+        const el = document.querySelector(selector);
+        if (el) {
+          el.textContent = state.title;
+          console.log(`[Shoptimizer Editor] Updated title via ${selector}`);
+          break;
+        }
+      }
+    } else if (type === 'price') {
+      const priceSelectors = ['.product-price', '.price', '[itemprop="price"]', '.product__price'];
+      for (const selector of priceSelectors) {
+        const el = document.querySelector(selector);
+        if (el) {
+          el.textContent = `$${state.price}`;
+          console.log(`[Shoptimizer Editor] Updated price via ${selector}`);
+          break;
+        }
+      }
+    } else if (type === 'description') {
+      const descSelectors = ['.product-description', '.product__description', '[itemprop="description"]', '.rte'];
+      for (const selector of descSelectors) {
+        const el = document.querySelector(selector);
+        if (el) {
+          el.innerHTML = state.description;
+          console.log(`[Shoptimizer Editor] Updated description via ${selector}`);
+          break;
+        }
+      }
+    }
+  }
+
+  async function handleOptimizationAction(optId, action) {
+    console.log(`[Shoptimizer Editor] ${action} optimization:`, optId);
+    
+    // TODO: Implement pause/resume/cancel API calls
+    alert(`${action} optimization feature coming soon!`);
   }
 
   function setupNavigationHandling() {
