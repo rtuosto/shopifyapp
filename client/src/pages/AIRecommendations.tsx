@@ -28,12 +28,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import AIRecommendationCard from "@/components/AIRecommendationCard";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Sparkles, Plus, Archive as ArchiveIcon, RotateCcw } from "lucide-react";
+import { Sparkles, Plus, Archive as ArchiveIcon, RotateCcw, AlertCircle, Settings as SettingsIcon } from "lucide-react";
 import type { Product, Recommendation, Optimization } from "@shared/schema";
+import { Link } from "wouter";
 
 export default function AIRecommendations() {
   const { toast } = useToast();
@@ -406,9 +408,122 @@ export default function AIRecommendations() {
     } catch (error) {
       console.error("Error creating preview session:", error);
       
-      // Close the preview window since we failed to get the URL
+      // Show helpful error message in the preview window
       if (previewWindow && !previewWindow.closed) {
-        previewWindow.close();
+        previewWindow.document.write(`
+          <html>
+            <head>
+              <title>Preview Setup Required</title>
+              <style>
+                body {
+                  margin: 0;
+                  padding: 40px;
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                  background: #f5f5f5;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  min-height: 100vh;
+                }
+                .container {
+                  background: white;
+                  border-radius: 12px;
+                  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                  padding: 40px;
+                  max-width: 600px;
+                  text-align: center;
+                }
+                h1 {
+                  color: #202223;
+                  margin: 0 0 16px 0;
+                  font-size: 24px;
+                }
+                p {
+                  color: #666;
+                  line-height: 1.6;
+                  margin: 0 0 24px 0;
+                }
+                .steps {
+                  background: #f9f9f9;
+                  border-radius: 8px;
+                  padding: 20px;
+                  text-align: left;
+                  margin: 24px 0;
+                }
+                .steps h3 {
+                  margin: 0 0 12px 0;
+                  font-size: 16px;
+                  color: #202223;
+                }
+                .steps ol {
+                  margin: 0;
+                  padding-left: 20px;
+                }
+                .steps li {
+                  margin: 8px 0;
+                  color: #666;
+                }
+                .button {
+                  display: inline-block;
+                  background: #5C6AC4;
+                  color: white;
+                  padding: 12px 24px;
+                  border-radius: 6px;
+                  text-decoration: none;
+                  font-weight: 500;
+                  margin-top: 8px;
+                }
+                .button:hover {
+                  background: #4A5AA8;
+                }
+                .icon {
+                  width: 64px;
+                  height: 64px;
+                  margin: 0 auto 16px;
+                  background: #f0f0f0;
+                  border-radius: 50%;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                }
+                .icon svg {
+                  width: 32px;
+                  height: 32px;
+                  color: #5C6AC4;
+                }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </div>
+                <h1>SDK Installation Required</h1>
+                <p>To preview AI recommendations on your actual storefront, you need to install the Shoptimizer SDK on your Shopify theme.</p>
+                
+                <div class="steps">
+                  <h3>Quick Setup:</h3>
+                  <ol>
+                    <li>Go to the Settings page in Shoptimizer</li>
+                    <li>Copy the installation script</li>
+                    <li>Add it to your Shopify theme's theme.liquid file</li>
+                    <li>Save and try previewing again</li>
+                  </ol>
+                </div>
+                
+                <p style="font-size: 14px; color: #888;">This window will close automatically...</p>
+              </div>
+              <script>
+                setTimeout(() => {
+                  window.close();
+                }, 10000);
+              </script>
+            </body>
+          </html>
+        `);
       }
       
       toast({
@@ -554,6 +669,23 @@ export default function AIRecommendations() {
           </Button>
         </div>
       </div>
+
+      {/* SDK Installation Warning */}
+      <Alert variant="default" className="border-orange-200 bg-orange-50 dark:bg-orange-950 dark:border-orange-800">
+        <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+        <AlertTitle className="text-orange-900 dark:text-orange-100">Preview Feature Requires SDK Installation</AlertTitle>
+        <AlertDescription className="text-orange-800 dark:text-orange-200 flex items-start justify-between gap-4">
+          <span>
+            To use the "Preview Changes" button, install the Shoptimizer SDK on your Shopify theme. Without it, preview links will show a blank page.
+          </span>
+          <Button variant="outline" size="sm" asChild className="flex-shrink-0 border-orange-300 dark:border-orange-700 hover-elevate">
+            <Link href="/settings">
+              <SettingsIcon className="w-3 h-3 mr-1" />
+              View Setup
+            </Link>
+          </Button>
+        </AlertDescription>
+      </Alert>
 
       {/* Tabs */}
       <Tabs defaultValue="pending" className="w-full">

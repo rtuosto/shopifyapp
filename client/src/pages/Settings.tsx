@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Copy, Check, ExternalLink, AlertCircle } from "lucide-react";
+import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -13,6 +13,10 @@ export default function Settings() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["/api/installation-script"],
+  });
+
+  const { data: sdkStatus } = useQuery({
+    queryKey: ["/api/sdk-status"],
   });
 
   const copyToClipboard = async (text: string, type: 'script' | 'webhook') => {
@@ -82,6 +86,14 @@ export default function Settings() {
           </AlertDescription>
         </Alert>
       )}
+
+      <Alert variant="default" className="border-orange-200 bg-orange-50 dark:bg-orange-950 dark:border-orange-800">
+        <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+        <AlertTitle className="text-orange-900 dark:text-orange-100">SDK Installation Required</AlertTitle>
+        <AlertDescription className="text-orange-800 dark:text-orange-200">
+          To use the Preview feature for AI recommendations, you must install the Shoptimizer SDK on your Shopify storefront theme. Follow the installation steps below to enable live previews on your actual product pages.
+        </AlertDescription>
+      </Alert>
 
       <Card>
         <CardHeader>

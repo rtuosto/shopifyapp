@@ -2844,6 +2844,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Check SDK installation status
+  app.get("/api/sdk-status", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      
+      // Check if we have any products to test with
+      const products = await storage.listProducts(shop);
+      if (products.length === 0) {
+        return res.json({
+          installed: false,
+          error: "No products found to test SDK installation",
+          testUrl: null,
+        });
+      }
+
+      // Use first product to test SDK installation
+      const testProduct = products[0];
+      const testUrl = `https://${shop}/products/${testProduct.handle}`;
+
+      res.json({
+        installed: null, // Client will check by trying to load from storefront
+        testUrl,
+        message: "Check installation by visiting your storefront",
+      });
+    } catch (error) {
+      console.error("Error checking SDK status:", error);
+      res.status(500).json({ error: "Failed to check SDK status" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   // Schedule periodic cleanup of expired preview sessions
