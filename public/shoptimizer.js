@@ -2002,7 +2002,7 @@
             <button class="shoptimizer-opt-action-btn preview-toggle" data-opt-id="${opt.id}">
               Preview Variant
             </button>
-            ${opt.status === 'live' ? `
+            ${opt.status === 'active' ? `
               <button class="shoptimizer-opt-action-btn pause" data-opt-id="${opt.id}" data-action="pause">
                 Pause
               </button>
