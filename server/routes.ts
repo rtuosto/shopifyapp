@@ -942,12 +942,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Missing productId or shop parameter" });
       }
 
-      // Get all active optimizations for this product (Live + Paused)
+      // Get all active optimizations for this product (active + paused)
       const optimizations = await storage.getOptimizationsByProduct(shop as string, productId as string);
       
       // Filter to only active optimizations that should be displayed in editor
       const activeOptimizations = optimizations.filter(o => 
-        o.status === 'live' || o.status === 'paused'
+        o.status === 'active' || o.status === 'paused'
       );
 
       res.json({
