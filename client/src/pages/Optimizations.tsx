@@ -665,6 +665,9 @@ export default function Optimizations() {
                 return null;
               };
 
+              // Normalize status to lowercase for consistent comparisons
+              const status = (optimization.status || "").toLowerCase();
+
               return (
                 <Card key={optimization.id} data-testid={`card-test-${index}`}>
                   <CardHeader className="p-4 md:p-6">
@@ -682,20 +685,26 @@ export default function Optimizations() {
                             </CardTitle>
                             <Badge
                               variant={
-                                optimization.status === "draft" ? "secondary" : 
-                                optimization.status === "paused" ? "outline" : "default"
+                                status === "draft" ? "secondary" : 
+                                status === "paused" ? "outline" :
+                                status === "active" ? "default" :
+                                "outline"
                               }
                               data-testid={`badge-status-${index}`}
                             >
-                              {optimization.status === "draft" ? "Draft" : 
-                               optimization.status === "paused" ? "Paused" : "Live"}
+                              {status === "draft" ? "Draft" : 
+                               status === "paused" ? "Paused" :
+                               status === "active" ? "Live" :
+                               status === "completed" ? "Completed" :
+                               status === "cancelled" ? "Cancelled" :
+                               "Unknown"}
                             </Badge>
-                            {isReadyToDecide && optimization.status === "active" && (
+                            {isReadyToDecide && status === "active" && (
                               <Badge variant="default" className="bg-green-600">
                                 Ready to Decide
                               </Badge>
                             )}
-                            {!isReadyToDecide && optimization.status === "active" && (
+                            {!isReadyToDecide && status === "active" && (
                               <Badge variant="outline">
                                 Still Learning
                               </Badge>
@@ -728,7 +737,7 @@ export default function Optimizations() {
 
                       {/* Action Buttons */}
                       <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
-                        {optimization.status === "draft" && (
+                        {status === "draft" && (
                           <Button
                             variant="default"
                             size="sm"
@@ -743,7 +752,7 @@ export default function Optimizations() {
                           </Button>
                         )}
                         
-                        {optimization.status === "active" && (
+                        {status === "active" && (
                           <>
                             <Button
                               variant="outline"
@@ -770,7 +779,7 @@ export default function Optimizations() {
                           </>
                         )}
 
-                        {optimization.status === "paused" && (
+                        {status === "paused" && (
                           <>
                             <Button
                               variant="default"
