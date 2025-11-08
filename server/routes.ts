@@ -950,8 +950,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         o.status === 'active' || o.status === 'paused'
       );
 
+      // Map database fields to SDK-expected format
+      const formattedOptimizations = activeOptimizations.map(opt => ({
+        ...opt,
+        controlState: opt.controlData,
+        variantState: opt.variantData,
+      }));
+
       res.json({
-        optimizations: activeOptimizations,
+        optimizations: formattedOptimizations,
       });
     } catch (error) {
       console.error("Error fetching optimizations for product:", error);
