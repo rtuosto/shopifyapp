@@ -907,12 +907,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { productId, shop } = req.query;
 
+      console.log('[Editor Recommendations] Request params:', { productId, shop });
+
       if (!productId || !shop) {
         return res.status(400).json({ error: "Missing productId or shop parameter" });
       }
 
       // Get all recommendations for this product (pending + active)
       const recommendations = await storage.getRecommendationsByProduct(shop as string, productId as string);
+      
+      console.log('[Editor Recommendations] Found recommendations:', recommendations.length);
       
       // Get active optimizations for conflict detection
       const activeOptimizations = await storage.getActiveOptimizationsByProduct(shop as string, productId as string);
