@@ -1601,10 +1601,11 @@
       
       if (!response.ok) {
         console.warn('[Shoptimizer Editor] Failed to fetch recommendations:', response.status);
-        return null;
+        return [];
       }
 
-      const recommendations = await response.json();
+      const data = await response.json();
+      const recommendations = data.recommendations || [];
       
       // Cache the recommendations
       editorState.recommendations[cacheKey] = recommendations;
@@ -1614,7 +1615,7 @@
 
     } catch (error) {
       console.error('[Shoptimizer Editor] Error fetching recommendations:', error);
-      return null;
+      return [];
     }
   }
 
