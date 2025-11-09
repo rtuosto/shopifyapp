@@ -905,12 +905,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get Recommendations by Product - Public endpoint for SDK to fetch recommendations
   app.get("/api/storefront/editor/recommendations", storefrontCors, async (req, res) => {
     try {
-      const { productId, shop } = req.query;
+      let { productId, shop } = req.query;
 
       console.log('[Editor Recommendations] Request params:', { productId, shop });
 
       if (!productId || !shop) {
         return res.status(400).json({ error: "Missing productId or shop parameter" });
+      }
+
+      // If productId is a Shopify GID, look up the internal UUID
+      if ((productId as string).startsWith('gid://shopify/Product/')) {
+        const product = await storage.getProductByShopifyId(shop as string, productId as string);
+        if (product) {
+          console.log('[Editor Recommendations] Translated Shopify GID to internal UUID:', product.id);
+          productId = product.id;
+        } else {
+          console.warn('[Editor Recommendations] Product not found for Shopify GID:', productId);
+          return res.json({ recommendations: [], activeOptimizations: [] });
+        }
       }
 
       // Get all recommendations for this product (pending + active)
@@ -940,10 +952,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get Optimizations by Product - Public endpoint for SDK editor to fetch optimizations
   app.get("/api/storefront/editor/optimizations", storefrontCors, async (req, res) => {
     try {
-      const { productId, shop } = req.query;
+      let { productId, shop } = req.query;
 
       if (!productId || !shop) {
         return res.status(400).json({ error: "Missing productId or shop parameter" });
+      }
+
+      // If productId is a Shopify GID, look up the internal UUID
+      if ((productId as string).startsWith('gid://shopify/Product/')) {
+        const product = await storage.getProductByShopifyId(shop as string, productId as string);
+        if (product) {
+          productId = product.id;
+        } else {
+          return res.json({ optimizations: [] });
+        }
       }
 
       // Get all active optimizations for this product (active + paused)
