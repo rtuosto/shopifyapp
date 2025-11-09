@@ -1504,16 +1504,16 @@
     updateEditorToolbar({ productName: product.title || product.handle });
 
     // Fetch recommendations for this product
-    await fetchRecommendations(product);
+    const recommendations = await fetchRecommendations(product);
 
     // Fetch and render optimizations for this product
     if (product.productId) {
       const optimizations = await fetchOptimizationsForProduct(product.productId);
-      renderOptimizations(optimizations);
+      renderEditorPanel(optimizations, recommendations);
       updateEditorToolbar({ optimizationsCount: optimizations.length });
     } else {
       console.warn('[Shoptimizer Editor] No productId available, cannot fetch optimizations');
-      renderOptimizations([]);
+      renderEditorPanel([], recommendations);
       updateEditorToolbar({ optimizationsCount: 0 });
     }
   }
@@ -1835,6 +1835,75 @@
           color: #721C24;
           border-color: #DC3545;
         }
+
+        /* Sections */
+        .shoptimizer-section {
+          margin-bottom: 20px;
+        }
+        .shoptimizer-section:last-child {
+          margin-bottom: 0;
+        }
+        .shoptimizer-section-title {
+          font-size: 14px;
+          font-weight: 700;
+          color: #333;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 12px;
+          padding-bottom: 8px;
+          border-bottom: 2px solid #E0E0E0;
+        }
+
+        /* Recommendations */
+        .shoptimizer-rec-item {
+          background: #F0F8FF;
+          border: 1px solid #B3D9FF;
+          border-radius: 8px;
+          padding: 12px;
+          margin-bottom: 12px;
+        }
+        .shoptimizer-rec-item:last-child {
+          margin-bottom: 0;
+        }
+        .shoptimizer-rec-reason {
+          margin-top: 8px;
+          padding: 8px;
+          background: white;
+          border-radius: 6px;
+          font-size: 12px;
+          color: #555;
+          line-height: 1.4;
+        }
+        .shoptimizer-rec-accept-btn {
+          padding: 4px 12px;
+          border: 1px solid #28A745;
+          border-radius: 4px;
+          font-size: 11px;
+          font-weight: 600;
+          cursor: pointer;
+          background: #28A745;
+          color: white;
+          transition: all 0.2s;
+        }
+        .shoptimizer-rec-accept-btn:hover {
+          background: #218838;
+          border-color: #218838;
+        }
+        .shoptimizer-rec-dismiss-btn {
+          padding: 4px 12px;
+          border: 1px solid #999;
+          border-radius: 4px;
+          font-size: 11px;
+          font-weight: 600;
+          cursor: pointer;
+          background: white;
+          color: #666;
+          transition: all 0.2s;
+        }
+        .shoptimizer-rec-dismiss-btn:hover {
+          background: #F0F0F0;
+          border-color: #666;
+        }
         
         @media (max-width: 768px) {
           #shoptimizer-editor-bar {
@@ -1980,16 +2049,20 @@
     }
   }
 
-  function renderOptimizations(optimizations) {
+  function renderEditorPanel(optimizations = [], recommendations = []) {
     const listEl = document.getElementById('shoptimizer-opt-list');
     if (!listEl) return;
 
-    if (!optimizations || optimizations.length === 0) {
-      listEl.innerHTML = '<div class="shoptimizer-opt-empty">No active optimizations for this product</div>';
-      return;
-    }
+    let html = '';
 
-    listEl.innerHTML = optimizations.map(opt => `
+    // Render Active Optimizations Section
+    html += '<div class="shoptimizer-section">';
+    html += '<h3 class="shoptimizer-section-title">Active Optimizations</h3>';
+    
+    if (!optimizations || optimizations.length === 0) {
+      html += '<div class="shoptimizer-opt-empty">No active optimizations for this product</div>';
+    } else {
+      html += optimizations.map(opt => `
       <div class="shoptimizer-opt-item" data-opt-id="${opt.id}">
         <div class="shoptimizer-opt-header">
           <div class="shoptimizer-opt-info">
@@ -2026,8 +2099,73 @@
         </div>
       </div>
     `).join('');
+    }
+    html += '</div>'; // Close optimizations section
 
-    // Set up event listeners for action buttons
+    // Render AI Recommendations Section
+    html += '<div class="shoptimizer-section">';
+    html += '<h3 class="shoptimizer-section-title">AI Recommendations</h3>';
+    
+    if (!recommendations || recommendations.length === 0) {
+      html += '<div class="shoptimizer-opt-empty">No recommendations available for this product</div>';
+    } else {
+      html += recommendations.map((rec, index) => {
+        // Format the proposed changes based on optimization type
+        const formatProposedChange = (type, changes) => {
+          if (!changes) return 'N/A';
+          if (type === 'price') {
+            return `$${changes.price || changes.variantPrices?.[0]?.price || 'N/A'}`;
+          } else if (type === 'title') {
+            return changes.title || 'N/A';
+          } else if (type === 'description') {
+            const desc = changes.description || 'N/A';
+            return desc.length > 60 ? desc.substring(0, 60) + '...' : desc;
+          }
+          return 'N/A';
+        };
+
+        // Get the first insight for display or use description
+        const firstInsight = rec.insights && rec.insights.length > 0 
+          ? rec.insights[0].description 
+          : rec.description || 'AI generated recommendation';
+
+        return `
+      <div class="shoptimizer-rec-item" data-rec-id="${rec.id}">
+        <div class="shoptimizer-opt-header">
+          <div class="shoptimizer-opt-info">
+            <div class="shoptimizer-opt-type">${formatOptimizationType(rec.optimizationType)} Optimization</div>
+            <div class="shoptimizer-rec-score">
+              <span class="shoptimizer-opt-badge" style="background: #E3F2FD; color: #1976D2;">
+                Impact Score: ${rec.impactScore || 'N/A'}/10
+              </span>
+            </div>
+          </div>
+          <div class="shoptimizer-opt-actions">
+            <button class="shoptimizer-rec-accept-btn" data-rec-id="${rec.id}">
+              ✓ Accept
+            </button>
+            <button class="shoptimizer-rec-dismiss-btn" data-rec-id="${rec.id}">
+              ✕ Dismiss
+            </button>
+          </div>
+        </div>
+        <div class="shoptimizer-rec-reason">
+          <strong>${rec.title}</strong><br/>
+          ${firstInsight}
+        </div>
+        <div class="shoptimizer-opt-preview">
+          <span class="shoptimizer-opt-preview-label">Suggested:</span>
+          <span class="shoptimizer-opt-preview-value variant">${formatProposedChange(rec.optimizationType, rec.proposedChanges)}</span>
+        </div>
+      </div>
+    `;
+      }).join('');
+    }
+    html += '</div>'; // Close recommendations section
+
+    listEl.innerHTML = html;
+
+    // Set up event listeners for optimization action buttons
     listEl.querySelectorAll('.shoptimizer-opt-action-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         const optId = e.target.dataset.optId;
@@ -2038,6 +2176,21 @@
         } else if (action) {
           await handleOptimizationAction(optId, action);
         }
+      });
+    });
+
+    // Set up event listeners for recommendation buttons
+    listEl.querySelectorAll('.shoptimizer-rec-accept-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const recId = e.target.dataset.recId;
+        await acceptRecommendation(recId);
+      });
+    });
+
+    listEl.querySelectorAll('.shoptimizer-rec-dismiss-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const recId = e.target.dataset.recId;
+        await dismissRecommendation(recId);
       });
     });
   }
@@ -2132,6 +2285,76 @@
     
     // TODO: Implement pause/resume/cancel API calls
     alert(`${action} optimization feature coming soon!`);
+  }
+
+  async function acceptRecommendation(recId) {
+    console.log('[Shoptimizer Editor] Accepting recommendation:', recId);
+    
+    try {
+      // Call backend API to accept recommendation
+      const response = await fetch(`${SHOPTIMIZER_CONFIG.apiUrl}/api/recommendations/${recId}/accept`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          shop: editorState.session.shop,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to accept recommendation');
+      }
+
+      const result = await response.json();
+      console.log('[Shoptimizer Editor] Recommendation accepted:', result);
+
+      // Show success message
+      alert('Recommendation accepted! Creating and activating optimization...');
+
+      // Refresh the product data to show the new optimization
+      await detectAndLoadProduct();
+
+    } catch (error) {
+      console.error('[Shoptimizer Editor] Error accepting recommendation:', error);
+      alert(`Error accepting recommendation: ${error.message}`);
+    }
+  }
+
+  async function dismissRecommendation(recId) {
+    console.log('[Shoptimizer Editor] Dismissing recommendation:', recId);
+    
+    try {
+      // Call backend API to dismiss recommendation
+      const response = await fetch(`${SHOPTIMIZER_CONFIG.apiUrl}/api/recommendations/${recId}/dismiss`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          shop: editorState.session.shop,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to dismiss recommendation');
+      }
+
+      const result = await response.json();
+      console.log('[Shoptimizer Editor] Recommendation dismissed:', result);
+
+      // Show success message
+      alert('Recommendation dismissed.');
+
+      // Refresh the product data to remove the dismissed recommendation
+      await detectAndLoadProduct();
+
+    } catch (error) {
+      console.error('[Shoptimizer Editor] Error dismissing recommendation:', error);
+      alert(`Error dismissing recommendation: ${error.message}`);
+    }
   }
 
   function setupNavigationHandling() {
