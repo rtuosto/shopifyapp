@@ -1493,7 +1493,7 @@
     if (!product) {
       console.log('[Shoptimizer Editor] No product detected on current page');
       updateEditorToolbar({ productName: 'Navigate to a product page', optimizationsCount: 0 });
-      renderOptimizations([]);
+      renderEditorPanel([], []);
       return;
     }
 
