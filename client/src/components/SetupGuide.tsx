@@ -30,9 +30,14 @@ export default function SetupGuide() {
       queryClient.invalidateQueries({ queryKey: ['/api/webhooks/status'] });
     },
     onError: (error: any) => {
+      const message = error.message || "";
+      const isProtectedDataError = message.includes("protected customer data");
+      
       toast({
         title: "Failed to register webhook",
-        description: error.message || "Please try again or contact support.",
+        description: isProtectedDataError 
+          ? "Your app needs Protected Customer Data access in Shopify Partner Dashboard. Go to Configuration → Data protection."
+          : message || "Please try again or contact support.",
         variant: "destructive",
       });
     },
