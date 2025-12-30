@@ -306,6 +306,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Webhook Status API - check if webhooks are registered
+  app.get("/api/webhooks/status", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const session = (req as any).shopifySession;
+      
+      // In dev mode without real session, return unknown status
+      if (!session?.accessToken) {
+        return res.json({ 
+          ordersWebhook: null,
+          status: 'unknown',
+          message: 'Unable to check webhook status in development mode without Shopify session'
+        });
+      }
+      
+      const { getWebhookSubscriptions } = await import("./shopify");
+      const webhooks = await getWebhookSubscriptions(session);
+      const ordersWebhook = webhooks.find((w: any) => w.topic === 'ORDERS_CREATE');
+      
+      res.json({
+        ordersWebhook: ordersWebhook || null,
+        status: ordersWebhook ? 'registered' : 'not_registered',
+        message: ordersWebhook ? 'Order webhook is registered' : 'Order webhook is not registered'
+      });
+    } catch (error) {
+      console.error("Error checking webhook status:", error);
+      res.status(500).json({ error: "Failed to check webhook status" });
+    }
+  });
+
+  // Register Webhook API - manually register order webhook
+  app.post("/api/webhooks/register", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const session = (req as any).shopifySession;
+      
+      // In dev mode without real session, return error
+      if (!session?.accessToken) {
+        return res.status(400).json({ 
+          error: 'Cannot register webhook in development mode without Shopify session'
+        });
+      }
+      
+      const { registerOrderWebhook } = await import("./shopify");
+      const webhookUrl = `${process.env.REPLIT_DEV_DOMAIN ? 'https://' : 'http://'}${process.env.REPLIT_DEV_DOMAIN || 'localhost:5000'}/api/webhooks/orders/create`;
+      
+      console.log(`[Webhook Registration] Registering webhook: ${webhookUrl}`);
+      await registerOrderWebhook(session, webhookUrl);
+      
+      res.json({ 
+        success: true, 
+        message: 'Order webhook registered successfully',
+        callbackUrl: webhookUrl
+      });
+    } catch (error: any) {
+      console.error("Error registering webhook:", error);
+      res.status(500).json({ error: error.message || "Failed to register webhook" });
+    }
+  });
+
   // Products API (protected by Shopify auth in production)
   app.get("/api/products", requireShopifySessionOrDev, async (req, res) => {
     try {

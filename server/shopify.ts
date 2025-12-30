@@ -242,9 +242,44 @@ export async function getProductVariants(session: Session, productId: string) {
   return response.data;
 }
 
+// Get existing webhook subscriptions
+export async function getWebhookSubscriptions(session: Session) {
+  const client = new shopify.clients.Graphql({ session });
+  
+  const response = await client.request(`
+    query {
+      webhookSubscriptions(first: 25) {
+        edges {
+          node {
+            id
+            topic
+            endpoint {
+              __typename
+              ... on WebhookHttpEndpoint {
+                callbackUrl
+              }
+            }
+          }
+        }
+      }
+    }
+  `);
+  
+  return response.data?.webhookSubscriptions?.edges?.map((edge: any) => edge.node) || [];
+}
+
 // Register webhooks for order tracking
 export async function registerOrderWebhook(session: Session, webhookUrl: string) {
   const client = new shopify.clients.Graphql({ session });
+  
+  // First check if webhook already exists
+  const existing = await getWebhookSubscriptions(session);
+  const ordersWebhook = existing.find((w: any) => w.topic === 'ORDERS_CREATE');
+  
+  if (ordersWebhook) {
+    console.log('[Shopify Webhook] ORDERS_CREATE webhook already exists');
+    return { webhookSubscriptionCreate: { webhookSubscription: ordersWebhook } };
+  }
   
   const response = await client.request(`
     mutation webhookSubscriptionCreate($topic: WebhookSubscriptionTopic!, $webhookSubscription: WebhookSubscriptionInput!) {
