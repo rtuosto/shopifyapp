@@ -794,438 +794,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/optimizations", requireShopifySessionOrDev, async (req, res) => {
     try {
       const shop = (req as any).shop;
-      const { recommendationId } = req.body;
-
-      if (!recommendationId) {
-        return res.status(400).json({ error: "Missing recommendationId" });
-      }
-
-      const recommendation = await storage.getRecommendation(shop, recommendationId);
-      if (!recommendation) {
-        return res.status(404).json({ error: "Recommendation not found" });
-      }
-
-      const product = await storage.getProduct(shop, recommendation.productId);
-      if (!product) {
-        return res.status(404).json({ error: "Product not found" });
-      }
-
-      // Generate secure, opaque token (short, URL-safe)
-      const token = randomUUID().replace(/-/g, '').substring(0, 16);
-
-      // Create preview session (expires in 15 minutes)
-      const expiresAt = new Date();
-      expiresAt.setMinutes(expiresAt.getMinutes() + 15);
-
-      // Build control data from product
-      // Include ALL fields that are in proposedChanges, even if empty
-      // This ensures the SDK can detect when fields are being added (empty → value)
-      const controlData: Record<string, any> = {
-        title: product.title,
-        price: product.price,
-        description: product.description || '',
-      };
-
-      const session = await storage.createPreviewSession(shop, {
-        token,
-        productId: product.id,
-        recommendationId: recommendation.id,
-        controlData,
-        variantData: recommendation.proposedChanges,
-        changes: Object.keys(recommendation.proposedChanges), // Array of changed field names
-        insights: recommendation.insights,
-        expiresAt,
-      });
-
-      // Build storefront URL with preview token
-      const shopDomain = shop;
-      const previewUrl = `https://${shopDomain}/products/${product.handle}?shoptimizer_preview=${token}`;
-
-      console.log(`[Preview] Created session ${session.id} for ${product.title} (token: ${token})`);
-      console.log(`[Preview] URL: ${previewUrl}`);
-
-      res.json({
-        sessionId: session.id,
-        token,
-        previewUrl,
-        expiresAt: session.expiresAt,
-      });
-    } catch (error) {
-      console.error("Error creating preview session:", error);
-      res.status(500).json({ error: "Failed to create preview session" });
-    }
-  });
-
-  // Get preview session data (public, CORS-enabled for SDK)
-  app.get("/api/preview/sessions/:token", storefrontCors, async (req, res) => {
-    try {
-      const { token } = req.params;
-      
-      const session = await storage.getPreviewSession(token);
-      if (!session) {
-        return res.status(404).json({ error: "Preview session not found or expired" });
-      }
-
-      // Check if expired
-      if (session.expiresAt < new Date()) {
-        return res.status(410).json({ error: "Preview session expired" });
-      }
-
-      // Check if already completed
-      if (session.completedAt) {
-        return res.status(410).json({ error: "Preview session already completed" });
-      }
-
-      // Return preview data for SDK
-      res.json({
-        token: session.token,
-        controlData: session.controlData,
-        variantData: session.variantData,
-        changes: session.changes,
-        insights: session.insights,
-        expiresAt: session.expiresAt,
-      });
-    } catch (error) {
-      console.error("Error fetching preview session:", error);
-      res.status(500).json({ error: "Failed to fetch preview session" });
-    }
-  });
-
-  // Complete preview session (approve or dismiss) - public, CORS-enabled for SDK
-  app.post("/api/preview/sessions/:token/complete", storefrontCors, async (req, res) => {
-    try {
-      const { token } = req.params;
-      const { approved } = req.body;
-
-      if (approved !== "yes" && approved !== "no") {
-        return res.status(400).json({ error: "Invalid approved value (must be 'yes' or 'no')" });
-      }
-
-      const session = await storage.getPreviewSession(token);
-      if (!session) {
-        return res.status(404).json({ error: "Preview session not found" });
-      }
-
-      // Check if already completed
-      if (session.completedAt) {
-        return res.status(400).json({ error: "Preview session already completed" });
-      }
-
-      // Mark as completed
-      const updated = await storage.completePreviewSession(token, approved);
-      
-      console.log(`[Preview] Session ${session.id} completed: ${approved}`);
-
-      res.json({
-        success: true,
-        approved: updated?.approved,
-        completedAt: updated?.completedAt,
-      });
-    } catch (error) {
-      console.error("Error completing preview session:", error);
-      res.status(500).json({ error: "Failed to complete preview session" });
-    }
-  });
-
-  // ==================== EDITOR MODE API ====================
-  
-  // Create Editor Session - Initiates editor mode for browsing storefront
-  app.post("/api/editor/sessions", requireShopifySessionOrDev, async (req, res) => {
-    try {
-      const shop = (req as any).shop;
-
-      // Generate session token
-      const token = randomUUID().replace(/-/g, '').substring(0, 24);
-
-      // Create session (expires in 20 minutes)
-      const expiresAt = new Date();
-      expiresAt.setMinutes(expiresAt.getMinutes() + 20);
-
-      const session = await storage.createEditorSession(shop, {
-        token,
-        expiresAt,
-      });
-
-      // Build storefront URL with editor token
-      const shopDomain = shop.replace('.myshopify.com', '');
-      const editorUrl = `https://${shop}?shoptimizer_editor=${token}`;
-
-      console.log(`[Editor] Created session ${session.id} for shop: ${shop}`);
-      console.log(`[Editor] URL: ${editorUrl}`);
-
-      res.json({
-        sessionId: session.id,
-        token: session.token,
-        editorUrl,
-        expiresAt: session.expiresAt,
-      });
-    } catch (error) {
-      console.error("Error creating editor session:", error);
-      res.status(500).json({ error: "Failed to create editor session" });
-    }
-  });
-
-  // Validate Editor Session - Public endpoint for SDK to validate session
-  app.get("/api/storefront/editor/validate/:token", storefrontCors, async (req, res) => {
-    try {
-      const { token } = req.params;
-
-      const session = await storage.getEditorSession(token);
-      if (!session) {
-        return res.status(404).json({ error: "Editor session not found" });
-      }
-
-      // Check if expired
-      if (new Date() > new Date(session.expiresAt)) {
-        await storage.deleteEditorSession(token);
-        return res.status(401).json({ error: "Editor session expired" });
-      }
-
-      // Update heartbeat to keep session alive
-      const updated = await storage.updateEditorSessionHeartbeat(token);
-
-      res.json({
-        valid: true,
-        shop: session.shop,
-        expiresAt: updated?.expiresAt || session.expiresAt,
-      });
-    } catch (error) {
-      console.error("Error validating editor session:", error);
-      res.status(500).json({ error: "Failed to validate editor session" });
-    }
-  });
-
-  // Heartbeat Editor Session - Keep session alive
-  app.post("/api/storefront/editor/heartbeat/:token", storefrontCors, async (req, res) => {
-    try {
-      const { token } = req.params;
-
-      const updated = await storage.updateEditorSessionHeartbeat(token);
-      if (!updated) {
-        return res.status(404).json({ error: "Editor session not found" });
-      }
-
-      res.json({
-        success: true,
-        expiresAt: updated.expiresAt,
-      });
-    } catch (error) {
-      console.error("Error updating editor heartbeat:", error);
-      res.status(500).json({ error: "Failed to update heartbeat" });
-    }
-  });
-
-  // Delete Editor Session - Exit editor mode
-  app.delete("/api/storefront/editor/:token", storefrontCors, async (req, res) => {
-    try {
-      const { token } = req.params;
-
-      const deleted = await storage.deleteEditorSession(token);
-      if (!deleted) {
-        return res.status(404).json({ error: "Editor session not found" });
-      }
-
-      console.log(`[Editor] Session deleted: ${token}`);
-
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error deleting editor session:", error);
-      res.status(500).json({ error: "Failed to delete editor session" });
-    }
-  });
-
-  // Get Recommendations by Product - Public endpoint for SDK to fetch recommendations
-  app.get("/api/storefront/editor/recommendations", storefrontCors, async (req, res) => {
-    try {
-      let { productId, shop } = req.query;
-
-      console.log('[Editor Recommendations] Request params:', { productId, shop });
-
-      if (!productId || !shop) {
-        return res.status(400).json({ error: "Missing productId or shop parameter" });
-      }
-
-      // If productId is a Shopify GID, look up the internal UUID
-      if ((productId as string).startsWith('gid://shopify/Product/')) {
-        const product = await storage.getProductByShopifyId(shop as string, productId as string);
-        if (product) {
-          console.log('[Editor Recommendations] Translated Shopify GID to internal UUID:', product.id);
-          productId = product.id;
-        } else {
-          console.warn('[Editor Recommendations] Product not found for Shopify GID:', productId);
-          return res.json({ recommendations: [], activeOptimizations: [] });
-        }
-      }
-
-      // Get all recommendations for this product (pending + active)
-      const recommendations = await storage.getRecommendationsByProduct(shop as string, productId as string);
-      
-      console.log('[Editor Recommendations] Found recommendations:', recommendations.length);
-      
-      // Get active optimizations for conflict detection
-      const activeOptimizations = await storage.getActiveOptimizationsByProduct(shop as string, productId as string);
-
-      // Filter to only pending recommendations (not already in active optimizations)
-      const activeOptTypes = new Set(activeOptimizations.map(o => o.optimizationType));
-      const availableRecommendations = recommendations.filter(r => 
-        r.status === 'pending' && !activeOptTypes.has(r.optimizationType)
-      );
-
-      res.json({
-        recommendations: availableRecommendations,
-        activeOptimizations,
-      });
-    } catch (error) {
-      console.error("Error fetching recommendations for product:", error);
-      res.status(500).json({ error: "Failed to fetch recommendations" });
-    }
-  });
-
-  // Get Optimizations by Product - Public endpoint for SDK editor to fetch optimizations
-  app.get("/api/storefront/editor/optimizations", storefrontCors, async (req, res) => {
-    try {
-      let { productId, shop } = req.query;
-
-      if (!productId || !shop) {
-        return res.status(400).json({ error: "Missing productId or shop parameter" });
-      }
-
-      // If productId is a Shopify GID, look up the internal UUID
-      if ((productId as string).startsWith('gid://shopify/Product/')) {
-        const product = await storage.getProductByShopifyId(shop as string, productId as string);
-        if (product) {
-          productId = product.id;
-        } else {
-          return res.json({ optimizations: [] });
-        }
-      }
-
-      // Get all active optimizations for this product (active + paused)
-      const optimizations = await storage.getOptimizationsByProduct(shop as string, productId as string);
-      
-      // Filter to only active optimizations that should be displayed in editor
-      const activeOptimizations = optimizations.filter(o => 
-        o.status === 'active' || o.status === 'paused'
-      );
-
-      // Map database fields to SDK-expected format
-      const formattedOptimizations = activeOptimizations.map(opt => ({
-        ...opt,
-        controlState: opt.controlData,
-        variantState: opt.variantData,
-      }));
-
-      res.json({
-        optimizations: formattedOptimizations,
-      });
-    } catch (error) {
-      console.error("Error fetching optimizations for product:", error);
-      res.status(500).json({ error: "Failed to fetch optimizations" });
-    }
-  });
-
-  // ==================== THEME ANALYSIS API ====================
-
-  // Theme Analysis API - Analyzes theme structure for accurate preview positioning
-  app.post("/api/theme/analyze", requireShopifySessionOrDev, async (req, res) => {
-    try {
-      const shop = (req as any).shop;
-      const shopifySession = (req as any).shopifySession;
-      
-      console.log(`[Theme Analysis] Starting theme analysis for shop: ${shop}`);
-      
-      // Import required modules
-      const { createTemplateCloneProduct, deleteCloneProduct, fetchProductPageHtml, fetchCurrentTheme } = await import("./shopify");
-      const { analyzeThemeStructure } = await import("./theme-analyzer");
-      
-      // Step 1: Get current theme ID
-      console.log('[Theme Analysis] Fetching current theme info...');
-      const currentTheme = await fetchCurrentTheme(shopifySession);
-      const themeId = currentTheme?.id || "unknown-theme";
-      const themeName = currentTheme?.name || "Unknown Theme";
-      
-      // Step 2: Check if we already have rules for this theme
-      const existingRules = await storage.getThemePositioningRules(shop);
-      if (existingRules && existingRules.themeId === themeId) {
-        console.log('[Theme Analysis] Using cached rules for current theme');
-        return res.json({
-          success: true,
-          rules: existingRules,
-          cached: true
-        });
-      }
-      
-      // Step 3: Create template clone product
-      console.log('[Theme Analysis] Creating template clone product...');
-      const cloneProduct = await createTemplateCloneProduct(shopifySession);
-      
-      try {
-        // Step 4: Fetch storefront HTML (wait a moment for product to be available)
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
-        console.log('[Theme Analysis] Fetching storefront HTML...');
-        const html = await fetchProductPageHtml(shop, cloneProduct.handle);
-        
-        // Step 5: Analyze theme structure
-        console.log('[Theme Analysis] Analyzing theme structure...');
-        const rules = analyzeThemeStructure(html);
-        
-        // Step 5: Store rules in database
-        console.log('[Theme Analysis] Storing positioning rules...');
-        const savedRules = await storage.createOrUpdateThemePositioningRules(shop, {
-          shop,
-          themeId,
-          themeName,
-          rules,
-          cloneProductId: cloneProduct.id,
-          analyzedAt: new Date(),
-        });
-        
-        console.log('[Theme Analysis] Theme analysis completed successfully');
-        
-        res.json({
-          success: true,
-          rules: savedRules,
-        });
-      } finally {
-        // Step 6: Always delete the clone product (cleanup)
-        console.log('[Theme Analysis] Deleting template clone product...');
-        await deleteCloneProduct(shopifySession, cloneProduct.id);
-      }
-    } catch (error) {
-      console.error("[Theme Analysis] Error analyzing theme:", error);
-      res.status(500).json({ 
-        error: "Failed to analyze theme structure",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
-
-  // Get current theme positioning rules
-  app.get("/api/theme/rules", storefrontCors, async (req, res) => {
-    try {
-      const shop = req.query.shop as string;
-      
-      if (!shop) {
-        return res.status(400).json({ error: "Shop parameter required" });
-      }
-      
-      const rules = await storage.getThemePositioningRules(shop);
-      
-      if (!rules) {
-        return res.status(404).json({ error: "Theme positioning rules not found for this shop" });
-      }
-      
-      res.json({ rules: rules.rules });
-    } catch (error) {
-      console.error("Error fetching theme rules:", error);
-      res.status(500).json({ error: "Failed to fetch theme positioning rules" });
-    }
-  });
-
-  // Optimizations API (protected)
-  app.get("/api/optimizations", requireShopifySessionOrDev, async (req, res) => {
-    try {
-      const shop = (req as any).shop;
       const status = req.query.status as string | undefined;
       const optimizations = await storage.getOptimizations(shop, status);
       
@@ -1971,8 +1539,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // For each product, check if there's an active optimization and attribute to correct variant
       for (const product of orderedProducts) {
-        const activeOptimizations = await storage.getTestsByProduct(shop, product.id);
-        const activeOptimization = activeOptimizations.find(opt => opt.status === "active");
+        const activeOptimizations = await storage.getActiveOptimizationsByProduct(shop, product.id);
+        const activeOptimization = activeOptimizations.find((opt: any) => opt.status === "active");
         
         if (activeOptimization) {
           // Find the line item for this product to get quantity and price
@@ -2054,25 +1622,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const syncedCount = await syncProductsFromShopify(session);
-      
-      // Trigger automatic theme analysis on first product sync
-      try {
-        const existingRules = await storage.getThemePositioningRules(shop);
-        
-        if (!existingRules && syncedCount > 0) {
-          console.log('[Theme Analysis] No existing rules found, triggering automatic theme analysis...');
-          
-          // Trigger analysis in background (don't wait for it)
-          analyzeThemeAndStoreRules(session, shop).then(() => {
-            console.log('[Theme Analysis] Automatic theme analysis completed successfully');
-          }).catch((error: Error) => {
-            console.error('[Theme Analysis] Automatic theme analysis failed:', error);
-          });
-        }
-      } catch (error) {
-        console.error('[Theme Analysis] Error checking for existing rules:', error);
-        // Don't fail the sync if theme analysis check fails
-      }
       
       res.json({ 
         success: true, 
@@ -2708,7 +2257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const orderValue = basePrice * variance;
           
           conversionRecords.push({
-            optimizationId: testIdStr,
+            optimizationId: optimizationIdStr,
             sessionId,
             variant: assignment.variant,
             revenue: orderValue.toFixed(2),
@@ -2741,7 +2290,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const cumulativeVariantRevenue = parseFloat(optimization.variantRevenue || "0") + variantRevenue;
 
           snapshotRecords.push({
-            optimizationId: testIdStr,
+            optimizationId: optimizationIdStr,
             impressions: cumulativeImpressions,
             controlImpressions: cumulativeControlImpressions,
             variantImpressions: cumulativeVariantImpressions,
@@ -2824,7 +2373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newRevenue = parseFloat(optimization.revenue || "0") + totalRevenue;
       const arpu = newConversions > 0 ? newRevenue / newConversions : 0;
 
-      const updatedOptimization = await storage.updateOptimization(shop, testIdStr, {
+      const updatedOptimization = await storage.updateOptimization(shop, optimizationIdStr, {
         impressions: newImpressions,
         conversions: newConversions,
         revenue: newRevenue.toString(),
@@ -2858,7 +2407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const updatedState = updateBayesianState(bayesianConfig, metrics);
           const result = computeAllocationUpdate(updatedState, metrics);
           
-          await storage.updateOptimization(shop, testIdStr, {
+          await storage.updateOptimization(shop, optimizationIdStr, {
             controlAllocation: (result.allocation.control * 100).toFixed(2),
             variantAllocation: (result.allocation.variant * 100).toFixed(2),
             bayesianConfig: result.bayesianState,
@@ -2881,7 +2430,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Send completion event
       sendEvent('complete', {
-        optimizationId: testIdStr,
+        optimizationId: optimizationIdStr,
         impressions: visitors,
         conversions: totalConversions,
         revenue: totalRevenue.toFixed(2),
@@ -3056,38 +2605,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Serve auto-configured storefront SDK with Replit URL pre-filled
-  app.get("/shoptimizer.js", (req, res) => {
-    try {
-      // Get Replit app URL from environment (auto-detects deployed URL)
-      const replitDomain = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPLIT_DEV_DOMAIN;
-      const apiUrl = replitDomain ? `https://${replitDomain}` : 'http://localhost:5000';
-      
-      console.log(`[SDK] Serving auto-configured SDK with API URL: ${apiUrl}`);
-      
-      // Read the SDK file
-      const sdkPath = join(import.meta.dirname, '../public/shoptimizer.js');
-      const sdkContent = readFileSync(sdkPath, 'utf8');
-      
-      // Inject the API URL into the SDK (replaces default placeholder)
-      const configuredSdk = sdkContent.replace(
-        "apiUrl: window.ShoptimizerConfig?.apiUrl || 'https://your-app.replit.app'",
-        `apiUrl: window.ShoptimizerConfig?.apiUrl || '${apiUrl}'`
-      );
-      
-      // Cache-busting headers for development (always get fresh SDK)
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-      
-      res.type('application/javascript');
-      res.send(configuredSdk);
-    } catch (error) {
-      console.error('[SDK] Error serving shoptimizer.js:', error);
-      res.status(500).send('// Error loading Shoptimizer SDK');
-    }
-  });
-
   // Migration endpoint: Backfill legacy fixed optimizations to Bayesian
   app.post("/api/migrate/bayesian", requireShopifySessionOrDev, async (req, res) => {
     try {
@@ -3153,76 +2670,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get installation instructions (for Settings page)
-  app.get("/api/installation-script", requireShopifySessionOrDev, async (req, res) => {
-    try {
-      const replitDomain = process.env.REPLIT_DOMAINS?.split(',')[0] || process.env.REPLIT_DEV_DOMAIN;
-      const apiUrl = replitDomain ? `https://${replitDomain}` : 'http://localhost:5000';
-      
-      const scriptTag = `<script src="${apiUrl}/shoptimizer.js" defer></script>`;
-
-      const webhookUrl = `${apiUrl}/api/webhooks/orders/create`;
-      
-      res.json({
-        apiUrl,
-        scriptTag,
-        webhookUrl,
-        isDev: !replitDomain || replitDomain.includes('replit.dev'),
-      });
-    } catch (error) {
-      console.error("Error getting installation script:", error);
-      res.status(500).json({ error: "Failed to get installation script" });
-    }
-  });
-
-  // Check SDK installation status
-  app.get("/api/sdk-status", requireShopifySessionOrDev, async (req, res) => {
-    try {
-      const shop = (req as any).shop;
-      
-      // Check if we have any products to test with
-      const products = await storage.getProducts(shop);
-      if (products.length === 0) {
-        return res.json({
-          installed: false,
-          error: "No products found to test SDK installation",
-          testUrl: null,
-        });
-      }
-
-      // Use first product to test SDK installation
-      const testProduct = products[0];
-      const testUrl = `https://${shop}/products/${testProduct.handle}`;
-
-      res.json({
-        installed: null, // Client will check by trying to load from storefront
-        testUrl,
-        message: "Check installation by visiting your storefront",
-      });
-    } catch (error) {
-      console.error("Error checking SDK status:", error);
-      res.status(500).json({ error: "Failed to check SDK status" });
-    }
-  });
-
   const httpServer = createServer(app);
-  
-  // Schedule periodic cleanup of expired preview sessions
-  // Run every 5 minutes to prevent token accumulation
-  const CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
-  setInterval(async () => {
-    try {
-      await storage.cleanupExpiredPreviewSessions();
-      console.log('[Preview Cleanup] Expired preview sessions cleaned up');
-    } catch (error) {
-      console.error('[Preview Cleanup] Error cleaning up preview sessions:', error);
-    }
-  }, CLEANUP_INTERVAL);
-  
-  // Run initial cleanup on startup
-  storage.cleanupExpiredPreviewSessions().catch(err => {
-    console.error('[Preview Cleanup] Initial cleanup failed:', err);
-  });
   
   return httpServer;
 }
