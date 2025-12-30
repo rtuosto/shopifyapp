@@ -54,9 +54,9 @@ export default function Settings() {
 
       <Alert className="border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
         <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-        <AlertTitle className="text-green-900 dark:text-green-100">App Store Compliant</AlertTitle>
+        <AlertTitle className="text-green-900 dark:text-green-100">Product Optimizations Work Immediately</AlertTitle>
         <AlertDescription className="text-green-800 dark:text-green-200">
-          Shoptimizer uses Shopify Theme App Extensions for A/B testing. This approach is fully compliant with Shopify App Store requirements and provides the best merchant experience.
+          Product optimizations (price, title, description) modify your actual Shopify product data via the Admin API. They work right away without any additional setup - just accept AI recommendations to get started!
         </AlertDescription>
       </Alert>
 
@@ -64,13 +64,20 @@ export default function Settings() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Zap className="h-5 w-5 text-primary" />
-            <CardTitle>Step 1: Enable CRO Runtime</CardTitle>
+            <CardTitle>Theme Extension Setup (Optional)</CardTitle>
           </div>
           <CardDescription>
-            Enable the Shoptimizer runtime across your entire storefront
+            For enhanced visitor tracking and Slot Experiments, enable the CRO Runtime in your theme
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <Alert variant="default" className="border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
+            <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <AlertDescription className="text-amber-800 dark:text-amber-200">
+              <strong>Note:</strong> The theme extension must be deployed to your Shopify Partner app before it appears in the Theme Editor. If you don't see "Shoptimizer CRO Runtime" in App embeds, the extension needs to be deployed first.
+            </AlertDescription>
+          </Alert>
+
           <div className="flex items-start gap-3 p-4 bg-muted rounded-lg">
             <Badge variant="outline" className="mt-0.5">App Embed</Badge>
             <div className="flex-1">
@@ -82,7 +89,7 @@ export default function Settings() {
           </div>
 
           <div className="pt-2">
-            <h4 className="text-sm font-medium mb-3">How to Enable:</h4>
+            <h4 className="text-sm font-medium mb-3">How to Enable (after deployment):</h4>
             <ol className="space-y-3 text-sm text-muted-foreground">
               <li className="flex gap-2">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">1</span>

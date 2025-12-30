@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ExternalLink, CheckCircle2, Circle, Settings, Puzzle, Zap } from "lucide-react";
+import { ExternalLink, CheckCircle2, Circle, Settings, Info, Sparkles } from "lucide-react";
 import { Link } from "wouter";
 
 export default function SetupGuide() {
@@ -26,36 +26,12 @@ export default function SetupGuide() {
       <CardContent className="space-y-6">
         <div className="space-y-3">
           <div className="flex items-start gap-3">
-            <Zap className="w-5 h-5 mt-0.5 text-primary" />
+            <CheckCircle2 className="w-5 h-5 mt-0.5 text-green-600" />
             <div className="flex-1">
-              <h3 className="font-semibold text-lg">Step 1: Enable CRO Runtime</h3>
+              <h3 className="font-semibold text-lg">Step 1: Products Synced</h3>
               <p className="text-sm text-muted-foreground mb-3">
-                Enable the Shoptimizer runtime in your theme to track visitors and run optimizations
+                Your products are automatically synced from Shopify during app installation and kept up to date.
               </p>
-              
-              <Alert>
-                <AlertDescription className="text-sm">
-                  <ol className="space-y-1.5 list-decimal list-inside">
-                    <li>Go to Shopify Admin → Online Store → Themes</li>
-                    <li>Click <strong>Customize</strong> on your active theme</li>
-                    <li>Click <strong>App embeds</strong> in the left sidebar (puzzle icon)</li>
-                    <li>Find <strong>"Shoptimizer CRO Runtime"</strong> and toggle it ON</li>
-                    <li>Click Save</li>
-                  </ol>
-                </AlertDescription>
-              </Alert>
-
-              <Button variant="outline" size="sm" className="mt-3" asChild>
-                <a 
-                  href="https://admin.shopify.com/themes/current/editor"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  data-testid="link-theme-editor"
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Open Theme Editor
-                </a>
-              </Button>
             </div>
           </div>
         </div>
@@ -66,7 +42,7 @@ export default function SetupGuide() {
             <div className="flex-1">
               <h3 className="font-semibold text-lg">Step 2: Webhook (Auto-Configured)</h3>
               <p className="text-sm text-muted-foreground mb-3">
-                Your order webhook was automatically registered during app installation
+                Your order webhook was automatically registered during app installation to track conversions.
               </p>
               
               <Button variant="outline" size="sm" asChild>
@@ -86,32 +62,19 @@ export default function SetupGuide() {
 
         <div className="space-y-3 pt-4 border-t">
           <div className="flex items-start gap-3">
-            <Puzzle className="w-5 h-5 mt-0.5 text-muted-foreground" />
+            <Sparkles className="w-5 h-5 mt-0.5 text-primary" />
             <div className="flex-1">
-              <h3 className="font-semibold text-lg">Step 3: Add Experiment Slots (Optional)</h3>
+              <h3 className="font-semibold text-lg">Step 3: Create Your First Optimization</h3>
               <p className="text-sm text-muted-foreground mb-3">
-                For custom content experiments, add Experiment Slot blocks to your product pages. 
-                This is optional - product optimizations (price, title, description) work automatically.
+                Accept AI recommendations to automatically create and activate product optimizations. Changes are applied directly to your Shopify products.
               </p>
               
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/settings" data-testid="link-slot-instructions">
-                  <Settings className="w-4 h-4 mr-2" />
-                  View Instructions
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-3 pt-4 border-t">
-          <div className="flex items-start gap-3">
-            <Circle className="w-5 h-5 mt-0.5 text-primary" />
-            <div className="flex-1">
-              <h3 className="font-semibold text-lg">Step 4: Create Your First Optimization</h3>
-              <p className="text-sm text-muted-foreground mb-3">
-                Once the runtime is enabled, accept AI recommendations or create optimizations manually
-              </p>
+              <Alert className="mb-3">
+                <Info className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  <strong>Product optimizations</strong> (price, title, description) modify your actual Shopify product data and work immediately - no additional setup required.
+                </AlertDescription>
+              </Alert>
               
               <div className="flex flex-wrap gap-2">
                 <Button variant="default" size="sm" asChild>
@@ -125,6 +88,25 @@ export default function SetupGuide() {
                   </Link>
                 </Button>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3 pt-4 border-t">
+          <div className="flex items-start gap-3">
+            <Circle className="w-5 h-5 mt-0.5 text-muted-foreground" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-lg">Advanced: Enable Theme Extension (Optional)</h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                For enhanced visitor tracking and custom content experiments (Slot Experiments), enable the CRO Runtime in your theme. This requires the extension to be deployed first.
+              </p>
+              
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/settings" data-testid="link-slot-instructions">
+                  <Settings className="w-4 h-4 mr-2" />
+                  View Setup Instructions
+                </Link>
+              </Button>
             </div>
           </div>
         </div>
