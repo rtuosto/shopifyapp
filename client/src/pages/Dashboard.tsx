@@ -234,29 +234,6 @@ export default function Dashboard() {
     },
   });
 
-  // Enter Editor Mode mutation
-  const enterEditorModeMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/editor/sessions");
-      return res.json();
-    },
-    onSuccess: (data: { editorUrl: string }) => {
-      // Open storefront in editor mode
-      window.open(data.editorUrl, '_blank');
-      toast({
-        title: "Editor Mode Activated",
-        description: "Browse your store to see and manage optimizations inline",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to enter editor mode",
-        variant: "destructive",
-      });
-    },
-  });
-
   // Fetch dashboard data (poll more frequently if syncing)
   const { data: dashboardData } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
@@ -437,22 +414,12 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4 md:space-y-6 max-w-full overflow-hidden">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <DashboardHeader 
-          activeOptimizations={activeOptimizationsCount} 
-          lastSync={getLastSyncText()}
-          quotaUsed={quotaData?.used}
-          quotaTotal={quotaData?.quota}
-        />
-        <Button
-          onClick={() => enterEditorModeMutation.mutate()}
-          disabled={enterEditorModeMutation.isPending}
-          data-testid="button-enter-editor-mode"
-          className="whitespace-nowrap"
-        >
-          {enterEditorModeMutation.isPending ? "Opening..." : "Enter Editor Mode"}
-        </Button>
-      </div>
+      <DashboardHeader 
+        activeOptimizations={activeOptimizationsCount} 
+        lastSync={getLastSyncText()}
+        quotaUsed={quotaData?.used}
+        quotaTotal={quotaData?.quota}
+      />
       
       {/* All-Time Performance */}
       <div>
