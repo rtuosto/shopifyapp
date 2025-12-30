@@ -35,6 +35,7 @@ export interface IStorage {
   getShop(shop: string): Promise<Shop | undefined>;
   createOrUpdateShop(shop: string, data: Partial<InsertShop>): Promise<Shop>;
   incrementQuota(shop: string, amount: number): Promise<Shop | undefined>;
+  resetQuota(shop: string): Promise<Shop | undefined>;
 
   // Products (shop-scoped)
   getProduct(shop: string, id: string): Promise<Product | undefined>;
@@ -173,6 +174,20 @@ export class MemStorage implements IStorage {
     const updated: Shop = {
       ...existing,
       recommendationsUsed: existing.recommendationsUsed + amount,
+      updatedAt: new Date(),
+    };
+    this.shops.set(shop, updated);
+    return updated;
+  }
+
+  async resetQuota(shop: string): Promise<Shop | undefined> {
+    const existing = this.shops.get(shop);
+    if (!existing) return undefined;
+    
+    const updated: Shop = {
+      ...existing,
+      recommendationsUsed: 0,
+      quotaResetDate: new Date(),
       updatedAt: new Date(),
     };
     this.shops.set(shop, updated);

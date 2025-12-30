@@ -98,6 +98,22 @@ export class DbStorage implements IStorage {
     return result;
   }
 
+  async resetQuota(shop: string): Promise<Shop | undefined> {
+    const existing = await this.getShop(shop);
+    if (!existing) return undefined;
+    
+    const [result] = await db.update(shops)
+      .set({ 
+        recommendationsUsed: 0,
+        quotaResetDate: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(shops.shop, shop))
+      .returning();
+    console.log(`[DbStorage] Reset quota for shop: ${shop}`);
+    return result;
+  }
+
   // Products (shop-scoped)
   async getProduct(shop: string, id: string): Promise<Product | undefined> {
     const result = await db.select().from(products)

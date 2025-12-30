@@ -563,16 +563,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         shopData = await storage.createOrUpdateShop(shop, {});
       }
       
+      const remaining = shopData.recommendationQuota - shopData.recommendationsUsed;
+      
       res.json({
         quota: shopData.recommendationQuota,
         used: shopData.recommendationsUsed,
-        remaining: shopData.recommendationQuota - shopData.recommendationsUsed,
+        remaining: Math.max(0, remaining), // Never return negative remaining
         planTier: shopData.planTier,
         resetDate: shopData.quotaResetDate,
       });
     } catch (error) {
       console.error("Error fetching quota:", error);
       res.status(500).json({ error: "Failed to fetch quota" });
+    }
+  });
+
+  // Admin endpoint to reset quota (for testing/dev purposes)
+  app.post("/api/admin/reset-quota", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      
+      // Only allow in development mode for safety
+      if (process.env.NODE_ENV !== 'development') {
+        return res.status(403).json({ error: "Quota reset only available in development mode" });
+      }
+      
+      const shopData = await storage.resetQuota(shop);
+      if (!shopData) {
+        return res.status(404).json({ error: "Shop not found" });
+      }
+      
+      console.log(`[Admin] Reset quota for shop: ${shop}`);
+      
+      res.json({
+        success: true,
+        quota: shopData.recommendationQuota,
+        used: shopData.recommendationsUsed,
+        remaining: shopData.recommendationQuota - shopData.recommendationsUsed,
+      });
+    } catch (error) {
+      console.error("Error resetting quota:", error);
+      res.status(500).json({ error: "Failed to reset quota" });
     }
   });
 

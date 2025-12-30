@@ -810,7 +810,7 @@ export default function AIRecommendations() {
               This will analyze your top products and generate up to 10 AI recommendations.
               <br />
               <br />
-              <strong>Cost: 10 AI Ideas</strong> (You have {quotaRemaining} remaining)
+              <span className="text-muted-foreground">Beta: Unlimited AI ideas during beta period</span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -1,4 +1,4 @@
-#!/usr/bin/env npx tsx
+ok #!/usr/bin/env npx tsx
 /**
  * Manual GDPR Webhook Test Script
  * 
