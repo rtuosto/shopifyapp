@@ -509,6 +509,67 @@ export class DbStorage implements IStorage {
     }
     return await query;
   }
+
+  // GDPR Compliance: Delete all data for a shop (shop/redact webhook)
+  async deleteAllShopData(shop: string): Promise<void> {
+    console.log(`[DbStorage] Deleting all data for shop: ${shop}`);
+    
+    try {
+      // Delete in order to respect foreign key constraints
+      // Note: Tables with onDelete: "cascade" on their FK to optimizations
+      // (optimizationImpressions, optimizationConversions, optimizationEvolutionSnapshots)
+      // will be automatically deleted when we delete optimizations
+      
+      // 1. Delete experiment events first (references slot experiments via experimentId)
+      await db.delete(experimentEvents).where(eq(experimentEvents.shop, shop));
+      console.log(`[DbStorage] Deleted experiment events for shop: ${shop}`);
+      
+      // 2. Delete slot experiments
+      await db.delete(slotExperiments).where(eq(slotExperiments.shop, shop));
+      console.log(`[DbStorage] Deleted slot experiments for shop: ${shop}`);
+      
+      // 3. Delete editor sessions
+      await db.delete(editorSessions).where(eq(editorSessions.shop, shop));
+      console.log(`[DbStorage] Deleted editor sessions for shop: ${shop}`);
+      
+      // 4. Delete preview sessions
+      await db.delete(previewSessions).where(eq(previewSessions.shop, shop));
+      console.log(`[DbStorage] Deleted preview sessions for shop: ${shop}`);
+      
+      // 5. Delete theme positioning rules
+      await db.delete(themePositioningRules).where(eq(themePositioningRules.shop, shop));
+      console.log(`[DbStorage] Deleted theme positioning rules for shop: ${shop}`);
+      
+      // 6. Delete session assignments
+      await db.delete(sessionAssignments).where(eq(sessionAssignments.shop, shop));
+      console.log(`[DbStorage] Deleted session assignments for shop: ${shop}`);
+      
+      // 7. Delete metrics
+      await db.delete(metrics).where(eq(metrics.shop, shop));
+      console.log(`[DbStorage] Deleted metrics for shop: ${shop}`);
+      
+      // 8. Delete optimizations (cascades to impressions, conversions, evolution snapshots)
+      await db.delete(optimizations).where(eq(optimizations.shop, shop));
+      console.log(`[DbStorage] Deleted optimizations (and cascaded data) for shop: ${shop}`);
+      
+      // 9. Delete recommendations
+      await db.delete(recommendations).where(eq(recommendations.shop, shop));
+      console.log(`[DbStorage] Deleted recommendations for shop: ${shop}`);
+      
+      // 10. Delete products
+      await db.delete(products).where(eq(products.shop, shop));
+      console.log(`[DbStorage] Deleted products for shop: ${shop}`);
+      
+      // 11. Delete shop record
+      await db.delete(shops).where(eq(shops.shop, shop));
+      console.log(`[DbStorage] Deleted shop record for: ${shop}`);
+      
+      console.log(`[DbStorage] Successfully deleted all data for shop: ${shop}`);
+    } catch (error) {
+      console.error(`[DbStorage] Error deleting shop data for ${shop}:`, error);
+      throw error;
+    }
+  }
 }
 
 // Export singleton instance

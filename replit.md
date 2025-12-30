@@ -70,6 +70,13 @@ Shoptimizer utilizes a full-stack architecture. The frontend uses React with Sha
 - **Optimization Evolution Charts**: Visualizes optimization performance over time on the Optimizations page, showing RPV and allocation evolution.
 - **CORS Configuration**: App Proxy endpoints are configured with CORS headers for cross-origin storefront requests.
 - **UI/UX**: Utilizes Shadcn UI components and Tailwind CSS for an embedded Shopify app experience.
+- **GDPR Compliance (Level 1 Protected Customer Data)**: Implements mandatory Shopify GDPR webhooks:
+  - `/api/webhooks/customers/data_request` - Handles customer data export requests (no PII stored)
+  - `/api/webhooks/customers/redact` - Handles customer data deletion requests (no PII stored)
+  - `/api/webhooks/shop/redact` - Handles complete shop data deletion on app uninstall
+  - All webhooks use HMAC-SHA256 signature verification
+  - Data minimization: Only stores order line items for conversion attribution, no customer PII (name, email, address)
+  - See `docs/privacy-policy.md` for full data protection documentation
 - **Theme App Extension Architecture**: Implements Shopify App Store compliant A/B testing using Theme App Extensions instead of DOM manipulation:
   - **App Embed (cro-embed.liquid)**: Loads the lightweight runtime.js across the entire storefront site-wide
   - **App Block (experiment-slot.liquid)**: Creates owned containers where experiment variants render. Merchants place these blocks in their theme's product pages

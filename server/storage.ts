@@ -112,6 +112,9 @@ export interface IStorage {
   // Experiment Events (App Proxy event tracking)
   createExperimentEvent(shop: string, event: InsertExperimentEvent): Promise<ExperimentEvent>;
   getExperimentEvents(experimentId: string, limit?: number): Promise<ExperimentEvent[]>;
+
+  // GDPR Compliance: Delete all data for a shop (shop/redact webhook)
+  deleteAllShopData(shop: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -816,6 +819,24 @@ export class MemStorage implements IStorage {
   async getExperimentEvents(experimentId: string, limit?: number): Promise<ExperimentEvent[]> {
     console.warn("[MemStorage] Experiment events not persisted in memory - upgrade to DbStorage");
     return [];
+  }
+
+  // GDPR Compliance: Delete all shop data
+  async deleteAllShopData(shop: string): Promise<void> {
+    console.log(`[MemStorage] Deleting all data for shop: ${shop}`);
+    this.shops.delete(shop);
+    this.products.delete(shop);
+    this.recommendations.delete(shop);
+    this.optimizations.delete(shop);
+    this.metrics.delete(shop);
+    this.sessionAssignments.delete(shop);
+    // Preview sessions are stored by token, need to filter
+    for (const [token, session] of this.previewSessions) {
+      if (session.shop === shop) {
+        this.previewSessions.delete(token);
+      }
+    }
+    console.log(`[MemStorage] Successfully deleted all data for shop: ${shop}`);
   }
 }
 
