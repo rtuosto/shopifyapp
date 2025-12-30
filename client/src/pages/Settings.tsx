@@ -1,39 +1,30 @@
-import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Copy, Check, ExternalLink, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Copy, Check, ExternalLink, Info, CheckCircle2, Puzzle, LayoutGrid, Zap } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Settings() {
   const { toast } = useToast();
-  const [copiedScript, setCopiedScript] = useState(false);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["/api/installation-script"],
-  });
+  const replitDomain = typeof window !== 'undefined' 
+    ? window.location.hostname 
+    : 'your-app.replit.app';
+  const apiUrl = `https://${replitDomain}`;
+  const webhookUrl = `${apiUrl}/api/webhooks/orders/create`;
+  const isDev = replitDomain.includes('replit.dev') || replitDomain === 'localhost';
 
-  const { data: sdkStatus } = useQuery({
-    queryKey: ["/api/sdk-status"],
-  });
-
-  const copyToClipboard = async (text: string, type: 'script' | 'webhook') => {
+  const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      
-      if (type === 'script') {
-        setCopiedScript(true);
-        setTimeout(() => setCopiedScript(false), 2000);
-      } else {
-        setCopiedWebhook(true);
-        setTimeout(() => setCopiedWebhook(false), 2000);
-      }
-
+      setCopiedWebhook(true);
+      setTimeout(() => setCopiedWebhook(false), 2000);
       toast({
         title: "Copied!",
-        description: `${type === 'script' ? 'Installation script' : 'Webhook URL'} copied to clipboard`,
+        description: "Webhook URL copied to clipboard",
       });
     } catch (err) {
       toast({
@@ -44,32 +35,6 @@ export default function Settings() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="container max-w-4xl py-8 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Settings</h1>
-          <p className="text-muted-foreground mt-2">Configure Shoptimizer for your store</p>
-        </div>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="animate-pulse space-y-4">
-              <div className="h-4 bg-muted rounded w-3/4"></div>
-              <div className="h-20 bg-muted rounded"></div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  const installationData = data as {
-    apiUrl: string;
-    scriptTag: string;
-    webhookUrl: string;
-    isDev: boolean;
-  } | undefined;
-
   return (
     <div className="container max-w-4xl py-8 space-y-6">
       <div>
@@ -77,84 +42,139 @@ export default function Settings() {
         <p className="text-muted-foreground mt-2">Configure Shoptimizer for your store</p>
       </div>
 
-      {installationData?.isDev && (
+      {isDev && (
         <Alert>
-          <AlertCircle className="h-4 w-4" />
+          <Info className="h-4 w-4" />
           <AlertTitle>Development Mode</AlertTitle>
           <AlertDescription>
-            You're running in development mode. The URLs below will change when you publish your app.
+            You're running in development mode. URLs will change when you publish your app.
           </AlertDescription>
         </Alert>
       )}
 
-      <Alert variant="default" className="border-orange-200 bg-orange-50 dark:bg-orange-950 dark:border-orange-800">
-        <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-        <AlertTitle className="text-orange-900 dark:text-orange-100">SDK Installation Required</AlertTitle>
-        <AlertDescription className="text-orange-800 dark:text-orange-200">
-          To use the Preview feature for AI recommendations, you must install the Shoptimizer SDK on your Shopify storefront theme. Follow the installation steps below to enable live previews on your actual product pages.
+      <Alert className="border-green-200 bg-green-50 dark:bg-green-950 dark:border-green-800">
+        <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+        <AlertTitle className="text-green-900 dark:text-green-100">App Store Compliant</AlertTitle>
+        <AlertDescription className="text-green-800 dark:text-green-200">
+          Shoptimizer uses Shopify Theme App Extensions for A/B testing. This approach is fully compliant with Shopify App Store requirements and provides the best merchant experience.
         </AlertDescription>
       </Alert>
 
       <Card>
         <CardHeader>
-          <CardTitle>Installation Script</CardTitle>
+          <div className="flex items-center gap-2">
+            <Zap className="h-5 w-5 text-primary" />
+            <CardTitle>Step 1: Enable CRO Runtime</CardTitle>
+          </div>
           <CardDescription>
-            Add this script to your Shopify theme to enable A/B optimization across all pages (product pages, collections, homepage, search)
+            Enable the Shoptimizer runtime across your entire storefront
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium">Theme Installation</label>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => installationData && copyToClipboard(installationData.scriptTag, 'script')}
-                data-testid="button-copy-script"
-              >
-                {copiedScript ? (
-                  <>
-                    <Check className="w-4 h-4 mr-2" />
-                    Copied
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-4 h-4 mr-2" />
-                    Copy
-                  </>
-                )}
-              </Button>
+          <div className="flex items-start gap-3 p-4 bg-muted rounded-lg">
+            <Badge variant="outline" className="mt-0.5">App Embed</Badge>
+            <div className="flex-1">
+              <p className="font-medium">CRO Runtime</p>
+              <p className="text-sm text-muted-foreground">
+                A lightweight script that handles visitor tracking, experiment bucketing, and conversion attribution across all pages.
+              </p>
             </div>
-            <div className="bg-muted p-4 rounded-lg font-mono text-sm overflow-x-auto">
-              <pre data-testid="text-installation-script">{installationData?.scriptTag}</pre>
-            </div>
-            <p className="text-sm text-muted-foreground mt-2">
-              Add this to your <code className="bg-muted px-1 rounded">theme.liquid</code> file before the closing <code className="bg-muted px-1 rounded">&lt;/head&gt;</code> tag
-            </p>
           </div>
 
-          <div className="pt-4 border-t">
-            <h4 className="text-sm font-medium mb-2">Installation Steps:</h4>
-            <ol className="space-y-2 text-sm text-muted-foreground">
+          <div className="pt-2">
+            <h4 className="text-sm font-medium mb-3">How to Enable:</h4>
+            <ol className="space-y-3 text-sm text-muted-foreground">
               <li className="flex gap-2">
-                <span className="font-semibold text-foreground">1.</span>
-                Go to Shopify Admin → Online Store → Themes
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">1</span>
+                <span>Go to <strong className="text-foreground">Shopify Admin → Online Store → Themes</strong></span>
               </li>
               <li className="flex gap-2">
-                <span className="font-semibold text-foreground">2.</span>
-                Click Actions → Edit code
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">2</span>
+                <span>Click <strong className="text-foreground">Customize</strong> on your active theme</span>
               </li>
               <li className="flex gap-2">
-                <span className="font-semibold text-foreground">3.</span>
-                Open <code className="bg-muted px-1 rounded">theme.liquid</code>
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">3</span>
+                <span>Click the <strong className="text-foreground">App embeds</strong> icon in the left sidebar (puzzle piece icon)</span>
               </li>
               <li className="flex gap-2">
-                <span className="font-semibold text-foreground">4.</span>
-                Paste the script above before <code className="bg-muted px-1 rounded">&lt;/head&gt;</code>
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">4</span>
+                <span>Find <strong className="text-foreground">"Shoptimizer CRO Runtime"</strong> and toggle it <strong className="text-foreground">ON</strong></span>
               </li>
               <li className="flex gap-2">
-                <span className="font-semibold text-foreground">5.</span>
-                Click Save
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">5</span>
+                <span>Click <strong className="text-foreground">Save</strong></span>
+              </li>
+            </ol>
+          </div>
+
+          <Button variant="outline" size="sm" asChild className="mt-4">
+            <a 
+              href="https://admin.shopify.com/themes/current/editor"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="link-theme-editor"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Open Theme Editor
+            </a>
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <LayoutGrid className="h-5 w-5 text-primary" />
+            <CardTitle>Step 2: Add Experiment Slots (Optional)</CardTitle>
+          </div>
+          <CardDescription>
+            Add content experiment zones to your product pages for slot-based A/B testing
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-start gap-3 p-4 bg-muted rounded-lg">
+            <Badge variant="outline" className="mt-0.5">App Block</Badge>
+            <div className="flex-1">
+              <p className="font-medium">Experiment Slot</p>
+              <p className="text-sm text-muted-foreground">
+                A designated area where different content variants can be displayed to visitors for A/B testing. Perfect for testing headlines, descriptions, badges, and promotional content.
+              </p>
+            </div>
+          </div>
+
+          <Alert variant="default" className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+            <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <AlertDescription className="text-blue-800 dark:text-blue-200">
+              <strong>This step is optional.</strong> Product optimizations (price, title, description) work automatically via the Admin API. Experiment Slots are only needed for custom content experiments.
+            </AlertDescription>
+          </Alert>
+
+          <div className="pt-2">
+            <h4 className="text-sm font-medium mb-3">How to Add Experiment Slots:</h4>
+            <ol className="space-y-3 text-sm text-muted-foreground">
+              <li className="flex gap-2">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">1</span>
+                <span>In Theme Editor, navigate to a <strong className="text-foreground">Product page template</strong></span>
+              </li>
+              <li className="flex gap-2">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">2</span>
+                <span>Click <strong className="text-foreground">Add block</strong> or <strong className="text-foreground">Add section</strong></span>
+              </li>
+              <li className="flex gap-2">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">3</span>
+                <span>Search for and select <strong className="text-foreground">"Shoptimizer Experiment Slot"</strong></span>
+              </li>
+              <li className="flex gap-2">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">4</span>
+                <span>Configure the <strong className="text-foreground">Slot ID</strong> (e.g., "hero-banner", "promo-text")</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">5</span>
+                <span>Position the slot where you want experiment content to appear</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">6</span>
+                <span>Click <strong className="text-foreground">Save</strong></span>
               </li>
             </ol>
           </div>
@@ -163,9 +183,12 @@ export default function Settings() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Webhook Configuration</CardTitle>
+          <div className="flex items-center gap-2">
+            <Puzzle className="h-5 w-5 text-primary" />
+            <CardTitle>Webhook Configuration</CardTitle>
+          </div>
           <CardDescription>
-            Your webhook is automatically registered. Verify it's working below.
+            Webhooks track purchases to measure optimization performance
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -175,7 +198,7 @@ export default function Settings() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => installationData && copyToClipboard(installationData.webhookUrl, 'webhook')}
+                onClick={() => copyToClipboard(webhookUrl)}
                 data-testid="button-copy-webhook"
               >
                 {copiedWebhook ? (
@@ -192,12 +215,19 @@ export default function Settings() {
               </Button>
             </div>
             <div className="bg-muted p-4 rounded-lg font-mono text-sm overflow-x-auto">
-              <code data-testid="text-webhook-url">{installationData?.webhookUrl}</code>
+              <code data-testid="text-webhook-url">{webhookUrl}</code>
             </div>
           </div>
 
+          <Alert variant="default">
+            <CheckCircle2 className="h-4 w-4" />
+            <AlertDescription>
+              Webhooks are <strong>automatically registered</strong> when your Shopify app is installed. You typically don't need to configure this manually.
+            </AlertDescription>
+          </Alert>
+
           <div className="pt-4 border-t">
-            <h4 className="text-sm font-medium mb-2">Verify Webhook:</h4>
+            <h4 className="text-sm font-medium mb-2">Verify Webhook (if needed):</h4>
             <ol className="space-y-2 text-sm text-muted-foreground mb-4">
               <li className="flex gap-2">
                 <span className="font-semibold text-foreground">1.</span>
@@ -209,14 +239,10 @@ export default function Settings() {
               </li>
               <li className="flex gap-2">
                 <span className="font-semibold text-foreground">3.</span>
-                Look for webhook with URL above and event "Order creation"
+                Look for webhook with event "Order creation"
               </li>
             </ol>
-            <Button
-              variant="outline"
-              size="sm"
-              asChild
-            >
+            <Button variant="outline" size="sm" asChild>
               <a 
                 href="https://admin.shopify.com/settings/notifications"
                 target="_blank"
@@ -235,18 +261,57 @@ export default function Settings() {
         <CardHeader>
           <CardTitle>API Configuration</CardTitle>
           <CardDescription>
-            Your Shoptimizer backend URL
+            Your Shoptimizer backend URL (auto-detected)
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div>
             <label className="text-sm font-medium">Backend URL</label>
             <div className="bg-muted p-4 rounded-lg font-mono text-sm mt-2">
-              <code data-testid="text-api-url">{installationData?.apiUrl}</code>
+              <code data-testid="text-api-url">{apiUrl}</code>
             </div>
             <p className="text-sm text-muted-foreground mt-2">
-              This URL is automatically detected from your Replit environment
+              This URL is automatically detected from your environment
             </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>How Shoptimizer Works</CardTitle>
+          <CardDescription>
+            Understanding the two types of A/B testing
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="p-4 border rounded-lg">
+              <h4 className="font-medium flex items-center gap-2 mb-2">
+                <Badge>Product Optimizations</Badge>
+              </h4>
+              <p className="text-sm text-muted-foreground">
+                Tests that modify actual Shopify product data (titles, descriptions, prices) via the Admin API. Changes are applied directly to your products.
+              </p>
+              <ul className="mt-3 space-y-1 text-sm text-muted-foreground">
+                <li>• Price optimization</li>
+                <li>• Title optimization</li>
+                <li>• Description optimization</li>
+              </ul>
+            </div>
+            <div className="p-4 border rounded-lg">
+              <h4 className="font-medium flex items-center gap-2 mb-2">
+                <Badge variant="secondary">Slot Experiments</Badge>
+              </h4>
+              <p className="text-sm text-muted-foreground">
+                Content experiments that render variants inside Theme App Extension slots. No product data is modified - variants display in designated areas.
+              </p>
+              <ul className="mt-3 space-y-1 text-sm text-muted-foreground">
+                <li>• Custom headlines</li>
+                <li>• Promotional badges</li>
+                <li>• Call-to-action text</li>
+              </ul>
+            </div>
           </div>
         </CardContent>
       </Card>
