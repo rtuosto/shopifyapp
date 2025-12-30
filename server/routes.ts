@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import cors from "cors";
-import { randomUUID, createHmac } from "crypto";
+import { randomUUID, createHmac, timingSafeEqual } from "crypto";
 import { storage } from "./storage";
 import { shopify, fetchProducts, updateProduct, getProductVariants, sessionStorage } from "./shopify";
 import { generateOptimizationRecommendations, generateBatchRecommendations } from "./ai-service";
@@ -1664,13 +1664,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Required for Protected Customer Data access (Level 1)
   // ============================================================
 
-  // Helper function to verify Shopify webhook HMAC
-  async function verifyShopifyWebhook(req: any, res: any): Promise<boolean> {
+  // Helper function to verify Shopify webhook HMAC using manual crypto verification
+  // This is more reliable than the Shopify library method
+  function verifyShopifyWebhookHmac(req: any): boolean {
     const hmac = req.get("X-Shopify-Hmac-Sha256");
     const shop = req.get("X-Shopify-Shop-Domain");
     
     if (!hmac || !shop) {
-      console.error('[GDPR Webhook] Missing required headers');
+      console.error('[GDPR Webhook] Missing required headers (HMAC or Shop-Domain)');
       return false;
     }
     
@@ -1680,15 +1681,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return false;
     }
     
+    const apiSecret = process.env.SHOPIFY_API_SECRET;
+    if (!apiSecret) {
+      console.error('[GDPR Webhook] SHOPIFY_API_SECRET not configured');
+      return false;
+    }
+    
     try {
-      const verified = await shopify.webhooks.validate({
-        rawBody: rawBody.toString('utf8'),
-        rawRequest: req,
-        rawResponse: res,
-      });
-      return verified;
+      // Generate HMAC using the same algorithm Shopify uses
+      const generatedHmac = createHmac('sha256', apiSecret)
+        .update(rawBody)
+        .digest('base64');
+      
+      // Constant-time comparison to prevent timing attacks
+      const valid = timingSafeEqual(
+        Buffer.from(hmac, 'base64'),
+        Buffer.from(generatedHmac, 'base64')
+      );
+      
+      if (!valid) {
+        console.error('[GDPR Webhook] HMAC verification failed - signature mismatch');
+      }
+      
+      return valid;
     } catch (error) {
-      console.error('[GDPR Webhook] HMAC verification failed:', error);
+      console.error('[GDPR Webhook] HMAC verification error:', error);
       return false;
     }
   }
@@ -1702,7 +1719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[GDPR Webhook] Received ${topic} from ${shop}`);
       
-      const verified = await verifyShopifyWebhook(req, res);
+      const verified = verifyShopifyWebhookHmac(req);
       if (!verified) {
         return res.status(401).json({ error: "Unauthorized" });
       }
@@ -1742,7 +1759,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[GDPR Webhook] Received ${topic} from ${shop}`);
       
-      const verified = await verifyShopifyWebhook(req, res);
+      const verified = verifyShopifyWebhookHmac(req);
       if (!verified) {
         return res.status(401).json({ error: "Unauthorized" });
       }
@@ -1782,7 +1799,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[GDPR Webhook] Received ${topic} from ${shopDomain}`);
       
-      const verified = await verifyShopifyWebhook(req, res);
+      const verified = verifyShopifyWebhookHmac(req);
       if (!verified) {
         return res.status(401).json({ error: "Unauthorized" });
       }
