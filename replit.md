@@ -26,6 +26,25 @@ This distinction ensures clarity in documentation, code comments, and user-facin
 - Ensure that the project adheres to Shopify's app development best practices.
 - Focus on delivering functional, well-tested features that directly impact conversion optimization.
 
+## Personas to consider 
+- Always plan and test/validate new updates considering each of the following user personas.
+- **Shopper**
+  - This is the end user who is browsing and shopping on the shopify store.
+  - If they are in an experiment variant, they should always see the same variant even across multiple sessions
+  - The variant change should never break the core shopping experience for this user
+- **Store Owner**
+  - This is the owner of the shopify store, and the user of this application.
+  - They may or may not have technical experience and our goal is to make their store perform better with minimal effort on their part.
+  - This is the customer and purchaser of our app so their positive experience is a top priority
+- **App Developer**
+  - This is you the Replit agent, and me the prompter.
+  - In the future we have have additional developers working on this app so the code must be understandable and scalable for team development.
+  - Documentation must be kept up to date
+  - Proper version control must be in place
+  - Follow best practices for CI/CO and deployment
+  - App security is a top priority - never expose secrets, security keys, or personal information to the storefront or app UI.
+
+- 
 ## System Architecture
 Shoptimizer utilizes a full-stack architecture. The frontend uses React with Shadcn UI, Wouter, and TanStack Query, integrated via Shopify App Bridge. The backend is built with Express.js and uses PostgreSQL with Drizzle ORM for multi-tenant data storage. It integrates with the Shopify Admin GraphQL API for product management and uses webhooks for conversion tracking. OpenAI's GPT-5-mini (October 2025 upgrade) powers AI-driven recommendations with enhanced reasoning and 45% fewer hallucinations.
 
