@@ -2,7 +2,8 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import crypto from 'crypto';
 
 const TEST_SHOP = 'test-gdpr-shop.myshopify.com';
-const TEST_API_SECRET = 'test-secret-for-hmac-verification';
+// Use the real secret from environment for integration tests
+const TEST_API_SECRET = process.env.SHOPIFY_API_SECRET || 'test-secret-for-hmac-verification';
 
 function generateHmac(body: string, secret: string): string {
   return crypto

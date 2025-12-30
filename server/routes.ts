@@ -1693,11 +1693,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .update(rawBody)
         .digest('base64');
       
+      // Convert to buffers for comparison
+      const providedBuffer = Buffer.from(hmac, 'base64');
+      const expectedBuffer = Buffer.from(generatedHmac, 'base64');
+      
+      // Check buffer lengths first to avoid timingSafeEqual exceptions
+      // (which happen when lengths differ and cause noisy logs)
+      if (providedBuffer.length !== expectedBuffer.length) {
+        console.error('[GDPR Webhook] HMAC verification failed - invalid signature length');
+        return false;
+      }
+      
       // Constant-time comparison to prevent timing attacks
-      const valid = timingSafeEqual(
-        Buffer.from(hmac, 'base64'),
-        Buffer.from(generatedHmac, 'base64')
-      );
+      const valid = timingSafeEqual(providedBuffer, expectedBuffer);
       
       if (!valid) {
         console.error('[GDPR Webhook] HMAC verification failed - signature mismatch');
