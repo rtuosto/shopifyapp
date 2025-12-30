@@ -1,5 +1,21 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+// Get shop parameter from current URL
+function getShopParam(): string | null {
+  if (typeof window === 'undefined') return null;
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get('shop');
+}
+
+// Add shop parameter to URL if it exists in the current page URL
+function addShopToUrl(url: string): string {
+  const shop = getShopParam();
+  if (!shop) return url;
+  
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}shop=${encodeURIComponent(shop)}`;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     try {
@@ -19,7 +35,8 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  const fullUrl = addShopToUrl(url);
+  const res = await fetch(fullUrl, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
@@ -36,7 +53,9 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const baseUrl = queryKey.join("/") as string;
+    const fullUrl = addShopToUrl(baseUrl);
+    const res = await fetch(fullUrl, {
       credentials: "include",
     });
 
