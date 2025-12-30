@@ -1,28 +1,32 @@
-import { 
-  type Product, 
-  type InsertProduct,
-  type Recommendation,
-  type InsertRecommendation,
-  type Optimization,
-  type InsertOptimization,
-  type Metric,
-  type InsertMetric,
-  type SessionAssignment,
-  type InsertSessionAssignment,
-  type OptimizationImpression,
-  type InsertOptimizationImpression,
-  type OptimizationConversion,
-  type InsertOptimizationConversion,
-  type OptimizationEvolutionSnapshot,
-  type InsertOptimizationEvolutionSnapshot,
-  type Shop,
-  type InsertShop,
-  type PreviewSession,
-  type InsertPreviewSession,
-  type ThemePositioningRules,
-  type InsertThemePositioningRules,
-  type EditorSession,
-  type InsertEditorSession,
+import type { 
+  Product, 
+  InsertProduct,
+  Recommendation,
+  InsertRecommendation,
+  Optimization,
+  InsertOptimization,
+  Metric,
+  InsertMetric,
+  SessionAssignment,
+  InsertSessionAssignment,
+  OptimizationImpression,
+  InsertOptimizationImpression,
+  OptimizationConversion,
+  InsertOptimizationConversion,
+  OptimizationEvolutionSnapshot,
+  InsertOptimizationEvolutionSnapshot,
+  Shop,
+  InsertShop,
+  PreviewSession,
+  InsertPreviewSession,
+  ThemePositioningRules,
+  InsertThemePositioningRules,
+  EditorSession,
+  InsertEditorSession,
+  SlotExperiment,
+  InsertSlotExperiment,
+  ExperimentEvent,
+  InsertExperimentEvent,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -96,6 +100,18 @@ export interface IStorage {
   updateEditorSessionHeartbeat(token: string): Promise<EditorSession | undefined>;
   deleteEditorSession(token: string): Promise<boolean>;
   cleanupExpiredEditorSessions(): Promise<number>;
+
+  // Slot Experiments (Theme App Extension based)
+  getSlotExperiment(shop: string, id: string): Promise<SlotExperiment | undefined>;
+  getSlotExperiments(shop: string, status?: string): Promise<SlotExperiment[]>;
+  getLiveSlotExperiments(shop: string): Promise<SlotExperiment[]>;
+  createSlotExperiment(shop: string, experiment: InsertSlotExperiment): Promise<SlotExperiment>;
+  updateSlotExperiment(shop: string, id: string, experiment: Partial<InsertSlotExperiment>): Promise<SlotExperiment | undefined>;
+  deleteSlotExperiment(shop: string, id: string): Promise<boolean>;
+
+  // Experiment Events (App Proxy event tracking)
+  createExperimentEvent(shop: string, event: InsertExperimentEvent): Promise<ExperimentEvent>;
+  getExperimentEvents(experimentId: string, limit?: number): Promise<ExperimentEvent[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -694,6 +710,112 @@ export class MemStorage implements IStorage {
       console.log(`[MemStorage] Cleaned up ${deleted} expired preview session(s)`);
     }
     return deleted;
+  }
+
+  // Theme Positioning Rules (not persisted in MemStorage)
+  async getThemePositioningRules(shop: string): Promise<ThemePositioningRules | undefined> {
+    console.warn("[MemStorage] Theme positioning rules not persisted in memory - upgrade to DbStorage");
+    return undefined;
+  }
+
+  async createOrUpdateThemePositioningRules(shop: string, rules: InsertThemePositioningRules): Promise<ThemePositioningRules> {
+    console.warn("[MemStorage] Theme positioning rules not persisted in memory - upgrade to DbStorage");
+    return {
+      ...rules,
+      id: randomUUID(),
+      shop,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as ThemePositioningRules;
+  }
+
+  async deleteThemePositioningRules(shop: string): Promise<boolean> {
+    console.warn("[MemStorage] Theme positioning rules not persisted in memory - upgrade to DbStorage");
+    return false;
+  }
+
+  // Editor Sessions (not persisted in MemStorage)
+  async createEditorSession(shop: string, session: InsertEditorSession): Promise<EditorSession> {
+    console.warn("[MemStorage] Editor sessions not persisted in memory - upgrade to DbStorage");
+    return {
+      ...session,
+      id: randomUUID(),
+      shop,
+      createdAt: new Date(),
+    } as EditorSession;
+  }
+
+  async getEditorSession(token: string): Promise<EditorSession | undefined> {
+    console.warn("[MemStorage] Editor sessions not persisted in memory - upgrade to DbStorage");
+    return undefined;
+  }
+
+  async updateEditorSessionHeartbeat(token: string): Promise<EditorSession | undefined> {
+    console.warn("[MemStorage] Editor sessions not persisted in memory - upgrade to DbStorage");
+    return undefined;
+  }
+
+  async deleteEditorSession(token: string): Promise<boolean> {
+    console.warn("[MemStorage] Editor sessions not persisted in memory - upgrade to DbStorage");
+    return false;
+  }
+
+  async cleanupExpiredEditorSessions(): Promise<number> {
+    console.warn("[MemStorage] Editor sessions not persisted in memory - upgrade to DbStorage");
+    return 0;
+  }
+
+  // Slot Experiments (not persisted in MemStorage)
+  async getSlotExperiment(shop: string, id: string): Promise<SlotExperiment | undefined> {
+    console.warn("[MemStorage] Slot experiments not persisted in memory - upgrade to DbStorage");
+    return undefined;
+  }
+
+  async getSlotExperiments(shop: string, status?: string): Promise<SlotExperiment[]> {
+    console.warn("[MemStorage] Slot experiments not persisted in memory - upgrade to DbStorage");
+    return [];
+  }
+
+  async getLiveSlotExperiments(shop: string): Promise<SlotExperiment[]> {
+    console.warn("[MemStorage] Slot experiments not persisted in memory - upgrade to DbStorage");
+    return [];
+  }
+
+  async createSlotExperiment(shop: string, experiment: InsertSlotExperiment): Promise<SlotExperiment> {
+    console.warn("[MemStorage] Slot experiments not persisted in memory - upgrade to DbStorage");
+    return {
+      ...experiment,
+      id: randomUUID(),
+      shop,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as SlotExperiment;
+  }
+
+  async updateSlotExperiment(shop: string, id: string, experiment: Partial<InsertSlotExperiment>): Promise<SlotExperiment | undefined> {
+    console.warn("[MemStorage] Slot experiments not persisted in memory - upgrade to DbStorage");
+    return undefined;
+  }
+
+  async deleteSlotExperiment(shop: string, id: string): Promise<boolean> {
+    console.warn("[MemStorage] Slot experiments not persisted in memory - upgrade to DbStorage");
+    return false;
+  }
+
+  // Experiment Events (not persisted in MemStorage)
+  async createExperimentEvent(shop: string, event: InsertExperimentEvent): Promise<ExperimentEvent> {
+    console.warn("[MemStorage] Experiment events not persisted in memory - upgrade to DbStorage");
+    return {
+      ...event,
+      id: randomUUID(),
+      shop,
+      createdAt: new Date(),
+    } as ExperimentEvent;
+  }
+
+  async getExperimentEvents(experimentId: string, limit?: number): Promise<ExperimentEvent[]> {
+    console.warn("[MemStorage] Experiment events not persisted in memory - upgrade to DbStorage");
+    return [];
   }
 }
 

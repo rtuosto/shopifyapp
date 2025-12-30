@@ -1,0 +1,15 @@
+{{ 'runtime.js' | asset_url | script_tag }}
+
+{% schema %}
+{
+  "name": "CRO Runtime",
+  "target": "body",
+  "javascript": "runtime.js",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "This embed loads the CRO optimization runtime across your entire store. Enable it to run A/B experiments."
+    }
+  ]
+}
+{% endschema %}

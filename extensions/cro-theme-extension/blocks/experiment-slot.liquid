@@ -1,0 +1,45 @@
+<div 
+  id="cro-slot-{{ block.id }}" 
+  class="cro-experiment-slot"
+  data-cro-slot="{{ block.settings.slot_id }}"
+  data-cro-block-id="{{ block.id }}"
+  data-shop="{{ shop.permanent_domain }}"
+>
+  <noscript>
+    {{ block.settings.fallback_content }}
+  </noscript>
+</div>
+
+{% schema %}
+{
+  "name": "Experiment Slot",
+  "target": "section",
+  "settings": [
+    {
+      "type": "select",
+      "id": "slot_id",
+      "label": "Slot Type",
+      "default": "pdp",
+      "options": [
+        { "value": "pdp", "label": "Product Page (PDP)" },
+        { "value": "home", "label": "Home Page" },
+        { "value": "collection", "label": "Collection Page" }
+      ],
+      "info": "Choose which type of experiment this slot will display."
+    },
+    {
+      "type": "textarea",
+      "id": "fallback_content",
+      "label": "Fallback Content",
+      "default": "",
+      "info": "Optional content to show if JavaScript is disabled or experiment fails to load."
+    }
+  ],
+  "presets": [
+    {
+      "name": "CRO Experiment Slot",
+      "category": "A/B Testing"
+    }
+  ]
+}
+{% endschema %}

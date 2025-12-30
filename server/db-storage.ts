@@ -13,6 +13,8 @@ import {
   previewSessions,
   themePositioningRules,
   editorSessions,
+  slotExperiments,
+  experimentEvents,
   type Product,
   type InsertProduct,
   type Recommendation,
@@ -37,6 +39,10 @@ import {
   type InsertThemePositioningRules,
   type EditorSession,
   type InsertEditorSession,
+  type SlotExperiment,
+  type InsertSlotExperiment,
+  type ExperimentEvent,
+  type InsertExperimentEvent,
 } from "@shared/schema";
 import type { IStorage } from "./storage";
 
@@ -431,6 +437,77 @@ export class DbStorage implements IStorage {
       console.log(`[DbStorage] Cleaned up ${deleted} expired editor session(s)`);
     }
     return deleted;
+  }
+
+  // Slot Experiments (Theme App Extension based)
+  async getSlotExperiment(shop: string, id: string): Promise<SlotExperiment | undefined> {
+    const result = await db.select().from(slotExperiments)
+      .where(and(eq(slotExperiments.shop, shop), eq(slotExperiments.id, id)))
+      .limit(1);
+    return result[0];
+  }
+
+  async getSlotExperiments(shop: string, status?: string): Promise<SlotExperiment[]> {
+    if (status) {
+      return await db.select().from(slotExperiments)
+        .where(and(eq(slotExperiments.shop, shop), eq(slotExperiments.status, status)))
+        .orderBy(desc(slotExperiments.createdAt));
+    }
+    return await db.select().from(slotExperiments)
+      .where(eq(slotExperiments.shop, shop))
+      .orderBy(desc(slotExperiments.createdAt));
+  }
+
+  async getLiveSlotExperiments(shop: string): Promise<SlotExperiment[]> {
+    return await db.select().from(slotExperiments)
+      .where(and(eq(slotExperiments.shop, shop), eq(slotExperiments.status, 'LIVE')));
+  }
+
+  async createSlotExperiment(shop: string, experiment: InsertSlotExperiment): Promise<SlotExperiment> {
+    const values = {
+      ...experiment,
+      shop,
+      variantA: experiment.variantA as any,
+      variantB: experiment.variantB as any,
+    };
+    const [result] = await db.insert(slotExperiments).values(values).returning();
+    return result;
+  }
+
+  async updateSlotExperiment(shop: string, id: string, experiment: Partial<InsertSlotExperiment>): Promise<SlotExperiment | undefined> {
+    const updates: Record<string, any> = { ...experiment, updatedAt: new Date() };
+    if (experiment.variantA) updates.variantA = experiment.variantA as any;
+    if (experiment.variantB) updates.variantB = experiment.variantB as any;
+    
+    const [result] = await db.update(slotExperiments)
+      .set(updates)
+      .where(and(eq(slotExperiments.shop, shop), eq(slotExperiments.id, id)))
+      .returning();
+    return result;
+  }
+
+  async deleteSlotExperiment(shop: string, id: string): Promise<boolean> {
+    const result = await db.delete(slotExperiments)
+      .where(and(eq(slotExperiments.shop, shop), eq(slotExperiments.id, id)))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Experiment Events (App Proxy event tracking)
+  async createExperimentEvent(shop: string, event: InsertExperimentEvent): Promise<ExperimentEvent> {
+    const [result] = await db.insert(experimentEvents).values({ ...event, shop }).returning();
+    return result;
+  }
+
+  async getExperimentEvents(experimentId: string, limit?: number): Promise<ExperimentEvent[]> {
+    const query = db.select().from(experimentEvents)
+      .where(eq(experimentEvents.experimentId, experimentId))
+      .orderBy(desc(experimentEvents.createdAt));
+    
+    if (limit) {
+      return await query.limit(limit);
+    }
+    return await query;
   }
 }
 

@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import cors from "cors";
-import { randomUUID } from "crypto";
+import { randomUUID, createHmac } from "crypto";
 import { storage } from "./storage";
 import { shopify, fetchProducts, updateProduct, getProductVariants, sessionStorage } from "./shopify";
 import { generateOptimizationRecommendations, generateBatchRecommendations } from "./ai-service";
@@ -87,6 +87,201 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Apply CORS to all storefront endpoints
   app.use('/api/storefront', storefrontCors);
   app.options('/api/storefront/*', storefrontCors); // Handle preflight requests
+
+  // App Proxy endpoints for Theme App Extension runtime
+  // These are called from the storefront via Shopify App Proxy
+  app.use('/apps/cro-proxy', storefrontCors);
+  app.options('/apps/cro-proxy/*', storefrontCors);
+
+  // Shopify App Proxy HMAC validation helper
+  // Validates requests coming through Shopify's App Proxy
+  function validateAppProxySignature(query: Record<string, any>): { valid: boolean; shop: string | null } {
+    const signature = query.signature as string;
+    if (!signature) {
+      // In development mode, allow requests without signature
+      if (process.env.NODE_ENV === 'development' && query.shop) {
+        console.log('[App Proxy] Dev mode: skipping HMAC validation');
+        return { valid: true, shop: query.shop as string };
+      }
+      return { valid: false, shop: null };
+    }
+
+    const apiSecret = process.env.SHOPIFY_API_SECRET;
+    if (!apiSecret) {
+      console.error('[App Proxy] SHOPIFY_API_SECRET not configured');
+      return { valid: false, shop: null };
+    }
+
+    // Build sorted query string (excluding signature)
+    const sortedParams = Object.keys(query)
+      .filter(key => key !== 'signature')
+      .sort()
+      .map(key => `${key}=${Array.isArray(query[key]) ? query[key].join(',') : query[key]}`)
+      .join('');
+
+    // Compute HMAC
+    const computedSignature = createHmac('sha256', apiSecret)
+      .update(sortedParams)
+      .digest('hex');
+
+    if (computedSignature === signature) {
+      return { valid: true, shop: query.shop as string };
+    }
+
+    console.warn('[App Proxy] HMAC validation failed');
+    return { valid: false, shop: null };
+  }
+
+  // App Proxy: Get experiment configuration for storefront
+  app.get("/apps/cro-proxy/config", async (req, res) => {
+    try {
+      // Validate App Proxy signature
+      const { valid, shop } = validateAppProxySignature(req.query as Record<string, any>);
+      
+      if (!valid || !shop) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      console.log(`[App Proxy] Config request for shop: ${shop}`);
+      
+      // Get all LIVE slot experiments for this shop
+      const experiments = await storage.getLiveSlotExperiments(shop);
+      
+      // Transform to config format for runtime.js
+      const config = experiments.map(exp => ({
+        id: exp.id,
+        name: exp.name,
+        slot_id: exp.slotId,
+        status: exp.status,
+        allocation: parseFloat(exp.allocation || "0.50"),
+        variants: {
+          A: exp.variantA,
+          B: exp.variantB,
+        },
+      }));
+
+      console.log(`[App Proxy] Returning ${config.length} experiments for ${shop}`);
+      
+      res.json({ 
+        experiments: config,
+        timestamp: Date.now(),
+      });
+    } catch (error: any) {
+      console.error("[App Proxy] Config error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // App Proxy: Track experiment event from storefront
+  // Security layers:
+  // 1. HMAC validation on query params (Shopify App Proxy standard)
+  // 2. Experiment must exist for the authenticated shop
+  // 3. Variant must be valid (A or B)
+  // 4. Event type must be from allowed list
+  // Note: Shopify App Proxy only signs query params, not POST body.
+  // Additional protection comes from experiment-shop binding.
+  app.post("/apps/cro-proxy/event", async (req, res) => {
+    try {
+      // Validate App Proxy signature
+      const { valid, shop } = validateAppProxySignature(req.query as Record<string, any>);
+      
+      if (!valid || !shop) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { 
+        experiment_id, 
+        variant, 
+        event_type, 
+        cro_vid, 
+        path,
+        revenue,
+        timestamp,
+        ...metadata 
+      } = req.body;
+
+      if (!experiment_id || !variant || !event_type || !cro_vid) {
+        return res.status(400).json({ 
+          error: "Missing required fields: experiment_id, variant, event_type, cro_vid" 
+        });
+      }
+
+      // Validate event type (whitelist allowed types)
+      const allowedEventTypes = ['slot_view', 'add_to_cart', 'purchase'];
+      if (!allowedEventTypes.includes(event_type)) {
+        return res.status(400).json({ error: "Invalid event type" });
+      }
+
+      // Optional: Validate timestamp is within acceptable range (prevent very old replays)
+      if (timestamp) {
+        const eventTime = new Date(timestamp);
+        const now = Date.now();
+        const maxAge = 5 * 60 * 1000; // 5 minutes
+        if (now - eventTime.getTime() > maxAge) {
+          console.warn(`[App Proxy] Event rejected: timestamp too old`);
+          return res.status(400).json({ error: "Stale event" });
+        }
+      }
+
+      console.log(`[App Proxy] Event: ${event_type} for experiment ${experiment_id}, variant ${variant}`);
+
+      // Validate experiment exists for this shop (prevents cross-shop spoofing)
+      const experiment = await storage.getSlotExperiment(shop, experiment_id);
+      if (!experiment) {
+        console.warn(`[App Proxy] Event rejected: experiment ${experiment_id} not found for shop ${shop}`);
+        return res.status(404).json({ error: "Experiment not found" });
+      }
+
+      // Validate variant is valid
+      if (variant !== 'A' && variant !== 'B') {
+        return res.status(400).json({ error: "Invalid variant" });
+      }
+
+      // Create event record
+      await storage.createExperimentEvent(shop, {
+        experimentId: experiment_id,
+        visitorId: cro_vid,
+        variant,
+        eventType: event_type,
+        path,
+        metadata,
+        revenue: revenue ? revenue.toString() : null,
+      });
+
+      // Update experiment metrics
+      const updates: Record<string, any> = {};
+      
+      if (event_type === 'slot_view') {
+        if (variant === 'A') {
+          updates.viewsA = (experiment.viewsA || 0) + 1;
+        } else if (variant === 'B') {
+          updates.viewsB = (experiment.viewsB || 0) + 1;
+        }
+      } else if (event_type === 'purchase' || event_type === 'add_to_cart') {
+        if (variant === 'A') {
+          updates.conversionsA = (experiment.conversionsA || 0) + 1;
+          if (revenue) {
+            updates.revenueA = parseFloat(experiment.revenueA || "0") + parseFloat(revenue);
+          }
+        } else if (variant === 'B') {
+          updates.conversionsB = (experiment.conversionsB || 0) + 1;
+          if (revenue) {
+            updates.revenueB = parseFloat(experiment.revenueB || "0") + parseFloat(revenue);
+          }
+        }
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await storage.updateSlotExperiment(shop, experiment_id, updates);
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[App Proxy] Event tracking error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Health check
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });

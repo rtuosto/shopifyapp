@@ -382,3 +382,86 @@ export const insertEditorSessionSchema = createInsertSchema(editorSessions).omit
 
 export type InsertEditorSession = z.infer<typeof insertEditorSessionSchema>;
 export type EditorSession = typeof editorSessions.$inferSelect;
+
+// Slot-based Experiments table - Theme App Extension compliant experiments (multi-tenant)
+// These experiments render content inside owned App Block slots, not DOM manipulation
+export const slotExperiments = pgTable("slot_experiments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shop: varchar("shop").notNull().default("default-shop"), // Shopify store identifier
+  
+  // Experiment configuration
+  name: text("name").notNull(), // Human-readable experiment name
+  slotId: text("slot_id").notNull().default("pdp"), // "pdp" | "home" | "collection"
+  status: text("status").notNull().default("DRAFT"), // "DRAFT" | "LIVE" | "PAUSED" | "COMPLETED"
+  allocation: decimal("allocation", { precision: 3, scale: 2 }).default("0.50"), // 0.00 to 1.00, percentage for variant B
+  
+  // Variant content (rendered into slot)
+  variantA: jsonb("variant_a").$type<{
+    html?: string;
+    text?: string;
+    styles?: string;
+    display?: string;
+  }>().notNull().default(sql`'{}'::jsonb`), // Control content
+  variantB: jsonb("variant_b").$type<{
+    html?: string;
+    text?: string;
+    styles?: string;
+    display?: string;
+  }>().notNull().default(sql`'{}'::jsonb`), // Variant content
+  
+  // Optional: Link to product (for product-specific experiments)
+  productId: varchar("product_id").references(() => products.id, { onDelete: "cascade" }),
+  
+  // Metrics (aggregated from events)
+  viewsA: integer("views_a").default(0),
+  viewsB: integer("views_b").default(0),
+  conversionsA: integer("conversions_a").default(0),
+  conversionsB: integer("conversions_b").default(0),
+  revenueA: decimal("revenue_a", { precision: 10, scale: 2 }).default("0"),
+  revenueB: decimal("revenue_b", { precision: 10, scale: 2 }).default("0"),
+  
+  // Metadata
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertSlotExperimentSchema = createInsertSchema(slotExperiments).omit({
+  id: true,
+  shop: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSlotExperiment = z.infer<typeof insertSlotExperimentSchema>;
+export type SlotExperiment = typeof slotExperiments.$inferSelect;
+
+// Experiment Events table - Tracks all events from the storefront runtime (multi-tenant)
+// Used for slot_view, add_to_cart, purchase events via App Proxy
+export const experimentEvents = pgTable("experiment_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shop: varchar("shop").notNull().default("default-shop"), // Shopify store identifier
+  
+  // Event data
+  experimentId: varchar("experiment_id").notNull(), // Links to slotExperiments.id
+  visitorId: varchar("visitor_id").notNull(), // cro_vid from browser
+  variant: text("variant").notNull(), // "A" | "B"
+  eventType: text("event_type").notNull(), // "slot_view" | "add_to_cart" | "purchase"
+  path: text("path"), // Page path where event occurred
+  
+  // Optional metadata
+  metadata: jsonb("metadata").$type<Record<string, any>>().default(sql`'{}'::jsonb`),
+  revenue: decimal("revenue", { precision: 10, scale: 2 }), // Only for purchase events
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertExperimentEventSchema = createInsertSchema(experimentEvents).omit({
+  id: true,
+  shop: true,
+  createdAt: true,
+});
+
+export type InsertExperimentEvent = z.infer<typeof insertExperimentEventSchema>;
+export type ExperimentEvent = typeof experimentEvents.$inferSelect;

@@ -1,0 +1,15 @@
+{
+  "app_name": "CRO Optimizer",
+  "cro_runtime": {
+    "name": "CRO Runtime",
+    "description": "Enables A/B testing experiments on your storefront"
+  },
+  "experiment_slot": {
+    "name": "Experiment Slot",
+    "slot_type": "Slot Type",
+    "slot_type_pdp": "Product Page (PDP)",
+    "slot_type_home": "Home Page",
+    "slot_type_collection": "Collection Page",
+    "fallback_content": "Fallback Content"
+  }
+}

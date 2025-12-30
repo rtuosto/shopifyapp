@@ -54,6 +54,13 @@ Shoptimizer utilizes a full-stack architecture. The frontend uses React with Sha
 - **CORS Configuration**: Public SDK endpoints are configured with CORS headers for cross-origin requests.
 - **Theme Positioning System (Preview Enhancement)**: Implements a template clone strategy to learn theme-specific DOM positioning rules for accurate preview rendering. Creates hidden draft products with all fields populated, analyzes storefront HTML with Cheerio to extract positioning rules, and caches them per theme. SDK preview mode fetches and applies these rules for better positioning accuracy. **Current Status**: Foundation implemented (database schema, clone creation, HTML parsing, rule caching, SDK integration). **Known Limitation**: Selectors may fail on hydrated storefronts; system falls back to heuristics. **Recommended Improvements**: (1) Use sibling-relative positioning instead of absolute selectors, (2) Verify selectors post-extraction, (3) Add theme-specific automated tests.
 - **UI/UX**: Utilizes Shadcn UI components and Tailwind CSS for an embedded Shopify app experience.
+- **Theme App Extension Architecture**: Implements Shopify App Store compliant A/B testing using Theme App Extensions instead of DOM manipulation:
+  - **App Embed (cro-embed.liquid)**: Loads the lightweight runtime.js across the entire storefront site-wide
+  - **App Block (experiment-slot.liquid)**: Creates owned containers where experiment variants render. Merchants place these blocks in their theme's product pages
+  - **runtime.js**: Lightweight (~5KB) script that handles visitor ID generation (cro_vid), deterministic bucketing via hash, config fetching from App Proxy, and slot rendering. ONLY renders content inside owned App Block containers - never manipulates theme DOM
+  - **App Proxy Endpoints**: `/apps/cro-proxy/config` returns LIVE experiments for the shop, `/apps/cro-proxy/event` tracks slot_view, add_to_cart, and purchase events
+  - **Database Tables**: `slot_experiments` stores slot-based experiment configs (DRAFT/LIVE/PAUSED status, variantA/B content, allocation), `experiment_events` logs all storefront events for analytics
+  - **Key Benefit**: Content renders ONLY inside owned slots, achieving full App Store compliance while maintaining robust A/B testing capabilities
 
 ## External Dependencies
 - **Shopify Admin GraphQL API v12**: For store data interaction (products, orders).
