@@ -393,7 +393,7 @@ export default function AIRecommendations() {
         return text.replace(/[&<>"']/g, (char) => htmlEscapes[char] || char);
       };
 
-      // Render the preview directly in the popup window
+      // Render the preview with tabbed interface (Comparison + Storefront Preview)
       previewWindow.document.open();
       previewWindow.document.write(`
         <!DOCTYPE html>
@@ -409,32 +409,59 @@ export default function AIRecommendations() {
               background: #f4f6f8;
               color: #1a1a1a;
               line-height: 1.5;
+              height: 100vh;
+              display: flex;
+              flex-direction: column;
             }
             .header {
               background: linear-gradient(135deg, #5C6AC4 0%, #3b4199 100%);
               color: white;
-              padding: 24px 40px;
+              padding: 16px 24px;
               display: flex;
               justify-content: space-between;
               align-items: center;
+              flex-shrink: 0;
             }
-            .header h1 { font-size: 24px; font-weight: 600; }
+            .header h1 { font-size: 20px; font-weight: 600; }
             .header-actions { display: flex; gap: 12px; }
             .btn {
-              padding: 10px 20px;
-              border-radius: 8px;
+              padding: 8px 16px;
+              border-radius: 6px;
               font-size: 14px;
               font-weight: 500;
               cursor: pointer;
               border: none;
               transition: all 0.2s;
+              text-decoration: none;
+              display: inline-block;
             }
             .btn-secondary { background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); }
             .btn-secondary:hover { background: rgba(255,255,255,0.3); }
             .btn-primary { background: white; color: #5C6AC4; }
             .btn-primary:hover { background: #f0f0f0; }
-            .container { max-width: 1400px; margin: 0 auto; padding: 32px; }
-            .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+            .tabs {
+              display: flex;
+              background: white;
+              border-bottom: 1px solid #e0e0e0;
+              flex-shrink: 0;
+            }
+            .tab {
+              padding: 12px 24px;
+              cursor: pointer;
+              border: none;
+              background: none;
+              font-size: 14px;
+              font-weight: 500;
+              color: #666;
+              border-bottom: 2px solid transparent;
+              transition: all 0.2s;
+            }
+            .tab:hover { color: #5C6AC4; }
+            .tab.active { color: #5C6AC4; border-bottom-color: #5C6AC4; }
+            .tab-content { display: none; flex: 1; overflow: hidden; }
+            .tab-content.active { display: flex; flex-direction: column; }
+            .container { max-width: 1400px; margin: 0 auto; padding: 24px; overflow: auto; flex: 1; }
+            .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
             @media (max-width: 900px) { .comparison { grid-template-columns: 1fr; } }
             .card {
               background: white;
@@ -469,67 +496,260 @@ export default function AIRecommendations() {
             .field-value.price { font-size: 24px; font-weight: 700; color: #2e7d32; }
             .field-value.description { color: #444; white-space: pre-wrap; }
             .changed { background: #fff3cd; padding: 4px 8px; border-radius: 4px; }
+            .storefront-container { flex: 1; display: flex; flex-direction: column; background: #f0f0f0; }
+            .storefront-notice {
+              background: #fff3cd;
+              border: 1px solid #ffc107;
+              border-radius: 8px;
+              padding: 12px 16px;
+              margin: 16px;
+              display: flex;
+              align-items: center;
+              gap: 12px;
+            }
+            .storefront-notice-icon { font-size: 20px; }
+            .storefront-notice-text { font-size: 14px; color: #856404; }
+            .storefront-iframe {
+              flex: 1;
+              border: none;
+              background: white;
+            }
+            .loading-overlay {
+              position: absolute;
+              top: 0;
+              left: 0;
+              right: 0;
+              bottom: 0;
+              background: rgba(255,255,255,0.9);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              flex-direction: column;
+            }
+            .spinner {
+              border: 4px solid #e0e0e0;
+              border-top: 4px solid #5C6AC4;
+              border-radius: 50%;
+              width: 40px;
+              height: 40px;
+              animation: spin 1s linear infinite;
+            }
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
           </style>
         </head>
         <body>
           <div class="header">
             <h1>Preview Changes</h1>
             <div class="header-actions">
-              ${storefrontUrl ? `<a class="btn btn-secondary" href="${escapeHtml(storefrontUrl)}" target="_blank" rel="noopener">View on Storefront</a>` : ''}
               <button class="btn btn-secondary" onclick="window.close()">Close</button>
               <button class="btn btn-primary" onclick="approveAndClose()">Launch Optimization</button>
             </div>
           </div>
+          <div class="tabs">
+            <button class="tab active" data-tab="comparison">Side-by-Side Comparison</button>
+            <button class="tab" data-tab="storefront">Storefront Preview</button>
+          </div>
+          <div id="comparison" class="tab-content active">
+            <div class="container">
+              <div class="comparison">
+                <div class="card">
+                  <div class="card-header control">
+                    <span class="badge badge-control">Current (Control)</span>
+                  </div>
+                  <div class="card-content">
+                    <div class="field">
+                      <div class="field-label">Title</div>
+                      <div class="field-value title">${escapeHtml(control.title)}</div>
+                    </div>
+                    <div class="field">
+                      <div class="field-label">Price</div>
+                      <div class="field-value price">$${parseFloat(control.price || '0').toFixed(2)}</div>
+                    </div>
+                    <div class="field">
+                      <div class="field-label">Description</div>
+                      <div class="field-value description">${escapeHtml(control.description) || '(No description)'}</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-header variant">
+                    <span class="badge badge-variant">Proposed (Variant)</span>
+                  </div>
+                  <div class="card-content">
+                    <div class="field">
+                      <div class="field-label">Title</div>
+                      <div class="field-value title ${changes.includes('title') ? 'changed' : ''}">${escapeHtml(variant.title)}</div>
+                    </div>
+                    <div class="field">
+                      <div class="field-label">Price</div>
+                      <div class="field-value price ${changes.includes('price') ? 'changed' : ''}">$${parseFloat(variant.price || '0').toFixed(2)}</div>
+                    </div>
+                    <div class="field">
+                      <div class="field-label">Description</div>
+                      <div class="field-value description ${changes.includes('description') ? 'changed' : ''}">${escapeHtml(variant.description) || '(No description)'}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="storefront" class="tab-content">
+            <div class="storefront-container" style="position: relative;">
+              <div class="storefront-notice">
+                <span class="storefront-notice-icon">ℹ️</span>
+                <span class="storefront-notice-text">This preview simulates how your changes will look. The actual product isn't modified until you launch the optimization.</span>
+              </div>
+              <div id="iframe-loading" class="loading-overlay">
+                <div class="spinner"></div>
+                <p style="margin-top: 16px; color: #666;">Loading storefront preview...</p>
+              </div>
+              <iframe 
+                id="storefront-iframe" 
+                class="storefront-iframe"
+                sandbox="allow-same-origin allow-scripts"
+                style="opacity: 0; transition: opacity 0.3s;"
+              ></iframe>
+            </div>
+          </div>
           <script>
+            const variantData = {
+              title: ${JSON.stringify(variant.title || '')},
+              price: ${JSON.stringify(variant.price || '')},
+              description: ${JSON.stringify(variant.description || '')},
+              changes: ${JSON.stringify(changes)}
+            };
+            const storefrontUrl = ${JSON.stringify(storefrontUrl)};
+            let iframeLoaded = false;
+
             function approveAndClose() {
               if (window.opener) {
                 window.opener.postMessage({ type: 'shoptimizer-preview-complete', approved: true }, '*');
               }
               window.close();
             }
+
+            // Tab switching
+            document.querySelectorAll('.tab').forEach(tab => {
+              tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+                
+                // Load iframe on first storefront tab click
+                if (tab.dataset.tab === 'storefront' && !iframeLoaded && storefrontUrl) {
+                  loadStorefrontPreview();
+                }
+              });
+            });
+
+            function loadStorefrontPreview() {
+              if (!storefrontUrl) return;
+              iframeLoaded = true;
+              
+              const iframe = document.getElementById('storefront-iframe');
+              const loading = document.getElementById('iframe-loading');
+              
+              // Use server-side proxy to fetch page (avoids CORS)
+              const previewToken = ${JSON.stringify(data.token)};
+              const proxyUrl = '/api/preview/proxy/' + previewToken;
+              fetch(proxyUrl)
+                .then(res => res.text())
+                .then(html => {
+                  // Parse and modify the HTML
+                  const parser = new DOMParser();
+                  const doc = parser.parseFromString(html, 'text/html');
+                  
+                  // Inject modifications for title
+                  if (variantData.changes.includes('title') && variantData.title) {
+                    // Try common Shopify title selectors
+                    const titleSelectors = [
+                      'h1.product__title',
+                      'h1.product-title', 
+                      '.product__title h1',
+                      '.product-single__title',
+                      'h1[data-product-title]',
+                      '.product h1',
+                      'h1'
+                    ];
+                    for (const sel of titleSelectors) {
+                      const el = doc.querySelector(sel);
+                      if (el && el.textContent.trim()) {
+                        el.innerHTML = variantData.title + ' <span style="background:#c8e6c9;color:#2e7d32;font-size:12px;padding:2px 6px;border-radius:4px;margin-left:8px;">PREVIEW</span>';
+                        break;
+                      }
+                    }
+                  }
+                  
+                  // Inject modifications for price
+                  if (variantData.changes.includes('price') && variantData.price) {
+                    const priceSelectors = [
+                      '.product__price .price-item--regular',
+                      '.product__price .money',
+                      '.product-price .money',
+                      '.price__regular .price-item',
+                      '[data-product-price]',
+                      '.product-single__price',
+                      '.price .money'
+                    ];
+                    const formattedPrice = '$' + parseFloat(variantData.price).toFixed(2);
+                    for (const sel of priceSelectors) {
+                      const els = doc.querySelectorAll(sel);
+                      els.forEach(el => {
+                        if (el.textContent.includes('$')) {
+                          el.innerHTML = formattedPrice + ' <span style="background:#c8e6c9;color:#2e7d32;font-size:10px;padding:1px 4px;border-radius:3px;">PREVIEW</span>';
+                        }
+                      });
+                      if (els.length) break;
+                    }
+                  }
+                  
+                  // Inject modifications for description
+                  if (variantData.changes.includes('description') && variantData.description) {
+                    const descSelectors = [
+                      '.product__description',
+                      '.product-single__description',
+                      '.product-description',
+                      '[data-product-description]',
+                      '.rte'
+                    ];
+                    for (const sel of descSelectors) {
+                      const el = doc.querySelector(sel);
+                      if (el) {
+                        el.innerHTML = '<div style="border-left:3px solid #4caf50;padding-left:12px;background:#f1f8e9;padding:12px;border-radius:4px;margin-bottom:8px;"><span style="background:#c8e6c9;color:#2e7d32;font-size:10px;padding:1px 4px;border-radius:3px;margin-bottom:8px;display:inline-block;">PREVIEW</span><br>' + variantData.description.replace(/\\n/g, '<br>') + '</div>';
+                        break;
+                      }
+                    }
+                  }
+                  
+                  // Add base tag to fix relative URLs
+                  const base = doc.createElement('base');
+                  base.href = storefrontUrl;
+                  doc.head.insertBefore(base, doc.head.firstChild);
+                  
+                  // Add preview banner at top
+                  const banner = doc.createElement('div');
+                  banner.style.cssText = 'background:linear-gradient(135deg,#5C6AC4,#3b4199);color:white;padding:12px 20px;text-align:center;font-family:system-ui;font-size:14px;position:sticky;top:0;z-index:99999;';
+                  banner.innerHTML = '🔍 <strong>Preview Mode</strong> - Changes shown below are simulated and not yet live';
+                  doc.body.insertBefore(banner, doc.body.firstChild);
+                  
+                  // Write to iframe
+                  iframe.srcdoc = doc.documentElement.outerHTML;
+                  
+                  iframe.onload = () => {
+                    loading.style.display = 'none';
+                    iframe.style.opacity = '1';
+                  };
+                })
+                .catch(err => {
+                  console.error('Failed to load storefront:', err);
+                  loading.innerHTML = '<p style="color:#d32f2f;">Unable to load storefront preview due to cross-origin restrictions.<br><br><a href="' + storefrontUrl + '" target="_blank" style="color:#5C6AC4;">Open product page in new tab</a></p>';
+                });
+            }
           </script>
-          <div class="container">
-            <div class="comparison">
-              <div class="card">
-                <div class="card-header control">
-                  <span class="badge badge-control">Current (Control)</span>
-                </div>
-                <div class="card-content">
-                  <div class="field">
-                    <div class="field-label">Title</div>
-                    <div class="field-value title">${escapeHtml(control.title)}</div>
-                  </div>
-                  <div class="field">
-                    <div class="field-label">Price</div>
-                    <div class="field-value price">$${parseFloat(control.price || '0').toFixed(2)}</div>
-                  </div>
-                  <div class="field">
-                    <div class="field-label">Description</div>
-                    <div class="field-value description">${escapeHtml(control.description) || '(No description)'}</div>
-                  </div>
-                </div>
-              </div>
-              <div class="card">
-                <div class="card-header variant">
-                  <span class="badge badge-variant">Proposed (Variant)</span>
-                </div>
-                <div class="card-content">
-                  <div class="field">
-                    <div class="field-label">Title</div>
-                    <div class="field-value title ${changes.includes('title') ? 'changed' : ''}">${escapeHtml(variant.title)}</div>
-                  </div>
-                  <div class="field">
-                    <div class="field-label">Price</div>
-                    <div class="field-value price ${changes.includes('price') ? 'changed' : ''}">$${parseFloat(variant.price || '0').toFixed(2)}</div>
-                  </div>
-                  <div class="field">
-                    <div class="field-label">Description</div>
-                    <div class="field-value description ${changes.includes('description') ? 'changed' : ''}">${escapeHtml(variant.description) || '(No description)'}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </body>
         </html>
       `);

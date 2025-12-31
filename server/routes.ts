@@ -1596,6 +1596,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Proxy endpoint to fetch storefront page HTML (avoids CORS issues)
+  app.get("/api/preview/proxy/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      
+      const session = await storage.getPreviewSession(token);
+      if (!session) {
+        return res.status(404).json({ error: "Preview session not found" });
+      }
+      
+      // Check if expired
+      if (new Date() > new Date(session.expiresAt)) {
+        return res.status(410).json({ error: "Preview session expired" });
+      }
+      
+      const storefrontUrl = session.storefrontUrl;
+      if (!storefrontUrl) {
+        return res.status(400).json({ error: "No storefront URL available" });
+      }
+      
+      // Fetch the storefront page HTML
+      console.log(`[Preview Proxy] Fetching storefront: ${storefrontUrl}`);
+      const response = await fetch(storefrontUrl.split('?')[0]); // Remove preview param for fetching
+      
+      if (!response.ok) {
+        console.warn(`[Preview Proxy] Failed to fetch storefront: ${response.status}`);
+        return res.status(502).json({ error: "Failed to fetch storefront page" });
+      }
+      
+      const html = await response.text();
+      
+      res.setHeader('Content-Type', 'text/html');
+      res.send(html);
+    } catch (error) {
+      console.error("Error in preview proxy:", error);
+      res.status(500).json({ error: "Failed to fetch storefront page" });
+    }
+  });
+  
   // Get preview session by token and render HTML
   app.get("/preview/:token", async (req, res) => {
     try {
