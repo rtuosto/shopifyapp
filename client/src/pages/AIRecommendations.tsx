@@ -378,6 +378,7 @@ export default function AIRecommendations() {
       const control = data.controlData || {};
       const variant = data.variantData || {};
       const changes = data.changes || [];
+      const storefrontUrl = data.storefrontUrl || '';
       
       // Helper to escape HTML
       const escapeHtml = (text: string | null | undefined): string => {
@@ -474,6 +475,7 @@ export default function AIRecommendations() {
           <div class="header">
             <h1>Preview Changes</h1>
             <div class="header-actions">
+              ${storefrontUrl ? `<a class="btn btn-secondary" href="${escapeHtml(storefrontUrl)}" target="_blank" rel="noopener">View on Storefront</a>` : ''}
               <button class="btn btn-secondary" onclick="window.close()">Close</button>
               <button class="btn btn-primary" onclick="approveAndClose()">Launch Optimization</button>
             </div>

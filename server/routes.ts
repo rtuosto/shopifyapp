@@ -122,6 +122,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // App Proxy: Get preview configuration for forced variant rendering
+  // This endpoint returns forced experiment config for preview mode
+  // Security: Validates HMAC signature and ensures session belongs to requesting shop
+  app.get("/apps/cro-proxy/preview/:token", async (req, res) => {
+    try {
+      // Validate App Proxy signature
+      const { valid, shop } = validateAppProxySignature(req.query as Record<string, any>);
+      
+      if (!valid || !shop) {
+        console.warn('[App Proxy] Preview request failed HMAC validation');
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const { token } = req.params;
+      
+      if (!token) {
+        return res.status(400).json({ error: "Preview token required" });
+      }
+
+      console.log(`[App Proxy] Preview request for token: ${token} from shop: ${shop}`);
+      
+      // Get preview session by token
+      const session = await storage.getPreviewSession(token);
+      
+      if (!session) {
+        return res.status(404).json({ error: "Preview session not found" });
+      }
+      
+      // Verify session belongs to the requesting shop
+      if (session.shop !== shop) {
+        console.warn(`[App Proxy] Preview session shop mismatch: ${session.shop} !== ${shop}`);
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      
+      // Check if expired
+      if (new Date() > new Date(session.expiresAt)) {
+        return res.status(410).json({ error: "Preview session expired" });
+      }
+      
+      // If this is a slot experiment preview, return forced experiment config
+      if (session.previewType === 'slot' && session.experimentConfig) {
+        const config = session.experimentConfig as {
+          experimentId?: string;
+          slotId?: string;
+          forcedVariant: "A" | "B";
+          variantAContent?: string;
+          variantBContent?: string;
+        };
+        
+        return res.json({
+          preview: true,
+          experiments: [{
+            id: config.experimentId || 'preview',
+            name: 'Preview Experiment',
+            slot_id: config.slotId,
+            status: 'LIVE',
+            allocation: config.forcedVariant === 'B' ? 1.0 : 0.0, // Force specific variant
+            forced_variant: config.forcedVariant,
+            variants: {
+              A: config.variantAContent || '',
+              B: config.variantBContent || '',
+            },
+          }],
+          timestamp: Date.now(),
+        });
+      }
+      
+      // For product optimizations, return the preview data
+      return res.json({
+        preview: true,
+        previewType: session.previewType,
+        controlData: session.controlData,
+        variantData: session.variantData,
+        changes: session.changes,
+        timestamp: Date.now(),
+      });
+    } catch (error: any) {
+      console.error("[App Proxy] Preview error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // App Proxy: Track experiment event from storefront
   // Security layers:
   // 1. HMAC validation on query params (Shopify App Proxy standard)
@@ -1475,6 +1557,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate unique token for preview URL
       const token = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
       
+      // Build storefront URL for full-page preview
+      // Shop domain format: example.myshopify.com
+      const storefrontUrl = `https://${shop}/products/${product.handle}?shoptimizer_preview=${token}`;
+      
       // Create preview session (expires in 15 minutes)
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
       
@@ -1482,6 +1568,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         token,
         productId: product.id,
         recommendationId: recommendation.id,
+        previewType: "product",
+        storefrontUrl,
         controlData,
         variantData,
         changes,
@@ -1489,13 +1577,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiresAt,
       });
       
-      // Return preview URL that will render the comparison
+      // Return both the internal preview URL and storefront URL for full-page preview
       const previewUrl = `/preview/${token}`;
       
       res.json({
         sessionId: session.id,
         token,
         previewUrl,
+        storefrontUrl,
         expiresAt,
         controlData,
         variantData,

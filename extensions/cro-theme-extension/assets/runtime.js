@@ -18,10 +18,28 @@
   // State
   let visitorId = null;
   let assignments = {};
+  let isPreviewMode = false;
+  let previewToken = null;
+
+  // Check for preview mode query parameter
+  function checkPreviewMode() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('shoptimizer_preview');
+    if (token) {
+      console.log(`[CRO] Preview mode detected with token: ${token}`);
+      isPreviewMode = true;
+      previewToken = token;
+      return true;
+    }
+    return false;
+  }
 
   // Initialize
   function init() {
     console.log(`[CRO] Runtime v${CRO_VERSION} initializing...`);
+    
+    // Check for preview mode first
+    checkPreviewMode();
     
     // Get shop domain from page
     config.shop = getShopDomain();
@@ -30,12 +48,19 @@
       return;
     }
 
-    // Generate or retrieve visitor ID
-    visitorId = getOrCreateVisitorId();
-    console.log(`[CRO] Visitor ID: ${visitorId}`);
+    // Generate or retrieve visitor ID (skip persistence in preview mode)
+    if (isPreviewMode) {
+      visitorId = 'preview-' + previewToken;
+      console.log(`[CRO] Preview mode - using temporary visitor ID: ${visitorId}`);
+    } else {
+      visitorId = getOrCreateVisitorId();
+      console.log(`[CRO] Visitor ID: ${visitorId}`);
+    }
 
-    // Load persisted assignments
-    assignments = loadAssignments();
+    // Load persisted assignments (skip in preview mode)
+    if (!isPreviewMode) {
+      assignments = loadAssignments();
+    }
 
     // Fetch experiment config and render
     fetchConfigAndRender();
@@ -126,7 +151,13 @@
   }
 
   // Assign variant deterministically based on visitor ID
-  function assignVariant(experimentId, allocation) {
+  function assignVariant(experimentId, allocation, forcedVariant) {
+    // In preview mode with forced variant, use that directly
+    if (isPreviewMode && forcedVariant) {
+      console.log(`[CRO] Preview mode - forced variant: ${forcedVariant}`);
+      return forcedVariant;
+    }
+    
     // Check if already assigned
     if (assignments[experimentId]) {
       return assignments[experimentId];
@@ -140,9 +171,11 @@
     // Assign variant based on allocation
     const variant = bucket < allocation ? 'B' : 'A';
     
-    // Persist assignment
-    assignments[experimentId] = variant;
-    saveAssignments();
+    // Persist assignment (skip in preview mode)
+    if (!isPreviewMode) {
+      assignments[experimentId] = variant;
+      saveAssignments();
+    }
 
     console.log(`[CRO] Assigned ${experimentId} -> ${variant} (bucket: ${bucket.toFixed(2)}, allocation: ${allocation})`);
     return variant;
@@ -151,10 +184,15 @@
   // Fetch experiment config from App Proxy
   async function fetchConfigAndRender() {
     try {
-      // Build App Proxy URL
-      const proxyUrl = `/apps/cro-proxy/config?shop=${encodeURIComponent(config.shop)}`;
-      
-      console.log(`[CRO] Fetching config from: ${proxyUrl}`);
+      // In preview mode, fetch from preview endpoint
+      let proxyUrl;
+      if (isPreviewMode && previewToken) {
+        proxyUrl = `/apps/cro-proxy/preview/${previewToken}`;
+        console.log(`[CRO] Preview mode - fetching config from: ${proxyUrl}`);
+      } else {
+        proxyUrl = `/apps/cro-proxy/config?shop=${encodeURIComponent(config.shop)}`;
+        console.log(`[CRO] Fetching config from: ${proxyUrl}`);
+      }
       
       const response = await fetch(proxyUrl, {
         method: 'GET',
@@ -169,11 +207,17 @@
       }
 
       const data = await response.json();
+      
+      // Log preview mode indicator
+      if (data.preview) {
+        console.log('[CRO] Running in PREVIEW MODE - no tracking, forced variants');
+      }
+      
       console.log(`[CRO] Received ${data.experiments?.length || 0} experiments`);
 
       // Process and render experiments
       if (data.experiments && data.experiments.length > 0) {
-        renderExperiments(data.experiments);
+        renderExperiments(data.experiments, data.preview);
       }
     } catch (error) {
       console.error('[CRO] Error fetching config:', error);
@@ -181,7 +225,7 @@
   }
 
   // Render experiments into slots
-  function renderExperiments(experiments) {
+  function renderExperiments(experiments, isPreview) {
     experiments.forEach(experiment => {
       if (experiment.status !== 'LIVE') return;
 
@@ -193,7 +237,8 @@
       }
 
       // Assign variant (same for all slots of this experiment)
-      const variant = assignVariant(experiment.id, experiment.allocation || 0.5);
+      // In preview mode, use forced_variant if provided
+      const variant = assignVariant(experiment.id, experiment.allocation || 0.5, experiment.forced_variant);
 
       // Get variant content
       const variantContent = experiment.variants?.[variant];
@@ -209,7 +254,12 @@
       });
 
       // Track slot view once per experiment (not per slot)
-      trackEvent(experiment.id, variant, 'slot_view');
+      // Skip tracking in preview mode to avoid polluting data
+      if (!isPreview && !isPreviewMode) {
+        trackEvent(experiment.id, variant, 'slot_view');
+      } else {
+        console.log(`[CRO] Preview mode - skipping slot_view tracking for ${experiment.id}`);
+      }
     });
   }
 

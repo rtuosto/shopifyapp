@@ -277,23 +277,36 @@ export const insertOptimizationEvolutionSnapshotSchema = createInsertSchema(opti
 export type InsertOptimizationEvolutionSnapshot = z.infer<typeof insertOptimizationEvolutionSnapshotSchema>;
 export type OptimizationEvolutionSnapshot = typeof optimizationEvolutionSnapshots.$inferSelect;
 
-// Preview Sessions table - Stores temporary preview sessions for storefront overlay preview (multi-tenant)
+// Preview Sessions table - Stores temporary preview sessions for full-page storefront preview (multi-tenant)
 export const previewSessions = pgTable("preview_sessions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   token: varchar("token").notNull().unique(), // Opaque token for URL (short, single-use)
   shop: varchar("shop").notNull().default("default-shop"), // Shopify store identifier
-  productId: varchar("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  productId: varchar("product_id").references(() => products.id, { onDelete: "cascade" }), // Optional for slot experiments
   recommendationId: varchar("recommendation_id").references(() => recommendations.id, { onDelete: "set null" }),
   
-  // Preview data
-  controlData: jsonb("control_data").$type<Record<string, any>>().notNull(),
-  variantData: jsonb("variant_data").$type<Record<string, any>>().notNull(),
-  changes: jsonb("changes").$type<string[]>().notNull(), // Array of changed field names
+  // Preview type and storefront URL
+  previewType: text("preview_type").default("product").notNull(), // "product" | "slot" - type of preview
+  storefrontUrl: text("storefront_url"), // Full URL to the product/page on the storefront
+  
+  // Preview data (for product optimizations)
+  controlData: jsonb("control_data").$type<Record<string, any>>(),
+  variantData: jsonb("variant_data").$type<Record<string, any>>(),
+  changes: jsonb("changes").$type<string[]>(), // Array of changed field names
   insights: jsonb("insights").$type<Array<{
     type: "psychology" | "competitor" | "seo" | "data";
     title: string;
     description: string;
-  }>>().notNull(),
+  }>>(),
+  
+  // Forced experiment config (for slot experiments and preview override)
+  experimentConfig: jsonb("experiment_config").$type<{
+    experimentId?: string;
+    slotId?: string;
+    forcedVariant: "A" | "B";
+    variantAContent?: string;
+    variantBContent?: string;
+  }>(),
   
   // Session state
   expiresAt: timestamp("expires_at").notNull(), // Short-lived (15 minutes)
