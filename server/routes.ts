@@ -1597,6 +1597,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Proxy endpoint to fetch storefront page HTML (avoids CORS issues)
+  // Handles password-protected dev stores by authenticating first
   app.get("/api/preview/proxy/:token", async (req, res) => {
     try {
       const { token } = req.params;
@@ -1616,16 +1617,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No storefront URL available" });
       }
       
-      // Fetch the storefront page HTML
+      // Extract store domain from URL
+      const urlObj = new URL(storefrontUrl);
+      const storeDomain = urlObj.origin;
+      
+      // For password-protected stores, we need to authenticate first
+      // Get store password from environment or use default for dev
+      const storePassword = process.env.SHOPIFY_STORE_PASSWORD || "saotsu";
+      
+      console.log(`[Preview Proxy] Authenticating with password-protected store: ${storeDomain}`);
+      
+      // Step 1: Authenticate with the store password
+      const authResponse = await fetch(`${storeDomain}/password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `password=${encodeURIComponent(storePassword)}`,
+        redirect: 'manual', // Don't follow redirects to capture cookies
+      });
+      
+      // Extract cookies from the auth response
+      const setCookieHeaders = authResponse.headers.getSetCookie ? 
+        authResponse.headers.getSetCookie() : 
+        (authResponse.headers.get('set-cookie')?.split(', ') || []);
+      
+      // Build cookie string for subsequent requests
+      const cookies = setCookieHeaders
+        .map(cookie => cookie.split(';')[0])
+        .join('; ');
+      
+      console.log(`[Preview Proxy] Auth response status: ${authResponse.status}, got ${setCookieHeaders.length} cookies`);
+      
+      // Step 2: Fetch the actual product page with the auth cookies
       console.log(`[Preview Proxy] Fetching storefront: ${storefrontUrl}`);
-      const response = await fetch(storefrontUrl.split('?')[0]); // Remove preview param for fetching
+      const pageUrl = storefrontUrl.split('?')[0]; // Remove preview param
+      
+      const response = await fetch(pageUrl, {
+        headers: {
+          'Cookie': cookies,
+          'User-Agent': 'Mozilla/5.0 (compatible; ShoptimizerPreview/1.0)',
+        },
+      });
       
       if (!response.ok) {
         console.warn(`[Preview Proxy] Failed to fetch storefront: ${response.status}`);
         return res.status(502).json({ error: "Failed to fetch storefront page" });
       }
       
-      const html = await response.text();
+      let html = await response.text();
+      
+      // Check if we still got the password page (auth failed)
+      if (html.includes('Enter store password') || html.includes('password-page')) {
+        console.warn(`[Preview Proxy] Password authentication failed - still seeing password page`);
+        return res.status(502).json({ 
+          error: "Store password authentication failed. Please check SHOPIFY_STORE_PASSWORD environment variable." 
+        });
+      }
+      
+      // Clean up the HTML for preview:
+      // 1. Remove external scripts that cause CORS errors
+      // 2. Remove Shoptimizer runtime.js that causes storefrontBaseUrl errors
+      // 3. Keep styles and static content
+      html = html
+        // Remove Shoptimizer runtime.js script tags
+        .replace(/<script[^>]*runtime\.js[^>]*><\/script>/gi, '')
+        // Remove Shopify analytics and tracking scripts
+        .replace(/<script[^>]*cdn\.shopify\.com\/s\/trekkie[^>]*><\/script>/gi, '')
+        .replace(/<script[^>]*cdn\.shopify\.com\/shopifycloud\/web-pixels[^>]*><\/script>/gi, '')
+        // Remove inline scripts that reference window.Shopify features that won't work
+        .replace(/<script[^>]*>[\s\S]*?ShopifyAnalytics[\s\S]*?<\/script>/gi, '')
+        // Remove meta tags that try to redirect
+        .replace(/<meta[^>]*http-equiv="refresh"[^>]*>/gi, '');
+      
+      console.log(`[Preview Proxy] Serving cleaned HTML (${html.length} bytes)`);
       
       res.setHeader('Content-Type', 'text/html');
       res.send(html);
