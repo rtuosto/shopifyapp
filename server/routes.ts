@@ -12,6 +12,18 @@ import { getSyncStatus, completeSyncSuccess } from "./sync-status";
 import { selectTopProducts } from "./recommendation-engine";
 import type { BayesianState } from "./statistics/allocation-service";
 
+function escapeHtml(text: string | null | undefined): string {
+  if (!text) return '';
+  const htmlEscapes: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  };
+  return text.replace(/[&<>"']/g, (char) => htmlEscapes[char] || char);
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // CORS configuration for public API endpoints
   // These endpoints are called from storefronts via Shopify App Proxy
@@ -1407,6 +1419,318 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error checking promotion:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to check promotion";
       res.status(500).json({ error: errorMessage });
+    }
+  });
+
+  // Preview Sessions API - for previewing recommendations before activation
+  app.post("/api/preview/sessions", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const shop = (req as any).shop;
+      const { recommendationId } = req.body;
+      
+      if (!recommendationId) {
+        return res.status(400).json({ error: "recommendationId is required" });
+      }
+      
+      // Get recommendation
+      const recommendation = await storage.getRecommendation(shop, recommendationId);
+      if (!recommendation) {
+        return res.status(404).json({ error: "Recommendation not found" });
+      }
+      
+      // Get product
+      const product = await storage.getProduct(shop, recommendation.productId);
+      if (!product) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+      
+      // Build control data from current product state
+      const controlData: Record<string, any> = {
+        title: product.title,
+        description: product.description,
+        price: product.price,
+      };
+      
+      // Build variant data from proposed changes
+      const proposedChanges = recommendation.proposedChanges as Record<string, any>;
+      const variantData: Record<string, any> = { ...controlData };
+      const changes: string[] = [];
+      
+      // Apply proposed changes
+      if (proposedChanges.newTitle) {
+        variantData.title = proposedChanges.newTitle;
+        changes.push("title");
+      }
+      if (proposedChanges.newDescription) {
+        variantData.description = proposedChanges.newDescription;
+        changes.push("description");
+      }
+      if (proposedChanges.newPrice !== undefined) {
+        variantData.price = proposedChanges.newPrice.toString();
+        changes.push("price");
+      }
+      
+      // Generate unique token for preview URL
+      const token = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+      
+      // Create preview session (expires in 15 minutes)
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+      
+      const session = await storage.createPreviewSession(shop, {
+        token,
+        productId: product.id,
+        recommendationId: recommendation.id,
+        controlData,
+        variantData,
+        changes,
+        insights: recommendation.insights || [],
+        expiresAt,
+      });
+      
+      // Return preview URL that will render the comparison
+      const previewUrl = `/preview/${token}`;
+      
+      res.json({
+        sessionId: session.id,
+        token,
+        previewUrl,
+        expiresAt,
+        controlData,
+        variantData,
+        changes,
+      });
+    } catch (error) {
+      console.error("Error creating preview session:", error);
+      res.status(500).json({ error: "Failed to create preview session" });
+    }
+  });
+  
+  // Get preview session by token and render HTML
+  app.get("/preview/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      
+      const session = await storage.getPreviewSession(token);
+      if (!session) {
+        return res.status(404).send(`
+          <html>
+            <head><title>Preview Not Found</title></head>
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; text-align: center;">
+              <h1>Preview Not Found</h1>
+              <p>This preview link has expired or is invalid.</p>
+              <a href="/">Return to Dashboard</a>
+            </body>
+          </html>
+        `);
+      }
+      
+      // Check if expired
+      if (new Date() > new Date(session.expiresAt)) {
+        return res.status(410).send(`
+          <html>
+            <head><title>Preview Expired</title></head>
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; text-align: center;">
+              <h1>Preview Expired</h1>
+              <p>This preview link has expired. Please generate a new preview from the dashboard.</p>
+              <a href="/">Return to Dashboard</a>
+            </body>
+          </html>
+        `);
+      }
+      
+      const control = session.controlData as Record<string, any>;
+      const variant = session.variantData as Record<string, any>;
+      const changes = (session.changes as string[]) || [];
+      const insights = session.insights || [];
+      
+      // Render side-by-side comparison HTML
+      res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Preview Changes - Shoptimizer</title>
+          <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+              background: #f4f6f8;
+              color: #1a1a1a;
+              line-height: 1.5;
+            }
+            .header {
+              background: linear-gradient(135deg, #5C6AC4 0%, #3b4199 100%);
+              color: white;
+              padding: 24px 40px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            }
+            .header h1 { font-size: 24px; font-weight: 600; }
+            .header-actions { display: flex; gap: 12px; }
+            .btn {
+              padding: 10px 20px;
+              border-radius: 8px;
+              font-size: 14px;
+              font-weight: 500;
+              cursor: pointer;
+              border: none;
+              transition: all 0.2s;
+            }
+            .btn-primary { background: white; color: #5C6AC4; }
+            .btn-primary:hover { background: #f0f0f0; }
+            .btn-secondary { background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); }
+            .btn-secondary:hover { background: rgba(255,255,255,0.3); }
+            .container { max-width: 1400px; margin: 0 auto; padding: 32px; }
+            .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+            @media (max-width: 900px) { .comparison { grid-template-columns: 1fr; } }
+            .card {
+              background: white;
+              border-radius: 12px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+              overflow: hidden;
+            }
+            .card-header {
+              padding: 16px 24px;
+              border-bottom: 1px solid #e5e5e5;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            }
+            .card-header.control { background: #f5f5f5; }
+            .card-header.variant { background: #e8f5e9; }
+            .badge {
+              padding: 4px 10px;
+              border-radius: 4px;
+              font-size: 12px;
+              font-weight: 600;
+              text-transform: uppercase;
+            }
+            .badge-control { background: #e0e0e0; color: #616161; }
+            .badge-variant { background: #c8e6c9; color: #2e7d32; }
+            .card-content { padding: 24px; }
+            .field { margin-bottom: 20px; }
+            .field:last-child { margin-bottom: 0; }
+            .field-label { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+            .field-value { font-size: 16px; }
+            .field-value.title { font-size: 20px; font-weight: 600; }
+            .field-value.price { font-size: 24px; font-weight: 700; color: #2e7d32; }
+            .field-value.description { color: #444; white-space: pre-wrap; }
+            .changed { background: #fff3cd; padding: 4px 8px; border-radius: 4px; }
+            .insights {
+              background: white;
+              border-radius: 12px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+              padding: 24px;
+            }
+            .insights h3 { margin-bottom: 16px; font-size: 18px; }
+            .insight {
+              display: flex;
+              align-items: flex-start;
+              gap: 12px;
+              padding: 12px 0;
+              border-bottom: 1px solid #eee;
+            }
+            .insight:last-child { border-bottom: none; }
+            .insight-icon {
+              width: 32px;
+              height: 32px;
+              border-radius: 8px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 16px;
+              flex-shrink: 0;
+            }
+            .insight-icon.psychology { background: #e3f2fd; }
+            .insight-icon.competitor { background: #fff3e0; }
+            .insight-icon.seo { background: #e8f5e9; }
+            .insight-icon.data { background: #f3e5f5; }
+            .insight-content h4 { font-size: 14px; margin-bottom: 4px; }
+            .insight-content p { font-size: 13px; color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Preview Changes</h1>
+            <div class="header-actions">
+              <button class="btn btn-secondary" onclick="window.close()">Close Preview</button>
+            </div>
+          </div>
+          <div class="container">
+            <div class="comparison">
+              <div class="card">
+                <div class="card-header control">
+                  <span class="badge badge-control">Current (Control)</span>
+                </div>
+                <div class="card-content">
+                  <div class="field">
+                    <div class="field-label">Title</div>
+                    <div class="field-value title">${escapeHtml(control.title || '')}</div>
+                  </div>
+                  <div class="field">
+                    <div class="field-label">Price</div>
+                    <div class="field-value price">$${parseFloat(control.price || '0').toFixed(2)}</div>
+                  </div>
+                  <div class="field">
+                    <div class="field-label">Description</div>
+                    <div class="field-value description">${escapeHtml(control.description || '(No description)')}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header variant">
+                  <span class="badge badge-variant">Proposed (Variant)</span>
+                </div>
+                <div class="card-content">
+                  <div class="field">
+                    <div class="field-label">Title</div>
+                    <div class="field-value title ${changes.includes('title') ? 'changed' : ''}">${escapeHtml(variant.title || '')}</div>
+                  </div>
+                  <div class="field">
+                    <div class="field-label">Price</div>
+                    <div class="field-value price ${changes.includes('price') ? 'changed' : ''}">$${parseFloat(variant.price || '0').toFixed(2)}</div>
+                  </div>
+                  <div class="field">
+                    <div class="field-label">Description</div>
+                    <div class="field-value description ${changes.includes('description') ? 'changed' : ''}">${escapeHtml(variant.description || '(No description)')}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            ${insights.length > 0 ? `
+              <div class="insights">
+                <h3>AI Insights</h3>
+                ${(insights as Array<{type: string; title: string; description: string}>).map(insight => `
+                  <div class="insight">
+                    <div class="insight-icon ${insight.type}">
+                      ${insight.type === 'psychology' ? '🧠' : insight.type === 'competitor' ? '🏆' : insight.type === 'seo' ? '🔍' : '📊'}
+                    </div>
+                    <div class="insight-content">
+                      <h4>${escapeHtml(insight.title)}</h4>
+                      <p>${escapeHtml(insight.description)}</p>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+          </div>
+        </body>
+        </html>
+      `);
+    } catch (error) {
+      console.error("Error fetching preview:", error);
+      res.status(500).send(`
+        <html>
+          <head><title>Preview Error</title></head>
+          <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; text-align: center;">
+            <h1>Preview Error</h1>
+            <p>Something went wrong loading this preview.</p>
+            <a href="/">Return to Dashboard</a>
+          </body>
+        </html>
+      `);
     }
   });
 
