@@ -369,16 +369,171 @@ export default function AIRecommendations() {
         </html>
       `);
 
-      // Create preview session and get storefront URL
+      // Create preview session and get data
       const res = await apiRequest("POST", "/api/preview/sessions", {
         recommendationId: id,
       });
       const data = await res.json();
+      
+      const control = data.controlData || {};
+      const variant = data.variantData || {};
+      const changes = data.changes || [];
+      
+      // Helper to escape HTML
+      const escapeHtml = (text: string | null | undefined): string => {
+        if (!text) return '';
+        const htmlEscapes: Record<string, string> = {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;',
+        };
+        return text.replace(/[&<>"']/g, (char) => htmlEscapes[char] || char);
+      };
 
-      // Navigate the already-open window to the preview URL
-      previewWindow.location.href = data.previewUrl;
+      // Render the preview directly in the popup window
+      previewWindow.document.open();
+      previewWindow.document.write(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Preview Changes - Shoptimizer</title>
+          <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+              background: #f4f6f8;
+              color: #1a1a1a;
+              line-height: 1.5;
+            }
+            .header {
+              background: linear-gradient(135deg, #5C6AC4 0%, #3b4199 100%);
+              color: white;
+              padding: 24px 40px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            }
+            .header h1 { font-size: 24px; font-weight: 600; }
+            .header-actions { display: flex; gap: 12px; }
+            .btn {
+              padding: 10px 20px;
+              border-radius: 8px;
+              font-size: 14px;
+              font-weight: 500;
+              cursor: pointer;
+              border: none;
+              transition: all 0.2s;
+            }
+            .btn-secondary { background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); }
+            .btn-secondary:hover { background: rgba(255,255,255,0.3); }
+            .btn-primary { background: white; color: #5C6AC4; }
+            .btn-primary:hover { background: #f0f0f0; }
+            .container { max-width: 1400px; margin: 0 auto; padding: 32px; }
+            .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+            @media (max-width: 900px) { .comparison { grid-template-columns: 1fr; } }
+            .card {
+              background: white;
+              border-radius: 12px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+              overflow: hidden;
+            }
+            .card-header {
+              padding: 16px 24px;
+              border-bottom: 1px solid #e5e5e5;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            }
+            .card-header.control { background: #f5f5f5; }
+            .card-header.variant { background: #e8f5e9; }
+            .badge {
+              padding: 4px 10px;
+              border-radius: 4px;
+              font-size: 12px;
+              font-weight: 600;
+              text-transform: uppercase;
+            }
+            .badge-control { background: #e0e0e0; color: #616161; }
+            .badge-variant { background: #c8e6c9; color: #2e7d32; }
+            .card-content { padding: 24px; }
+            .field { margin-bottom: 20px; }
+            .field:last-child { margin-bottom: 0; }
+            .field-label { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+            .field-value { font-size: 16px; }
+            .field-value.title { font-size: 20px; font-weight: 600; }
+            .field-value.price { font-size: 24px; font-weight: 700; color: #2e7d32; }
+            .field-value.description { color: #444; white-space: pre-wrap; }
+            .changed { background: #fff3cd; padding: 4px 8px; border-radius: 4px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Preview Changes</h1>
+            <div class="header-actions">
+              <button class="btn btn-secondary" onclick="window.close()">Close</button>
+              <button class="btn btn-primary" onclick="approveAndClose()">Launch Optimization</button>
+            </div>
+          </div>
+          <script>
+            function approveAndClose() {
+              if (window.opener) {
+                window.opener.postMessage({ type: 'shoptimizer-preview-complete', approved: true }, '*');
+              }
+              window.close();
+            }
+          </script>
+          <div class="container">
+            <div class="comparison">
+              <div class="card">
+                <div class="card-header control">
+                  <span class="badge badge-control">Current (Control)</span>
+                </div>
+                <div class="card-content">
+                  <div class="field">
+                    <div class="field-label">Title</div>
+                    <div class="field-value title">${escapeHtml(control.title)}</div>
+                  </div>
+                  <div class="field">
+                    <div class="field-label">Price</div>
+                    <div class="field-value price">$${parseFloat(control.price || '0').toFixed(2)}</div>
+                  </div>
+                  <div class="field">
+                    <div class="field-label">Description</div>
+                    <div class="field-value description">${escapeHtml(control.description) || '(No description)'}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header variant">
+                  <span class="badge badge-variant">Proposed (Variant)</span>
+                </div>
+                <div class="card-content">
+                  <div class="field">
+                    <div class="field-label">Title</div>
+                    <div class="field-value title ${changes.includes('title') ? 'changed' : ''}">${escapeHtml(variant.title)}</div>
+                  </div>
+                  <div class="field">
+                    <div class="field-label">Price</div>
+                    <div class="field-value price ${changes.includes('price') ? 'changed' : ''}">$${parseFloat(variant.price || '0').toFixed(2)}</div>
+                  </div>
+                  <div class="field">
+                    <div class="field-label">Description</div>
+                    <div class="field-value description ${changes.includes('description') ? 'changed' : ''}">${escapeHtml(variant.description) || '(No description)'}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </body>
+        </html>
+      `);
+      previewWindow.document.close();
 
-      // Listen for completion messages from preview window
+      // Listen for approval messages from preview window
       const messageHandler = (event: MessageEvent) => {
         if (event.data?.type === 'shoptimizer-preview-complete') {
           console.log('[Dashboard] Preview completed:', event.data);
@@ -400,7 +555,7 @@ export default function AIRecommendations() {
       
       window.addEventListener('message', messageHandler);
       
-      // Clean up listener after 30 minutes (preview sessions expire in 15 min)
+      // Clean up listener after 30 minutes
       setTimeout(() => {
         window.removeEventListener('message', messageHandler);
       }, 30 * 60 * 1000);
