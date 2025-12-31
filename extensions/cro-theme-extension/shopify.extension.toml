@@ -1,10 +1,8 @@
 api_version = "2024-10"
-type = "theme"
-
-[capabilities]
-ajax_api = true
 
 [[extensions]]
+uid = "fb383981-6114-c7fc-fe5f-8ea321524cf0b1448f57"
+type = "theme_app_extension"
 name = "CRO Optimizer"
 handle = "cro-optimizer"
 
@@ -12,7 +10,3 @@ handle = "cro-optimizer"
 assets = true
 blocks = true
 snippets = false
-
-[[extensions.settings]]
-type = "paragraph"
-content = "Enable the CRO Runtime to run A/B experiments on your storefront."

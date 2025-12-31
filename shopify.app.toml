@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 name = "Shoptimizer"
-client_id = "$SHOPIFY_API_KEY"
+client_id = "3698c1ae9df020062dc4d95310653fee"
 application_url = "https://e8eac444-6280-4392-9345-d986a5660e1a-00-8jafwgovh6h.worf.replit.dev"
 embedded = true
 

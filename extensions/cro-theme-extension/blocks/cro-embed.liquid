@@ -1,10 +1,9 @@
-{{ 'runtime.js' | asset_url | script_tag }}
+<script src="{{ 'runtime.js' | asset_url }}" defer></script>
 
 {% schema %}
 {
   "name": "CRO Runtime",
   "target": "body",
-  "javascript": "runtime.js",
   "settings": [
     {
       "type": "paragraph",
