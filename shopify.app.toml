@@ -1,0 +1,20 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+name = "Shoptimizer"
+client_id = "$SHOPIFY_API_KEY"
+application_url = "https://e8eac444-6280-4392-9345-d986a5660e1a-00-8jafwgovh6h.worf.replit.dev"
+embedded = true
+
+[access_scopes]
+scopes = "read_products,write_products,read_orders"
+
+[auth]
+redirect_urls = [
+  "https://e8eac444-6280-4392-9345-d986a5660e1a-00-8jafwgovh6h.worf.replit.dev/api/auth/callback"
+]
+
+[webhooks]
+api_version = "2024-10"
+
+[pos]
+embedded = false
