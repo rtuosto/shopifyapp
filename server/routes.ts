@@ -1456,17 +1456,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const variantData: Record<string, any> = { ...controlData };
       const changes: string[] = [];
       
-      // Apply proposed changes
-      if (proposedChanges.newTitle) {
-        variantData.title = proposedChanges.newTitle;
+      // Apply proposed changes - check both AI field names (title, description, price)
+      // and legacy names (newTitle, newDescription, newPrice) for compatibility
+      if (proposedChanges.title || proposedChanges.newTitle) {
+        variantData.title = proposedChanges.title || proposedChanges.newTitle;
         changes.push("title");
       }
-      if (proposedChanges.newDescription) {
-        variantData.description = proposedChanges.newDescription;
+      if (proposedChanges.description || proposedChanges.newDescription) {
+        variantData.description = proposedChanges.description || proposedChanges.newDescription;
         changes.push("description");
       }
-      if (proposedChanges.newPrice !== undefined) {
-        variantData.price = proposedChanges.newPrice.toString();
+      if (proposedChanges.price !== undefined || proposedChanges.newPrice !== undefined) {
+        const priceValue = proposedChanges.price !== undefined ? proposedChanges.price : proposedChanges.newPrice;
+        variantData.price = priceValue.toString();
         changes.push("price");
       }
       
