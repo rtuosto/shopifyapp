@@ -2902,12 +2902,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newVariantImpressions = (Number(optimization.variantImpressions) || 0) + variantImpressions;
       const newControlConversions = (Number(optimization.controlConversions) || 0) + controlConversions;
       const newVariantConversions = (Number(optimization.variantConversions) || 0) + variantConversions;
-      const newControlRevenue = parseFloat(optimization.controlRevenue || "0") + controlRevenue;
-      const newVariantRevenue = parseFloat(optimization.variantRevenue || "0") + variantRevenue;
+      const newControlRevenue = parseFloat(String(optimization.controlRevenue || "0")) + controlRevenue;
+      const newVariantRevenue = parseFloat(String(optimization.variantRevenue || "0")) + variantRevenue;
       
-      const newImpressions = (Number(optimization.impressions) || 0) + visitors;
+      const newImpressions = (Number(optimization.impressions) || 0) + Number(visitors);
       const newConversions = (Number(optimization.conversions) || 0) + totalConversions;
-      const newRevenue = parseFloat(optimization.revenue || "0") + totalRevenue;
+      const newRevenue = parseFloat(String(optimization.revenue || "0")) + totalRevenue;
       const arpu = newConversions > 0 ? newRevenue / newConversions : 0;
 
       const updatedOptimization = await storage.updateOptimization(shop, optimizationId, {
@@ -3247,8 +3247,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newVariantImpressions = (Number(optimization.variantImpressions) || 0) + variantImpressions;
       const newControlConversions = (Number(optimization.controlConversions) || 0) + controlConversions;
       const newVariantConversions = (Number(optimization.variantConversions) || 0) + variantConversions;
-      const newControlRevenue = parseFloat(optimization.controlRevenue || "0") + controlRevenue;
-      const newVariantRevenue = parseFloat(optimization.variantRevenue || "0") + variantRevenue;
+      const newControlRevenue = parseFloat(String(optimization.controlRevenue || "0")) + controlRevenue;
+      const newVariantRevenue = parseFloat(String(optimization.variantRevenue || "0")) + variantRevenue;
       
       const newImpressions = (Number(optimization.impressions) || 0) + visitorsNum;
       const newConversions = (Number(optimization.conversions) || 0) + totalConversions;
