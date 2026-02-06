@@ -1,24 +1,25 @@
 import { Link } from "wouter";
+import { Page, Box, BlockStack, Text, Button } from "@shopify/polaris";
 
 export default function NotFound() {
   return (
-    <s-page>
-      <s-box padding="large-400" style={{ textAlign: 'center' }}>
-        <s-stack direction="block" gap="large" align="center">
-          <s-text variant="heading3xl" tone="subdued">404</s-text>
-          <s-stack direction="block" gap="small" align="center">
-            <s-text variant="headingLg">Page Not Found</s-text>
-            <s-text variant="bodyMd" tone="subdued">
+    <Page>
+      <Box padding="600" >
+        <BlockStack gap="600" align="center">
+          <Text as="h1" variant="heading3xl" tone="subdued">404</Text>
+          <BlockStack gap="200" align="center">
+            <Text as="h2" variant="headingLg">Page Not Found</Text>
+            <Text as="p" variant="bodyMd" tone="subdued">
               The page you're looking for doesn't exist.
-            </s-text>
-          </s-stack>
+            </Text>
+          </BlockStack>
           <Link href="/">
-            <s-button variant="primary" icon="home" data-testid="button-home">
+            <Button variant="primary" data-testid="button-home">
               Back to Dashboard
-            </s-button>
+            </Button>
           </Link>
-        </s-stack>
-      </s-box>
-    </s-page>
+        </BlockStack>
+      </Box>
+    </Page>
   );
 }

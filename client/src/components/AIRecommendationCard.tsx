@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { formatOptimizationType } from "@/lib/optimizationTypeFormatter";
+import { Card, BlockStack, InlineStack, Text, Button, ButtonGroup, Spinner, Box } from "@shopify/polaris";
+import { ViewIcon, CheckCircleIcon, XCircleIcon } from "@shopify/polaris-icons";
 
 interface AIRecommendationCardProps {
   id: string;
@@ -59,86 +61,86 @@ export default function AIRecommendationCard({
   };
 
   return (
-    <s-section data-testid={`card-recommendation-${id}`}>
-      <s-stack direction="block" gap="base">
-        <s-stack direction="inline" gap="base" blockAlign="start">
+    <Card data-testid={`card-recommendation-${id}`}>
+      <BlockStack gap="400">
+        <InlineStack gap="400" blockAlign="start">
           {productImage && (
-            <s-box borderRadius="base" overflow="hidden" inlineSize="64px" blockSize="64px">
+            <div style={{ borderRadius: '4px', overflow: 'hidden', width: '64px', height: '64px', flexShrink: 0 }}>
               <img 
                 src={productImage} 
                 alt={productName}
                 style={{ width: '64px', height: '64px', objectFit: 'cover', opacity: imageOpacity === 'opacity-60' ? 0.6 : 1 }}
                 data-testid={`img-product-${id}`}
               />
-            </s-box>
+            </div>
           )}
-          <s-stack direction="block" gap="small" style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+          <BlockStack gap="200">
             {headerBadge && (
               <div>{headerBadge}</div>
             )}
-            <s-stack direction="inline" gap="small" blockAlign="center">
-              <s-text variant="bodySm" fontWeight="medium" tone="subdued" truncate data-testid={`text-product-name-${id}`}>
+            <InlineStack gap="200" blockAlign="center">
+              <Text as="span" variant="bodySm" fontWeight="medium" tone="subdued" truncate data-testid={`text-product-name-${id}`}>
                 {productName}
-              </s-text>
-              <s-text variant="bodySm" tone="subdued">·</s-text>
-              <s-text variant="bodySm" tone="subdued" data-testid={`text-optimization-type-${id}`}>
+              </Text>
+              <Text as="span" variant="bodySm" tone="subdued">·</Text>
+              <Text as="span" variant="bodySm" tone="subdued" data-testid={`text-optimization-type-${id}`}>
                 {formatOptimizationType(optimizationType)}
-              </s-text>
-            </s-stack>
-            <s-text variant="bodySm" fontWeight="semibold" data-testid={`text-recommendation-title-${id}`}>
+              </Text>
+            </InlineStack>
+            <Text as="p" variant="bodySm" fontWeight="semibold" data-testid={`text-recommendation-title-${id}`}>
               {title}
-            </s-text>
-            <s-text variant="bodyXs" tone="subdued" data-testid={`text-recommendation-description-${id}`}>
+            </Text>
+            <Text as="p" variant="bodyXs" tone="subdued" data-testid={`text-recommendation-description-${id}`}>
               {description}
-            </s-text>
-          </s-stack>
-        </s-stack>
+            </Text>
+          </BlockStack>
+          </div>
+        </InlineStack>
 
         {customActions ? (
-          <s-button-group gap="small">
+          <ButtonGroup>
             {customActions}
-          </s-button-group>
+          </ButtonGroup>
         ) : (
-          <s-button-group gap="small">
-            <s-button
-              variant="secondary"
+          <ButtonGroup>
+            <Button
               size="slim"
-              icon="view"
+              icon={ViewIcon}
               onClick={handlePreview}
               disabled={isProcessing}
               data-testid={`button-preview-optimization-${id}`}
             >
               Preview
-            </s-button>
-            <s-button
+            </Button>
+            <Button
               variant="primary"
               size="slim"
-              icon="check-circle"
+              icon={CheckCircleIcon}
               onClick={handleAccept}
               disabled={isProcessing}
               data-testid={`button-accept-recommendation-${id}`}
             >
               Accept
-            </s-button>
-            <s-button
-              variant="secondary"
+            </Button>
+            <Button
               size="slim"
-              icon="x-circle"
+              icon={XCircleIcon}
               onClick={handleReject}
               disabled={isProcessing}
               data-testid={`button-reject-recommendation-${id}`}
               accessibilityLabel="Dismiss recommendation"
             />
-          </s-button-group>
+          </ButtonGroup>
         )}
         
         {isProcessing && (
-          <s-stack direction="inline" gap="small" align="center" blockAlign="center">
-            <s-spinner size="small" accessibilityLabel="Processing" />
-            <s-text variant="bodyXs" tone="subdued">Processing...</s-text>
-          </s-stack>
+          <InlineStack gap="200" align="center" blockAlign="center">
+            <Spinner size="small" accessibilityLabel="Processing" />
+            <Text as="span" variant="bodyXs" tone="subdued">Processing...</Text>
+          </InlineStack>
         )}
-      </s-stack>
-    </s-section>
+      </BlockStack>
+    </Card>
   );
 }

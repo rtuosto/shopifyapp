@@ -2,6 +2,8 @@ import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Card, BlockStack, InlineStack, Text, Button, Badge, Divider, Spinner, Banner, ButtonGroup, Box } from "@shopify/polaris";
+import { SettingsIcon } from "@shopify/polaris-icons";
 
 interface WebhookStatus {
   ordersWebhook: any | null;
@@ -43,132 +45,134 @@ export default function SetupGuide() {
   const webhookUnknown = webhookStatus?.status === 'unknown';
 
   return (
-    <s-section data-testid="card-setup-guide">
-      <s-stack direction="inline" align="space-between" blockAlign="start" gap="base">
-        <s-stack direction="block" gap="small">
-          <s-text variant="headingMd">Welcome to Shoptimizer!</s-text>
-          <s-text variant="bodySm" tone="subdued">
-            Complete these steps to start optimizing your products with A/B testing
-          </s-text>
-        </s-stack>
-        <Link href="/settings">
-          <s-button variant="tertiary" icon="settings" data-testid="link-full-settings">
-            Full Settings
-          </s-button>
-        </Link>
-      </s-stack>
+    <Card data-testid="card-setup-guide">
+      <BlockStack gap="400">
+        <InlineStack align="space-between" blockAlign="start" gap="400">
+          <BlockStack gap="200">
+            <Text as="h2" variant="headingMd">Welcome to Shoptimizer!</Text>
+            <Text as="p" variant="bodySm" tone="subdued">
+              Complete these steps to start optimizing your products with A/B testing
+            </Text>
+          </BlockStack>
+          <Link href="/settings">
+            <Button variant="plain" icon={SettingsIcon} data-testid="link-full-settings">
+              Full Settings
+            </Button>
+          </Link>
+        </InlineStack>
 
-      <s-divider />
+        <Divider />
 
-      <s-stack direction="inline" gap="base" blockAlign="start">
-        <s-badge tone="success" icon="check-circle">Done</s-badge>
-        <s-stack direction="block" gap="small">
-          <s-text variant="headingSm">Step 1: Products Synced</s-text>
-          <s-text variant="bodySm" tone="subdued">
-            Your products are automatically synced from Shopify during app installation and kept up to date.
-          </s-text>
-        </s-stack>
-      </s-stack>
+        <InlineStack gap="400" blockAlign="start">
+          <Badge tone="success">Done</Badge>
+          <BlockStack gap="200">
+            <Text as="h3" variant="headingSm">Step 1: Products Synced</Text>
+            <Text as="p" variant="bodySm" tone="subdued">
+              Your products are automatically synced from Shopify during app installation and kept up to date.
+            </Text>
+          </BlockStack>
+        </InlineStack>
 
-      <s-divider />
+        <Divider />
 
-      <s-stack direction="inline" gap="base" blockAlign="start">
-        {webhookLoading ? (
-          <s-spinner size="small" accessibilityLabel="Checking webhook status" />
-        ) : webhookRegistered ? (
-          <s-badge tone="success" icon="check-circle">Done</s-badge>
-        ) : webhookUnknown ? (
-          <s-badge tone="read-only" icon="circle">Unknown</s-badge>
-        ) : (
-          <s-badge tone="warning" icon="alert-circle">Required</s-badge>
-        )}
-        <s-stack direction="block" gap="small">
-          <s-text variant="headingSm">Step 2: Order Tracking Webhook</s-text>
+        <InlineStack gap="400" blockAlign="start">
           {webhookLoading ? (
-            <s-text variant="bodySm" tone="subdued">Checking webhook status...</s-text>
+            <Spinner size="small" accessibilityLabel="Checking webhook status" />
           ) : webhookRegistered ? (
-            <s-text variant="bodySm" tone="subdued">
-              Order tracking webhook is registered and ready to track conversions.
-            </s-text>
+            <Badge tone="success">Done</Badge>
           ) : webhookUnknown ? (
-            <s-text variant="bodySm" tone="subdued">
-              Unable to check webhook status in development mode. When running with a real Shopify session, you can verify and register the webhook.
-            </s-text>
+            <Badge tone="read-only">Unknown</Badge>
           ) : (
-            <s-stack direction="block" gap="small">
-              <s-text variant="bodySm" tone="subdued">
-                The order tracking webhook is not registered. Click below to register it for conversion tracking.
-              </s-text>
-              <s-button
-                variant="primary"
-                size="slim"
-                onClick={() => registerWebhookMutation.mutate()}
-                disabled={registerWebhookMutation.isPending}
-                loading={registerWebhookMutation.isPending}
-                data-testid="button-register-webhook"
-              >
-                Register Webhook
-              </s-button>
-            </s-stack>
+            <Badge tone="warning">Required</Badge>
           )}
-        </s-stack>
-      </s-stack>
+          <BlockStack gap="200">
+            <Text as="h3" variant="headingSm">Step 2: Order Tracking Webhook</Text>
+            {webhookLoading ? (
+              <Text as="p" variant="bodySm" tone="subdued">Checking webhook status...</Text>
+            ) : webhookRegistered ? (
+              <Text as="p" variant="bodySm" tone="subdued">
+                Order tracking webhook is registered and ready to track conversions.
+              </Text>
+            ) : webhookUnknown ? (
+              <Text as="p" variant="bodySm" tone="subdued">
+                Unable to check webhook status in development mode. When running with a real Shopify session, you can verify and register the webhook.
+              </Text>
+            ) : (
+              <BlockStack gap="200">
+                <Text as="p" variant="bodySm" tone="subdued">
+                  The order tracking webhook is not registered. Click below to register it for conversion tracking.
+                </Text>
+                <Button
+                  variant="primary"
+                  size="slim"
+                  onClick={() => registerWebhookMutation.mutate()}
+                  disabled={registerWebhookMutation.isPending}
+                  loading={registerWebhookMutation.isPending}
+                  data-testid="button-register-webhook"
+                >
+                  Register Webhook
+                </Button>
+              </BlockStack>
+            )}
+          </BlockStack>
+        </InlineStack>
 
-      <s-divider />
+        <Divider />
 
-      <s-stack direction="inline" gap="base" blockAlign="start">
-        <s-badge tone="info" icon="wand">Next</s-badge>
-        <s-stack direction="block" gap="small">
-          <s-text variant="headingSm">Step 3: Create Your First Optimization</s-text>
-          <s-text variant="bodySm" tone="subdued">
-            Accept AI recommendations to automatically create and activate product optimizations. Changes are applied directly to your Shopify products.
-          </s-text>
-          <s-banner tone="info">
-            <strong>Product optimizations</strong> (price, title, description) modify your actual Shopify product data and work immediately - no additional setup required.
-          </s-banner>
-          <s-button-group>
-            <Link href="/recommendations">
-              <s-button variant="primary" data-testid="link-ai-recommendations">
-                View AI Recommendations
-              </s-button>
+        <InlineStack gap="400" blockAlign="start">
+          <Badge tone="info">Next</Badge>
+          <BlockStack gap="200">
+            <Text as="h3" variant="headingSm">Step 3: Create Your First Optimization</Text>
+            <Text as="p" variant="bodySm" tone="subdued">
+              Accept AI recommendations to automatically create and activate product optimizations. Changes are applied directly to your Shopify products.
+            </Text>
+            <Banner tone="info">
+              <p><strong>Product optimizations</strong> (price, title, description) modify your actual Shopify product data and work immediately - no additional setup required.</p>
+            </Banner>
+            <ButtonGroup>
+              <Link href="/recommendations">
+                <Button variant="primary" data-testid="link-ai-recommendations">
+                  View AI Recommendations
+                </Button>
+              </Link>
+              <Link href="/optimizations">
+                <Button data-testid="link-active-optimizations">
+                  View Optimizations
+                </Button>
+              </Link>
+            </ButtonGroup>
+          </BlockStack>
+        </InlineStack>
+
+        <Divider />
+
+        <InlineStack gap="400" blockAlign="start">
+          <Badge tone="read-only">Optional</Badge>
+          <BlockStack gap="200">
+            <Text as="h3" variant="headingSm">Advanced: Enable Theme Extension (Optional)</Text>
+            <Text as="p" variant="bodySm" tone="subdued">
+              For enhanced visitor tracking and custom content experiments (Slot Experiments), enable the CRO Runtime in your theme. This requires the extension to be deployed first.
+            </Text>
+            <Link href="/settings">
+              <Button icon={SettingsIcon} data-testid="link-slot-instructions">
+                View Setup Instructions
+              </Button>
             </Link>
-            <Link href="/optimizations">
-              <s-button variant="secondary" data-testid="link-active-optimizations">
-                View Optimizations
-              </s-button>
+          </BlockStack>
+        </InlineStack>
+
+        <Divider />
+
+        <Box padding="200">
+          <Text as="p" variant="bodySm" tone="subdued" alignment="center">
+            Need help? Visit{' '}
+            <Link href="/settings">
+              Settings
             </Link>
-          </s-button-group>
-        </s-stack>
-      </s-stack>
-
-      <s-divider />
-
-      <s-stack direction="inline" gap="base" blockAlign="start">
-        <s-badge tone="read-only" icon="circle">Optional</s-badge>
-        <s-stack direction="block" gap="small">
-          <s-text variant="headingSm">Advanced: Enable Theme Extension (Optional)</s-text>
-          <s-text variant="bodySm" tone="subdued">
-            For enhanced visitor tracking and custom content experiments (Slot Experiments), enable the CRO Runtime in your theme. This requires the extension to be deployed first.
-          </s-text>
-          <Link href="/settings">
-            <s-button variant="secondary" icon="settings" data-testid="link-slot-instructions">
-              View Setup Instructions
-            </s-button>
-          </Link>
-        </s-stack>
-      </s-stack>
-
-      <s-divider />
-
-      <s-box padding="small">
-        <s-text variant="bodySm" tone="subdued" alignment="center">
-          Need help? Visit{' '}
-          <Link href="/settings">
-            <s-link>Settings</s-link>
-          </Link>
-          {' '}for detailed configuration
-        </s-text>
-      </s-box>
-    </s-section>
+            {' '}for detailed configuration
+          </Text>
+        </Box>
+      </BlockStack>
+    </Card>
   );
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { Page, Card, Text, InlineGrid, BlockStack, InlineStack, Button } from "@shopify/polaris";
 import DashboardHeader from "@/components/DashboardHeader";
 import MetricCard from "@/components/MetricCard";
 import OptimizationHistoryTable from "@/components/OptimizationHistoryTable";
@@ -328,7 +329,7 @@ export default function Dashboard() {
   };
 
   return (
-    <s-page size="large">
+    <Page fullWidth>
       <DashboardHeader 
         activeOptimizations={activeOptimizationsCount} 
         lastSync={(() => {
@@ -349,11 +350,11 @@ export default function Dashboard() {
         quotaTotal={quotaData?.quota}
       />
       
-      <s-section>
-        <s-text variant="headingSm" tone="subdued" data-testid="text-all-time-heading">
+      <Card>
+        <Text as="h2" variant="headingSm" tone="subdued" data-testid="text-all-time-heading">
           All-Time Performance
-        </s-text>
-        <s-grid columns="4" gap="base">
+        </Text>
+        <InlineGrid columns={4} gap="400">
           <MetricCard 
             title="Optimizations Run" 
             value={dashboardData?.allTimeMetrics?.optimizationCount?.toString() || '0'}
@@ -377,14 +378,14 @@ export default function Dashboard() {
             valueClassName={dashboardData?.allTimeMetrics ? formatIncrementalConversions(dashboardData.allTimeMetrics.incrementalConversions).className : ''}
             subtitle="lift from optimizations"
           />
-        </s-grid>
-      </s-section>
+        </InlineGrid>
+      </Card>
 
-      <s-section>
-        <s-text variant="headingSm" tone="subdued" data-testid="text-active-heading">
+      <Card>
+        <Text as="h2" variant="headingSm" tone="subdued" data-testid="text-active-heading">
           Currently Active
-        </s-text>
-        <s-grid columns="4" gap="base">
+        </Text>
+        <InlineGrid columns={4} gap="400">
           <MetricCard 
             title="Active Optimizations" 
             value={dashboardData?.activeMetrics?.optimizationCount?.toString() || '0'}
@@ -408,8 +409,8 @@ export default function Dashboard() {
             valueClassName={dashboardData?.activeMetrics ? formatIncrementalConversions(dashboardData.activeMetrics.incrementalConversions).className : ''}
             subtitle="lift from optimizations"
           />
-        </s-grid>
-      </s-section>
+        </InlineGrid>
+      </Card>
 
       {activeOptimizationsCount === 0 && completedOptimizations.length === 0 && (
         <SetupGuide />
@@ -420,33 +421,33 @@ export default function Dashboard() {
       )}
 
       {activeOptimizationsCount > 0 && (
-        <s-section>
-          <s-stack direction="inline" align="space-between" blockAlign="center" gap="base">
-            <s-stack direction="block" gap="small">
-              <s-text variant="headingSm">Active Optimizations</s-text>
-              <s-text variant="bodySm" tone="subdued">
+        <Card>
+          <InlineStack align="space-between" blockAlign="center" gap="400">
+            <BlockStack gap="200">
+              <Text as="h2" variant="headingSm">Active Optimizations</Text>
+              <Text as="p" variant="bodySm" tone="subdued">
                 You have {activeOptimizationsCount} optimization{activeOptimizationsCount === 1 ? '' : 's'} running live
-              </s-text>
-            </s-stack>
+              </Text>
+            </BlockStack>
             <Link href="/optimizations">
-              <s-button variant="secondary" data-testid="button-view-optimizations">
+              <Button data-testid="button-view-optimizations">
                 View All
-              </s-button>
+              </Button>
             </Link>
-          </s-stack>
-        </s-section>
+          </InlineStack>
+        </Card>
       )}
 
       {formattedOptimizations.length > 0 && (
-        <s-section>
-          <s-text variant="headingMd">Completed Optimizations</s-text>
+        <Card>
+          <Text as="h2" variant="headingMd">Completed Optimizations</Text>
           <OptimizationHistoryTable 
             optimizations={formattedOptimizations} 
             onStartOptimization={(optimizationId) => activateOptimizationMutation.mutate(optimizationId)}
             onStopOptimization={(optimizationId) => deactivateOptimizationMutation.mutate(optimizationId)}
           />
-        </s-section>
+        </Card>
       )}
-    </s-page>
+    </Page>
   );
 }

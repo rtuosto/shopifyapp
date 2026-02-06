@@ -1,3 +1,5 @@
+import { Box, BlockStack, InlineStack, Badge, Text } from "@shopify/polaris";
+
 interface DashboardHeaderProps {
   activeOptimizations: number;
   lastSync?: string;
@@ -12,21 +14,21 @@ export default function DashboardHeader({
   quotaTotal = 20
 }: DashboardHeaderProps) {
   return (
-    <s-box padding="none" data-testid="dashboard-header">
-      <s-stack direction="block" gap="small">
-        <s-text variant="headingLg" data-testid="text-dashboard-title">Dashboard</s-text>
-        <s-stack direction="inline" gap="small" blockAlign="center">
-          <s-badge tone="info" data-testid="badge-active-optimizations">
-            {activeOptimizations} Active
-          </s-badge>
-          <s-badge tone="info" icon="wand" data-testid="badge-quota">
-            {quotaUsed} AI Ideas Used · Beta: Unlimited
-          </s-badge>
-          <s-text variant="bodySm" tone="subdued" data-testid="text-last-sync">
+    <Box padding="0" data-testid="dashboard-header">
+      <BlockStack gap="200">
+        <Text as="h1" variant="headingLg" data-testid="text-dashboard-title">Dashboard</Text>
+        <InlineStack gap="200" blockAlign="center">
+          <Badge tone="info" data-testid="badge-active-optimizations">
+            {`${activeOptimizations} Active`}
+          </Badge>
+          <Badge tone="info" data-testid="badge-quota">
+            {`${quotaUsed} AI Ideas Used · Beta: Unlimited`}
+          </Badge>
+          <Text as="span" variant="bodySm" tone="subdued" data-testid="text-last-sync">
             Last synced {lastSync}
-          </s-text>
-        </s-stack>
-      </s-stack>
-    </s-box>
+          </Text>
+        </InlineStack>
+      </BlockStack>
+    </Box>
   );
 }

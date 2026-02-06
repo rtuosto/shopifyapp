@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Page, Card, BlockStack, InlineStack, Text, Button, Banner, Badge, Box, Divider, InlineGrid, Spinner } from "@shopify/polaris";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface BillingStatus {
@@ -106,191 +107,187 @@ export default function Billing() {
 
   if (isLoading) {
     return (
-      <s-page>
-        <s-box padding="base" minBlockSize="400px">
-          <s-stack direction="block" align="center" blockAlign="center">
-            <s-spinner size="large" accessibilityLabel="Loading billing information" data-testid="spinner-billing-loading" />
-          </s-stack>
-        </s-box>
-      </s-page>
+      <Page>
+        <Box padding="400" minHeight="400px">
+          <BlockStack align="center">
+            <Spinner size="large" accessibilityLabel="Loading billing information" data-testid="spinner-billing-loading" />
+          </BlockStack>
+        </Box>
+      </Page>
     );
   }
 
   return (
-    <s-page>
-      <s-stack direction="block" gap="large">
-        <s-stack direction="block" gap="small">
-          <s-text variant="headingLg" data-testid="text-billing-title">Plans & Billing</s-text>
-          <s-text variant="bodySm" tone="subdued">Manage your subscription and billing</s-text>
-        </s-stack>
+    <Page>
+      <BlockStack gap="600">
+        <BlockStack gap="200">
+          <Text as="h1" variant="headingLg" data-testid="text-billing-title">Plans & Billing</Text>
+          <Text as="p" variant="bodySm" tone="subdued">Manage your subscription and billing</Text>
+        </BlockStack>
 
         {isBeta && (
-          <s-banner tone="info" data-testid="alert-beta-access">
-            You're currently on beta access with all features unlocked. When the app launches, you'll need to select a plan.
-          </s-banner>
+          <Banner tone="info" data-testid="alert-beta-access">
+            <p>You're currently on beta access with all features unlocked. When the app launches, you'll need to select a plan.</p>
+          </Banner>
         )}
 
         {billing?.subscription && (
-          <s-section data-testid="card-current-subscription">
-            <s-stack direction="block" gap="base">
-              <s-stack direction="inline" align="space-between" blockAlign="center" wrap>
-                <s-stack direction="block" gap="small">
-                  <s-text variant="headingMd">Current Subscription</s-text>
-                  <s-text variant="bodySm" tone="subdued">{billing.subscription.name}</s-text>
-                </s-stack>
-                <s-badge
-                  tone={isActive ? "success" : "read-only"}
+          <Card data-testid="card-current-subscription">
+            <BlockStack gap="400">
+              <InlineStack align="space-between" blockAlign="center" wrap={false}>
+                <BlockStack gap="200">
+                  <Text as="h2" variant="headingMd">Current Subscription</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">{billing.subscription.name}</Text>
+                </BlockStack>
+                <Badge
+                  tone={isActive ? "success" : undefined}
                   data-testid="badge-subscription-status"
                 >
                   {billing.subscription.status}
-                </s-badge>
-              </s-stack>
+                </Badge>
+              </InlineStack>
 
-              <s-stack direction="inline" gap="large" wrap>
+              <InlineStack gap="600" wrap={true}>
                 {billing.subscription.price && (
-                  <s-stack direction="inline" gap="small">
-                    <s-text variant="bodySm" tone="subdued">Price:</s-text>
-                    <s-text variant="bodySm" fontWeight="semibold" data-testid="text-subscription-price">{billing.subscription.price}/month</s-text>
-                  </s-stack>
+                  <InlineStack gap="200">
+                    <Text as="span" variant="bodySm" tone="subdued">Price:</Text>
+                    <Text as="span" variant="bodySm" fontWeight="semibold" data-testid="text-subscription-price">{billing.subscription.price}/month</Text>
+                  </InlineStack>
                 )}
                 {billing.subscription.trialDays > 0 && (
-                  <s-stack direction="inline" gap="small">
-                    <s-text variant="bodySm" tone="subdued">Trial:</s-text>
-                    <s-text variant="bodySm" fontWeight="semibold">{billing.subscription.trialDays} days</s-text>
-                  </s-stack>
+                  <InlineStack gap="200">
+                    <Text as="span" variant="bodySm" tone="subdued">Trial:</Text>
+                    <Text as="span" variant="bodySm" fontWeight="semibold">{billing.subscription.trialDays} days</Text>
+                  </InlineStack>
                 )}
                 {billing.subscription.currentPeriodEnd && (
-                  <s-stack direction="inline" gap="small">
-                    <s-text variant="bodySm" tone="subdued">Next billing:</s-text>
-                    <s-text variant="bodySm" fontWeight="semibold">
+                  <InlineStack gap="200">
+                    <Text as="span" variant="bodySm" tone="subdued">Next billing:</Text>
+                    <Text as="span" variant="bodySm" fontWeight="semibold">
                       {new Date(billing.subscription.currentPeriodEnd).toLocaleDateString()}
-                    </s-text>
-                  </s-stack>
+                    </Text>
+                  </InlineStack>
                 )}
                 {billing.subscription.test && (
-                  <s-badge tone="read-only">Test Mode</s-badge>
+                  <Badge>Test Mode</Badge>
                 )}
-              </s-stack>
+              </InlineStack>
 
-              <s-button
+              <Button
                 variant="primary"
                 tone="critical"
-                size="slim"
                 onClick={() => cancelMutation.mutate(billing.subscription!.id)}
                 disabled={cancelMutation.isPending}
                 loading={cancelMutation.isPending}
                 data-testid="button-cancel-subscription"
               >
                 Cancel Subscription
-              </s-button>
-            </s-stack>
-          </s-section>
+              </Button>
+            </BlockStack>
+          </Card>
         )}
 
-        <s-grid columns="3" gap="base">
+        <InlineGrid columns={3} gap="400">
           {plans.map((plan) => {
             const isCurrentPlan = currentPlan === plan.id || (isBeta && plan.id === "pro");
             const canUpgrade = !isCurrentPlan && plan.id !== "free";
             const isPlanActive = isCurrentPlan && isActive;
 
             return (
-              <s-section key={plan.id} data-testid={`card-plan-${plan.id}`}>
-                <s-stack direction="block" gap="base">
-                  <s-stack direction="inline" align="space-between" blockAlign="center">
-                    <s-text variant="headingMd">{plan.name}</s-text>
+              <Card key={plan.id} data-testid={`card-plan-${plan.id}`}>
+                <BlockStack gap="400">
+                  <InlineStack align="space-between" blockAlign="center">
+                    <Text as="h2" variant="headingMd">{plan.name}</Text>
                     {plan.popular && (
-                      <s-badge tone="info" data-testid="badge-popular">Popular</s-badge>
+                      <Badge tone="info" data-testid="badge-popular">Popular</Badge>
                     )}
-                  </s-stack>
+                  </InlineStack>
 
-                  <s-stack direction="inline" blockAlign="baseline" gap="small">
-                    <s-text variant="headingXl" data-testid={`text-price-${plan.id}`}>{plan.price}</s-text>
-                    <s-text variant="bodySm" tone="subdued">/{plan.period}</s-text>
-                  </s-stack>
+                  <InlineStack blockAlign="baseline" gap="200">
+                    <Text as="p" variant="headingXl" data-testid={`text-price-${plan.id}`}>{plan.price}</Text>
+                    <Text as="span" variant="bodySm" tone="subdued">/{plan.period}</Text>
+                  </InlineStack>
 
-                  <s-text variant="bodySm" tone="subdued">{plan.description}</s-text>
+                  <Text as="p" variant="bodySm" tone="subdued">{plan.description}</Text>
 
-                  <s-divider />
+                  <Divider />
 
-                  <s-stack direction="block" gap="small">
+                  <BlockStack gap="200">
                     {plan.features.map((feature, i) => (
-                      <s-stack direction="inline" gap="small" blockAlign="start" key={i}>
-                        <s-text variant="bodySm" tone="success">&#10003;</s-text>
-                        <s-text variant="bodySm">{feature}</s-text>
-                      </s-stack>
+                      <InlineStack gap="200" blockAlign="start" key={i}>
+                        <Text as="span" variant="bodySm" tone="success">&#10003;</Text>
+                        <Text as="span" variant="bodySm">{feature}</Text>
+                      </InlineStack>
                     ))}
-                  </s-stack>
+                  </BlockStack>
 
                   {isPlanActive || (isBeta && plan.id === "pro") ? (
-                    <s-button
-                      variant="secondary"
+                    <Button
                       fullWidth
                       disabled
                       data-testid={`button-plan-${plan.id}`}
                     >
                       {isBeta ? "Beta Access" : "Current Plan"}
-                    </s-button>
+                    </Button>
                   ) : canUpgrade ? (
-                    <s-button
-                      variant={plan.popular ? "primary" : "secondary"}
+                    <Button
+                      variant={plan.popular ? "primary" : undefined}
                       fullWidth
-                      icon="external-link"
                       onClick={() => subscribeMutation.mutate(plan.id)}
                       disabled={subscribeMutation.isPending}
                       loading={subscribeMutation.isPending}
                       data-testid={`button-plan-${plan.id}`}
                     >
                       {plan.cta}
-                    </s-button>
+                    </Button>
                   ) : (
-                    <s-button
-                      variant="secondary"
+                    <Button
                       fullWidth
                       disabled
                       data-testid={`button-plan-${plan.id}`}
                     >
                       {plan.cta}
-                    </s-button>
+                    </Button>
                   )}
-                </s-stack>
-              </s-section>
+                </BlockStack>
+              </Card>
             );
           })}
-        </s-grid>
+        </InlineGrid>
 
-        <s-section data-testid="card-billing-faq">
-          <s-stack direction="block" gap="base">
-            <s-text variant="headingMd">Billing FAQ</s-text>
+        <Card data-testid="card-billing-faq">
+          <BlockStack gap="400">
+            <Text as="h2" variant="headingMd">Billing FAQ</Text>
 
-            <s-stack direction="block" gap="base">
-              <s-stack direction="block" gap="small">
-                <s-text variant="bodyMd" fontWeight="semibold">How does billing work?</s-text>
-                <s-text variant="bodySm" tone="subdued">
+            <BlockStack gap="400">
+              <BlockStack gap="200">
+                <Text as="p" variant="bodyMd" fontWeight="semibold">How does billing work?</Text>
+                <Text as="p" variant="bodySm" tone="subdued">
                   All charges go through Shopify's billing system. You'll see charges on your Shopify invoice, not a separate bill.
-                </s-text>
-              </s-stack>
+                </Text>
+              </BlockStack>
 
-              <s-divider />
+              <Divider />
 
-              <s-stack direction="block" gap="small">
-                <s-text variant="bodyMd" fontWeight="semibold">Can I cancel anytime?</s-text>
-                <s-text variant="bodySm" tone="subdued">
+              <BlockStack gap="200">
+                <Text as="p" variant="bodyMd" fontWeight="semibold">Can I cancel anytime?</Text>
+                <Text as="p" variant="bodySm" tone="subdued">
                   Yes, you can cancel your subscription at any time. Your features will remain active until the end of the current billing period.
-                </s-text>
-              </s-stack>
+                </Text>
+              </BlockStack>
 
-              <s-divider />
+              <Divider />
 
-              <s-stack direction="block" gap="small">
-                <s-text variant="bodyMd" fontWeight="semibold">What happens to my data if I downgrade?</s-text>
-                <s-text variant="bodySm" tone="subdued">
+              <BlockStack gap="200">
+                <Text as="p" variant="bodyMd" fontWeight="semibold">What happens to my data if I downgrade?</Text>
+                <Text as="p" variant="bodySm" tone="subdued">
                   Your optimization data and history are preserved. Active optimizations beyond your plan limit will be paused, not deleted.
-                </s-text>
-              </s-stack>
-            </s-stack>
-          </s-stack>
-        </s-section>
-      </s-stack>
-    </s-page>
+                </Text>
+              </BlockStack>
+            </BlockStack>
+          </BlockStack>
+        </Card>
+      </BlockStack>
+    </Page>
   );
 }

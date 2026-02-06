@@ -5,6 +5,21 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Product, Recommendation, Optimization } from "@shared/schema";
 import { Link } from "wouter";
+import {
+  Page,
+  Card,
+  Text,
+  BlockStack,
+  InlineStack,
+  InlineGrid,
+  Box,
+  Badge,
+  Banner,
+  Button,
+  Select,
+  ButtonGroup,
+  Modal,
+} from "@shopify/polaris";
 
 export default function AIRecommendations() {
   const { toast } = useToast();
@@ -14,7 +29,6 @@ export default function AIRecommendations() {
   const [dismissingRecommendation, setDismissingRecommendation] = useState<Recommendation | null>(null);
   const [activeTab, setActiveTab] = useState<"pending" | "archive">("pending");
 
-  // Fetch quota data
   const { data: quotaData } = useQuery<{
     quota: number;
     used: number;
@@ -25,17 +39,14 @@ export default function AIRecommendations() {
     queryKey: ["/api/quota"],
   });
 
-  // Fetch shop domain
   const { data: shopData } = useQuery<{ shop: string }>({
     queryKey: ["/api/shop"],
   });
 
-  // Fetch products
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["/api/products"],
   });
 
-  // Fetch pending recommendations
   const { data: recommendations = [] } = useQuery<Recommendation[]>({
     queryKey: ["/api/recommendations", "pending"],
     queryFn: async () => {
@@ -45,7 +56,6 @@ export default function AIRecommendations() {
     },
   });
 
-  // Fetch archived recommendations
   const { data: archivedRecommendations = [] } = useQuery<Recommendation[]>({
     queryKey: ["/api/recommendations", "archived"],
     queryFn: async () => {
@@ -55,7 +65,6 @@ export default function AIRecommendations() {
     },
   });
 
-  // Generate store-wide recommendations
   const generateStoreRecommendationsMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/recommendations/store-analysis");
@@ -80,7 +89,6 @@ export default function AIRecommendations() {
     },
   });
 
-  // Generate product-specific recommendation
   const generateProductRecommendationMutation = useMutation({
     mutationFn: async (productId: string) => {
       const res = await apiRequest("POST", `/api/recommendations/product/${productId}/generate`);
@@ -104,7 +112,6 @@ export default function AIRecommendations() {
     },
   });
 
-  // Dismiss recommendation (just dismiss or dismiss & replace)
   const dismissRecommendationMutation = useMutation({
     mutationFn: async ({ id, replace }: { id: string; replace: boolean }) => {
       const res = await apiRequest("POST", `/api/recommendations/${id}/dismiss`, { replace });
@@ -139,7 +146,6 @@ export default function AIRecommendations() {
     },
   });
 
-  // Restore recommendation
   const restoreRecommendationMutation = useMutation({
     mutationFn: async (id: string) => {
       const res = await apiRequest("POST", `/api/recommendations/${id}/restore`);
@@ -162,7 +168,6 @@ export default function AIRecommendations() {
     },
   });
 
-  // Helper function to build optimization payload (shared between draft and activate flows)
   const buildTestPayload = (recommendationId: string, editedChanges?: Record<string, any>) => {
     const recommendation = recommendations.find(r => r.id === recommendationId);
     if (!recommendation) throw new Error("Recommendation not found");
@@ -183,7 +188,6 @@ export default function AIRecommendations() {
       }));
     }
 
-    // Use edited changes if provided, otherwise use recommendation's proposed changes
     const proposedChanges = editedChanges || recommendation.proposedChanges;
 
     const variantData: Record<string, any> = {
@@ -214,19 +218,16 @@ export default function AIRecommendations() {
     };
   };
 
-  // Save optimization as draft (without activating)
   const saveDraftOptimizationMutation = useMutation({
     mutationFn: async ({ recommendationId, editedChanges }: { recommendationId: string; editedChanges?: Record<string, any> }) => {
       const optimizationData = buildTestPayload(recommendationId, editedChanges);
 
-      // Create the optimization as draft (without activating)
       const createRes = await apiRequest("POST", "/api/optimizations", optimizationData);
       const createdTest = await createRes.json();
 
       return { test: createdTest, recommendationId };
     },
     onSuccess: async (data) => {
-      // Do NOT update recommendation status - keep it as "pending"
       toast({
         title: "Draft Saved",
         description: "Test saved as draft. Activate it from the Tests page when ready.",
@@ -243,16 +244,13 @@ export default function AIRecommendations() {
     },
   });
 
-  // Create and activate test from recommendation
   const createTestMutation = useMutation({
     mutationFn: async ({ recommendationId, editedChanges }: { recommendationId: string; editedChanges?: Record<string, any> }) => {
       const optimizationData = buildTestPayload(recommendationId, editedChanges);
 
-      // Create the test
       const createRes = await apiRequest("POST", "/api/optimizations", optimizationData);
       const createdTest = await createRes.json();
 
-      // Immediately activate the test
       const activateRes = await apiRequest("POST", `/api/optimizations/${createdTest.id}/activate`);
       const activatedTest = await activateRes.json();
 
@@ -282,8 +280,6 @@ export default function AIRecommendations() {
     const rec = recommendations.find(r => r.id === id) || archivedRecommendations.find(r => r.id === id);
     if (!rec) return;
 
-    // CRITICAL: Open window IMMEDIATELY (synchronously) during user click
-    // This must happen BEFORE any async operations to avoid popup blockers
     const previewWindow = window.open('about:blank', '_blank', 'width=1400,height=900');
     
     if (!previewWindow) {
@@ -296,7 +292,6 @@ export default function AIRecommendations() {
     }
 
     try {
-      // Show loading state in the preview window
       previewWindow.document.write(`
         <html>
           <head>
@@ -339,7 +334,6 @@ export default function AIRecommendations() {
         </html>
       `);
 
-      // Create preview session and get data
       const res = await apiRequest("POST", "/api/preview/sessions", {
         recommendationId: id,
       });
@@ -350,7 +344,6 @@ export default function AIRecommendations() {
       const changes = data.changes || [];
       const storefrontUrl = data.storefrontUrl || '';
       
-      // Helper to escape HTML
       const escapeHtml = (text: string | null | undefined): string => {
         if (!text) return '';
         const htmlEscapes: Record<string, string> = {
@@ -363,7 +356,6 @@ export default function AIRecommendations() {
         return text.replace(/[&<>"']/g, (char) => htmlEscapes[char] || char);
       };
 
-      // Render the preview with tabbed interface (Comparison + Storefront Preview)
       previewWindow.document.open();
       previewWindow.document.write(`
         <!DOCTYPE html>
@@ -601,7 +593,6 @@ export default function AIRecommendations() {
               window.close();
             }
 
-            // Tab switching
             document.querySelectorAll('.tab').forEach(tab => {
               tab.addEventListener('click', () => {
                 document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -609,7 +600,6 @@ export default function AIRecommendations() {
                 tab.classList.add('active');
                 document.getElementById(tab.dataset.tab).classList.add('active');
                 
-                // Load iframe on first storefront tab click
                 if (tab.dataset.tab === 'storefront' && !iframeLoaded && storefrontUrl) {
                   loadStorefrontPreview();
                 }
@@ -623,19 +613,15 @@ export default function AIRecommendations() {
               const iframe = document.getElementById('storefront-iframe');
               const loading = document.getElementById('iframe-loading');
               
-              // Use server-side proxy to fetch page (avoids CORS)
               const previewToken = ${JSON.stringify(data.token)};
               const proxyUrl = '/api/preview/proxy/' + previewToken;
               fetch(proxyUrl)
                 .then(res => res.text())
                 .then(html => {
-                  // Parse and modify the HTML
                   const parser = new DOMParser();
                   const doc = parser.parseFromString(html, 'text/html');
                   
-                  // Inject modifications for title
                   if (variantData.changes.includes('title') && variantData.title) {
-                    // Try common Shopify title selectors
                     const titleSelectors = [
                       'h1.product__title',
                       'h1.product-title', 
@@ -654,7 +640,6 @@ export default function AIRecommendations() {
                     }
                   }
                   
-                  // Inject modifications for price
                   if (variantData.changes.includes('price') && variantData.price) {
                     const priceSelectors = [
                       '.product__price .price-item--regular',
@@ -677,7 +662,6 @@ export default function AIRecommendations() {
                     }
                   }
                   
-                  // Inject modifications for description
                   if (variantData.changes.includes('description') && variantData.description) {
                     const descSelectors = [
                       '.product__description',
@@ -695,18 +679,15 @@ export default function AIRecommendations() {
                     }
                   }
                   
-                  // Add base tag to fix relative URLs
                   const base = doc.createElement('base');
                   base.href = storefrontUrl;
                   doc.head.insertBefore(base, doc.head.firstChild);
                   
-                  // Add preview banner at top
                   const banner = doc.createElement('div');
                   banner.style.cssText = 'background:linear-gradient(135deg,#5C6AC4,#3b4199);color:white;padding:12px 20px;text-align:center;font-family:system-ui;font-size:14px;position:sticky;top:0;z-index:99999;';
                   banner.innerHTML = '🔍 <strong>Preview Mode</strong> - Changes shown below are simulated and not yet live';
                   doc.body.insertBefore(banner, doc.body.firstChild);
                   
-                  // Write to iframe
                   iframe.srcdoc = doc.documentElement.outerHTML;
                   
                   iframe.onload = () => {
@@ -725,13 +706,11 @@ export default function AIRecommendations() {
       `);
       previewWindow.document.close();
 
-      // Listen for approval messages from preview window
       const messageHandler = (event: MessageEvent) => {
         if (event.data?.type === 'shoptimizer-preview-complete') {
           console.log('[Dashboard] Preview completed:', event.data);
           
           if (event.data.approved) {
-            // User approved the recommendation - create test
             createTestMutation.mutate({ recommendationId: id });
           } else {
             toast({
@@ -740,14 +719,12 @@ export default function AIRecommendations() {
             });
           }
           
-          // Clean up listener
           window.removeEventListener('message', messageHandler);
         }
       };
       
       window.addEventListener('message', messageHandler);
       
-      // Clean up listener after 30 minutes
       setTimeout(() => {
         window.removeEventListener('message', messageHandler);
       }, 30 * 60 * 1000);
@@ -755,7 +732,6 @@ export default function AIRecommendations() {
     } catch (error) {
       console.error("Error creating preview session:", error);
       
-      // Show helpful error message in the preview window
       if (previewWindow && !previewWindow.closed) {
         previewWindow.document.write(`
           <html>
@@ -887,7 +863,6 @@ export default function AIRecommendations() {
       return;
     }
 
-    // Only extract fields that were actually changed in the recommendation
     const rec = recommendations.find(r => r.id === id);
     if (!rec) {
       createTestMutation.mutate({ recommendationId: id });
@@ -896,12 +871,10 @@ export default function AIRecommendations() {
 
     const editedChanges: Record<string, any> = {};
     
-    // Only include fields that were in the original proposed changes
     if ('title' in rec.proposedChanges) {
       editedChanges.title = editedVariant.title;
     }
     if ('price' in rec.proposedChanges) {
-      // Keep price as number for variant pricing multiplier to work correctly
       editedChanges.price = editedVariant.price;
     }
     if ('description' in rec.proposedChanges) {
@@ -917,7 +890,6 @@ export default function AIRecommendations() {
       return;
     }
 
-    // Only extract fields that were actually changed in the recommendation
     const rec = recommendations.find(r => r.id === id);
     if (!rec) {
       saveDraftOptimizationMutation.mutate({ recommendationId: id });
@@ -926,12 +898,10 @@ export default function AIRecommendations() {
 
     const editedChanges: Record<string, any> = {};
     
-    // Only include fields that were in the original proposed changes
     if ('title' in rec.proposedChanges) {
       editedChanges.title = editedVariant.title;
     }
     if ('price' in rec.proposedChanges) {
-      // Keep price as number for variant pricing multiplier to work correctly
       editedChanges.price = editedVariant.price;
     }
     if ('description' in rec.proposedChanges) {
@@ -957,24 +927,22 @@ export default function AIRecommendations() {
   const quotaTotal = quotaData?.quota ?? 20;
 
   return (
-    <s-page>
-      <s-stack direction="block" gap="large">
-        {/* Header */}
-        <s-stack direction="inline" align="space-between" blockAlign="center" gap="base">
-          <s-stack direction="block" gap="small">
-            <s-text variant="headingLg" data-testid="text-page-title">AI Recommendations</s-text>
-            <s-text variant="bodySm" tone="subdued">
+    <Page>
+      <BlockStack gap="600">
+        <InlineStack align="space-between" blockAlign="center" gap="400">
+          <BlockStack gap="200">
+            <Text as="h1" variant="headingLg" data-testid="text-page-title">AI Recommendations</Text>
+            <Text as="p" variant="bodySm" tone="subdued">
               AI-powered optimization ideas for your products
-            </s-text>
-          </s-stack>
-          <s-badge tone="info" data-testid="badge-quota">
-            {quotaUsed} AI Ideas Used · Beta: Unlimited
-          </s-badge>
-        </s-stack>
+            </Text>
+          </BlockStack>
+          <Badge tone="info" data-testid="badge-quota">
+            {`${quotaUsed} AI Ideas Used · Beta: Unlimited`}
+          </Badge>
+        </InlineStack>
 
-        {/* Action Buttons */}
-        <s-stack direction="inline" gap="base" blockAlign="center" wrap>
-          <s-button
+        <InlineStack gap="400" blockAlign="center" wrap>
+          <Button
             variant="primary"
             onClick={() => setStoreIdeasDialogOpen(true)}
             disabled={generateStoreRecommendationsMutation.isPending}
@@ -982,23 +950,23 @@ export default function AIRecommendations() {
             data-testid="button-generate-store-ideas"
           >
             {generateStoreRecommendationsMutation.isPending ? "Generating..." : "Generate Store Ideas"}
-          </s-button>
-          <s-stack direction="inline" gap="small" blockAlign="center">
-            <s-select
+          </Button>
+          <InlineStack gap="200" blockAlign="center">
+            <Select
               label="Product"
-              labelAccessibilityVisibility="hidden"
+              labelHidden
               value={selectedProductId}
-              onChange={(e: any) => setSelectedProductId(e.target?.value || "")}
+              onChange={(value) => setSelectedProductId(value)}
               data-testid="select-product"
-            >
-              <option value="">Select a product...</option>
-              {products.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.title}
-                </option>
-              ))}
-            </s-select>
-            <s-button
+              options={[
+                { label: "Select a product...", value: "" },
+                ...products.map((product) => ({
+                  label: product.title,
+                  value: product.id,
+                })),
+              ]}
+            />
+            <Button
               onClick={() => {
                 if (selectedProductId) {
                   generateProductRecommendationMutation.mutate(selectedProductId);
@@ -1009,68 +977,66 @@ export default function AIRecommendations() {
               data-testid="button-generate-product-idea"
             >
               {generateProductRecommendationMutation.isPending ? "Generating..." : "Generate Idea"}
-            </s-button>
-          </s-stack>
-        </s-stack>
+            </Button>
+          </InlineStack>
+        </InlineStack>
 
-        {/* SDK Installation Warning */}
-        <s-banner tone="warning" heading="Preview Feature Requires SDK Installation">
-          <s-stack direction="inline" align="space-between" blockAlign="center" gap="base">
-            <s-text variant="bodySm">
+        <Banner title="Preview Feature Requires SDK Installation" tone="warning">
+          <InlineStack align="space-between" blockAlign="center" gap="400">
+            <Text as="p" variant="bodySm">
               To use the "Preview Changes" button, install the Shoptimizer SDK on your Shopify theme. Without it, preview links will show a blank page.
-            </s-text>
-            <s-button
-              variant="tertiary"
+            </Text>
+            <Button
+              variant="plain"
               size="slim"
               onClick={() => { window.location.href = '/settings'; }}
               accessibilityLabel="View Setup in Settings"
               data-testid="button-view-setup"
             >
               View Setup
-            </s-button>
-          </s-stack>
-        </s-banner>
+            </Button>
+          </InlineStack>
+        </Banner>
 
-        {/* Tabs */}
-        <s-stack direction="block" gap="base">
-          <s-button-group variant="segmented">
-            <s-button
-              variant={activeTab === "pending" ? "primary" : "secondary"}
+        <BlockStack gap="400">
+          <ButtonGroup variant="segmented">
+            <Button
+              variant={activeTab === "pending" ? "primary" : undefined}
               onClick={() => setActiveTab("pending")}
               data-testid="tab-pending"
             >
               Pending ({recommendations.length})
-            </s-button>
-            <s-button
-              variant={activeTab === "archive" ? "primary" : "secondary"}
+            </Button>
+            <Button
+              variant={activeTab === "archive" ? "primary" : undefined}
               onClick={() => setActiveTab("archive")}
               data-testid="tab-archive"
             >
               Archive ({archivedRecommendations.length})
-            </s-button>
-          </s-button-group>
+            </Button>
+          </ButtonGroup>
 
           {activeTab === "pending" && (
-            <s-stack direction="block" gap="base">
+            <BlockStack gap="400">
               {recommendations.length === 0 ? (
-                <s-section>
-                  <s-box padding="large">
-                    <s-stack direction="block" gap="base" align="center">
-                      <s-text variant="headingMd">No Recommendations Yet</s-text>
-                      <s-text variant="bodySm" tone="subdued">
+                <Card>
+                  <Box padding="600">
+                    <BlockStack gap="400" align="center">
+                      <Text as="h2" variant="headingMd">No Recommendations Yet</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">
                         Generate AI-powered optimization ideas for your store
-                      </s-text>
-                      <s-button
+                      </Text>
+                      <Button
                         variant="primary"
                         onClick={() => setStoreIdeasDialogOpen(true)}
                       >
                         Generate Store Ideas
-                      </s-button>
-                    </s-stack>
-                  </s-box>
-                </s-section>
+                      </Button>
+                    </BlockStack>
+                  </Box>
+                </Card>
               ) : (
-                <s-grid columns="2" gap="base">
+                <InlineGrid columns={2} gap="400">
                   {recommendations.map((rec) => {
                     const product = products.find(p => p.id === rec.productId);
                     const productImage = product?.images?.[0];
@@ -1090,26 +1056,26 @@ export default function AIRecommendations() {
                       />
                     );
                   })}
-                </s-grid>
+                </InlineGrid>
               )}
-            </s-stack>
+            </BlockStack>
           )}
 
           {activeTab === "archive" && (
-            <s-stack direction="block" gap="base">
+            <BlockStack gap="400">
               {archivedRecommendations.length === 0 ? (
-                <s-section>
-                  <s-box padding="large">
-                    <s-stack direction="block" gap="base" align="center">
-                      <s-text variant="headingMd">No Archived Recommendations</s-text>
-                      <s-text variant="bodySm" tone="subdued">
+                <Card>
+                  <Box padding="600">
+                    <BlockStack gap="400" align="center">
+                      <Text as="h2" variant="headingMd">No Archived Recommendations</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">
                         Dismissed recommendations will appear here
-                      </s-text>
-                    </s-stack>
-                  </s-box>
-                </s-section>
+                      </Text>
+                    </BlockStack>
+                  </Box>
+                </Card>
               ) : (
-                <s-grid columns="2" gap="base">
+                <InlineGrid columns={2} gap="400">
                   {archivedRecommendations.map((rec) => {
                     const product = products.find(p => p.id === rec.productId);
                     const productImage = product?.images?.[0];
@@ -1126,20 +1092,19 @@ export default function AIRecommendations() {
                         borderColor="border-l-muted"
                         imageOpacity="opacity-60"
                         headerBadge={
-                          <s-badge tone="read-only">Archived</s-badge>
+                          <Badge tone="read-only">Archived</Badge>
                         }
                         customActions={
                           <>
-                            <s-button
-                              variant="tertiary"
+                            <Button
+                              variant="plain"
                               size="slim"
                               onClick={() => handlePreview(rec.id)}
                               data-testid={`button-preview-${rec.id}`}
                             >
                               Preview
-                            </s-button>
-                            <s-button
-                              variant="secondary"
+                            </Button>
+                            <Button
                               size="slim"
                               onClick={() => handleRestore(rec.id)}
                               disabled={restoreRecommendationMutation.isPending}
@@ -1147,99 +1112,92 @@ export default function AIRecommendations() {
                               data-testid={`button-restore-${rec.id}`}
                             >
                               Restore
-                            </s-button>
+                            </Button>
                           </>
                         }
                       />
                     );
                   })}
-                </s-grid>
+                </InlineGrid>
               )}
-            </s-stack>
+            </BlockStack>
           )}
-        </s-stack>
-      </s-stack>
+        </BlockStack>
+      </BlockStack>
 
-      {/* Store Ideas Confirmation Modal */}
-      {storeIdeasDialogOpen && (
-        <s-modal heading="Generate Store Ideas?" open={storeIdeasDialogOpen} data-testid="dialog-store-ideas">
-          <s-box padding="base">
-            <s-stack direction="block" gap="base">
-              <s-text variant="bodyMd">
-                This will analyze your top products and generate up to 10 AI recommendations.
-              </s-text>
-              <s-text variant="bodySm" tone="subdued">
-                Beta: Unlimited AI ideas during beta period
-              </s-text>
-            </s-stack>
-          </s-box>
-          <s-modal-actions>
-            <s-button
-              onClick={() => setStoreIdeasDialogOpen(false)}
-              data-testid="button-cancel-store-ideas"
-            >
-              Cancel
-            </s-button>
-            <s-button
-              variant="primary"
-              onClick={() => generateStoreRecommendationsMutation.mutate()}
-              disabled={generateStoreRecommendationsMutation.isPending}
-              loading={generateStoreRecommendationsMutation.isPending}
-              data-testid="button-confirm-store-ideas"
-            >
-              {generateStoreRecommendationsMutation.isPending ? "Generating..." : "Generate Ideas"}
-            </s-button>
-          </s-modal-actions>
-        </s-modal>
-      )}
+      <Modal
+        open={storeIdeasDialogOpen}
+        onClose={() => setStoreIdeasDialogOpen(false)}
+        title="Generate Store Ideas?"
+        data-testid="dialog-store-ideas"
+        primaryAction={{
+          content: generateStoreRecommendationsMutation.isPending ? "Generating..." : "Generate Ideas",
+          onAction: () => generateStoreRecommendationsMutation.mutate(),
+          disabled: generateStoreRecommendationsMutation.isPending,
+          loading: generateStoreRecommendationsMutation.isPending,
+        }}
+        secondaryActions={[{
+          content: "Cancel",
+          onAction: () => setStoreIdeasDialogOpen(false),
+        }]}
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            <Text as="p" variant="bodyMd">
+              This will analyze your top products and generate up to 10 AI recommendations.
+            </Text>
+            <Text as="p" variant="bodySm" tone="subdued">
+              Beta: Unlimited AI ideas during beta period
+            </Text>
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
 
-      {/* Dismiss Modal */}
-      {dismissDialogOpen && (
-        <s-modal heading="Dismiss Recommendation" open={dismissDialogOpen} data-testid="dialog-dismiss">
-          <s-box padding="base">
-            <s-stack direction="block" gap="base">
-              <s-text variant="bodySm" tone="subdued">
-                What would you like to do with this recommendation?
-              </s-text>
-              <s-stack direction="block" gap="small">
-                <s-text variant="bodySm">
-                  <strong>Just Dismiss:</strong> Archive this recommendation
-                </s-text>
-                <s-text variant="bodySm">
-                  <strong>Dismiss &amp; Replace:</strong> Archive this and generate a different recommendation for the same product
-                </s-text>
-              </s-stack>
-            </s-stack>
-          </s-box>
-          <s-modal-actions>
-            <s-button
-              onClick={() => {
-                if (dismissingRecommendation) {
-                  dismissRecommendationMutation.mutate({ id: dismissingRecommendation.id, replace: false });
-                }
-              }}
-              disabled={dismissRecommendationMutation.isPending}
-              loading={dismissRecommendationMutation.isPending}
-              data-testid="button-just-dismiss"
-            >
-              Just Dismiss
-            </s-button>
-            <s-button
-              variant="primary"
-              onClick={() => {
-                if (dismissingRecommendation) {
-                  dismissRecommendationMutation.mutate({ id: dismissingRecommendation.id, replace: true });
-                }
-              }}
-              disabled={dismissRecommendationMutation.isPending}
-              loading={dismissRecommendationMutation.isPending}
-              data-testid="button-dismiss-replace"
-            >
-              Dismiss &amp; Replace
-            </s-button>
-          </s-modal-actions>
-        </s-modal>
-      )}
-    </s-page>
+      <Modal
+        open={dismissDialogOpen}
+        onClose={() => {
+          setDismissDialogOpen(false);
+          setDismissingRecommendation(null);
+        }}
+        title="Dismiss Recommendation"
+        data-testid="dialog-dismiss"
+        primaryAction={{
+          content: "Dismiss & Replace",
+          onAction: () => {
+            if (dismissingRecommendation) {
+              dismissRecommendationMutation.mutate({ id: dismissingRecommendation.id, replace: true });
+            }
+          },
+          disabled: dismissRecommendationMutation.isPending,
+          loading: dismissRecommendationMutation.isPending,
+        }}
+        secondaryActions={[{
+          content: "Just Dismiss",
+          onAction: () => {
+            if (dismissingRecommendation) {
+              dismissRecommendationMutation.mutate({ id: dismissingRecommendation.id, replace: false });
+            }
+          },
+          disabled: dismissRecommendationMutation.isPending,
+          loading: dismissRecommendationMutation.isPending,
+        }]}
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            <Text as="p" variant="bodySm" tone="subdued">
+              What would you like to do with this recommendation?
+            </Text>
+            <BlockStack gap="200">
+              <Text as="p" variant="bodySm">
+                <strong>Just Dismiss:</strong> Archive this recommendation
+              </Text>
+              <Text as="p" variant="bodySm">
+                <strong>Dismiss &amp; Replace:</strong> Archive this and generate a different recommendation for the same product
+              </Text>
+            </BlockStack>
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
+    </Page>
   );
 }

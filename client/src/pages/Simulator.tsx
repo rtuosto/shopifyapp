@@ -3,6 +3,24 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Optimization, Product } from "@shared/schema";
+import {
+  Page,
+  Card,
+  Text,
+  BlockStack,
+  InlineStack,
+  InlineGrid,
+  Box,
+  Divider,
+  Spinner,
+  Badge,
+  Banner,
+  Button,
+  TextField,
+  Select,
+  Checkbox,
+  ProgressBar,
+} from "@shopify/polaris";
 
 interface EnrichedOptimization extends Optimization {
   productName: string;
@@ -261,525 +279,487 @@ export default function Simulator() {
     };
   };
 
-  const handleSelectChange = (e: Event) => {
-    const target = e.target as HTMLSelectElement;
-    setSelectedOptimizationId(target.value);
-  };
-
-  const handleVisitorsChange = (e: Event) => {
-    const target = e.target as HTMLInputElement;
-    setVisitors(Number(target.value));
-  };
-
-  const handleControlCRChange = (e: Event) => {
-    const target = e.target as HTMLInputElement;
-    setControlConversionRate(Number(target.value));
-  };
-
-  const handleVariantCRChange = (e: Event) => {
-    const target = e.target as HTMLInputElement;
-    setVariantConversionRate(Number(target.value));
-  };
-
-  const handleLiveModeChange = (e: Event) => {
-    const target = e.target as HTMLInputElement;
-    setLiveMode(target.checked);
-  };
-
   return (
-    <s-page>
-      <s-stack direction="block" gap="large">
-        <s-stack direction="block" gap="small">
-          <s-text variant="heading2xl" data-testid="text-page-title">Optimization Simulator</s-text>
-          <s-text variant="bodyMd" tone="subdued" data-testid="text-page-description">
+    <Page>
+      <BlockStack gap="600">
+        <BlockStack gap="200">
+          <Text as="h1" variant="heading2xl" data-testid="text-page-title">Optimization Simulator</Text>
+          <Text as="p" variant="bodyMd" tone="subdued" data-testid="text-page-description">
             Simulate traffic and conversions to verify A/B optimization allocation and performance tracking
-          </s-text>
-        </s-stack>
+          </Text>
+        </BlockStack>
 
-        {/* Optimization Selection */}
-        <s-section data-testid="card-optimization-selection">
-          <s-stack direction="block" gap="base">
-            <s-text variant="headingMd">Select Active Optimization</s-text>
-            <s-text variant="bodySm" tone="subdued">Choose an optimization to simulate traffic and conversions</s-text>
-            <s-divider />
+        <Card data-testid="card-optimization-selection">
+          <BlockStack gap="400">
+            <Text as="h2" variant="headingMd">Select Active Optimization</Text>
+            <Text as="p" variant="bodySm" tone="subdued">Choose an optimization to simulate traffic and conversions</Text>
+            <Divider />
             {optimizationsLoading ? (
-              <s-spinner size="small" accessibilityLabel="Loading optimizations" />
+              <Spinner size="small" accessibilityLabel="Loading optimizations" />
             ) : enrichedOptimizations.length === 0 ? (
-              <s-text variant="bodySm" tone="subdued" data-testid="text-no-optimizations">
+              <Text as="p" variant="bodySm" tone="subdued" data-testid="text-no-optimizations">
                 No active optimizations available. Create and activate an optimization from the Dashboard first.
-              </s-text>
+              </Text>
             ) : (
-              <s-stack direction="block" gap="base">
-                <s-select
+              <BlockStack gap="400">
+                <Select
                   label="Active Optimization"
                   value={selectedOptimizationId}
-                  onChange={handleSelectChange}
+                  onChange={(value) => setSelectedOptimizationId(value)}
                   data-testid="select-optimization"
-                >
-                  <option value="">Select an optimization</option>
-                  {enrichedOptimizations.map((optimization) => (
-                    <option key={optimization.id} value={optimization.id} data-testid={`option-optimization-${optimization.id}`}>
-                      {optimization.productName} - {optimization.optimizationType}
-                    </option>
-                  ))}
-                </s-select>
+                  options={[
+                    { label: "Select an optimization", value: "" },
+                    ...enrichedOptimizations.map((optimization) => ({
+                      label: `${optimization.productName} - ${optimization.optimizationType}`,
+                      value: optimization.id,
+                    })),
+                  ]}
+                />
 
                 {selectedOptimization && (
-                  <s-box padding="base" background="bg-surface-secondary" borderRadius="large" data-testid="card-optimization-info">
-                    <s-stack direction="block" gap="small">
-                      <s-stack direction="inline" align="space-between">
-                        <s-text variant="bodySm" tone="subdued">Product:</s-text>
-                        <s-text variant="bodySm" fontWeight="semibold" data-testid="text-product-name">{selectedOptimization.productName}</s-text>
-                      </s-stack>
-                      <s-stack direction="inline" align="space-between">
-                        <s-text variant="bodySm" tone="subdued">Optimization Type:</s-text>
-                        <s-text variant="bodySm" fontWeight="semibold" data-testid="text-optimization-type">{selectedOptimization.optimizationType}</s-text>
-                      </s-stack>
-                      <s-stack direction="inline" align="space-between">
-                        <s-text variant="bodySm" tone="subdued">Current Impressions:</s-text>
-                        <s-text variant="bodySm" fontWeight="semibold" data-testid="text-current-impressions">{selectedOptimization.impressions || 0}</s-text>
-                      </s-stack>
-                      <s-stack direction="inline" align="space-between">
-                        <s-text variant="bodySm" tone="subdued">Current Conversions:</s-text>
-                        <s-text variant="bodySm" fontWeight="semibold" data-testid="text-current-conversions">{selectedOptimization.conversions || 0}</s-text>
-                      </s-stack>
-                      <s-stack direction="inline" align="space-between">
-                        <s-text variant="bodySm" tone="subdued">Current RPV:</s-text>
-                        <s-text variant="bodySm" fontWeight="semibold" data-testid="text-current-rpv">${selectedOptimization.arpu || "0.00"}</s-text>
-                      </s-stack>
-                    </s-stack>
-                  </s-box>
+                  <Box padding="400" data-testid="card-optimization-info">
+                    <BlockStack gap="200">
+                      <InlineStack align="space-between">
+                        <Text as="p" variant="bodySm" tone="subdued">Product:</Text>
+                        <Text as="p" variant="bodySm" fontWeight="semibold" data-testid="text-product-name">{selectedOptimization.productName}</Text>
+                      </InlineStack>
+                      <InlineStack align="space-between">
+                        <Text as="p" variant="bodySm" tone="subdued">Optimization Type:</Text>
+                        <Text as="p" variant="bodySm" fontWeight="semibold" data-testid="text-optimization-type">{selectedOptimization.optimizationType}</Text>
+                      </InlineStack>
+                      <InlineStack align="space-between">
+                        <Text as="p" variant="bodySm" tone="subdued">Current Impressions:</Text>
+                        <Text as="p" variant="bodySm" fontWeight="semibold" data-testid="text-current-impressions">{String(selectedOptimization.impressions || 0)}</Text>
+                      </InlineStack>
+                      <InlineStack align="space-between">
+                        <Text as="p" variant="bodySm" tone="subdued">Current Conversions:</Text>
+                        <Text as="p" variant="bodySm" fontWeight="semibold" data-testid="text-current-conversions">{String(selectedOptimization.conversions || 0)}</Text>
+                      </InlineStack>
+                      <InlineStack align="space-between">
+                        <Text as="p" variant="bodySm" tone="subdued">Current RPV:</Text>
+                        <Text as="p" variant="bodySm" fontWeight="semibold" data-testid="text-current-rpv">${selectedOptimization.arpu || "0.00"}</Text>
+                      </InlineStack>
+                    </BlockStack>
+                  </Box>
                 )}
-              </s-stack>
+              </BlockStack>
             )}
-          </s-stack>
-        </s-section>
+          </BlockStack>
+        </Card>
 
-        {/* Latest Simulation Results */}
         {lastSimulationResult && (
-          <s-section data-testid="card-simulation-results">
-            <s-stack direction="block" gap="base">
-              <s-stack direction="inline" align="space-between" blockAlign="center">
-                <s-stack direction="block" gap="small">
-                  <s-text variant="headingMd">Simulation Complete</s-text>
-                  <s-text variant="bodySm" tone="subdued">
+          <Card data-testid="card-simulation-results">
+            <BlockStack gap="400">
+              <InlineStack align="space-between" blockAlign="center">
+                <BlockStack gap="200">
+                  <Text as="h2" variant="headingMd">Simulation Complete</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
                     {lastSimulationResult.type.charAt(0).toUpperCase() + lastSimulationResult.type.slice(1)} simulation at {lastSimulationResult.timestamp}
-                  </s-text>
-                </s-stack>
-                <s-badge tone="success">Complete</s-badge>
-              </s-stack>
-              <s-divider />
+                  </Text>
+                </BlockStack>
+                <Badge tone="success">Complete</Badge>
+              </InlineStack>
+              <Divider />
 
-              <s-stack direction="block" gap="base">
-                {/* Summary */}
+              <BlockStack gap="400">
                 {lastSimulationResult.type === "batch" && lastSimulationResult.variantPerformance && (
-                  <s-banner tone="info" heading="Data Generation Summary">
-                    <s-stack direction="block" gap="small">
-                      <s-text variant="bodySm" data-testid="text-visitors-added">
+                  <Banner title="Data Generation Summary" tone="info">
+                    <BlockStack gap="200">
+                      <Text as="p" variant="bodySm" data-testid="text-visitors-added">
                         Added {lastSimulationResult.variantPerformance.control.impressions + lastSimulationResult.variantPerformance.variant.impressions} visitors to optimization
-                      </s-text>
+                      </Text>
                       {selectedOptimization && (
-                        <s-text variant="bodySm" data-testid="text-total-impressions">
+                        <Text as="p" variant="bodySm" data-testid="text-total-impressions">
                           Optimization now has {selectedOptimization.impressions || 0} total impressions
-                        </s-text>
+                        </Text>
                       )}
-                    </s-stack>
-                  </s-banner>
+                    </BlockStack>
+                  </Banner>
                 )}
 
-                {/* Optimization Info */}
-                <s-box padding="base" background="bg-surface-secondary" borderRadius="large">
-                  <s-stack direction="block" gap="small">
-                    <s-text variant="bodySm" fontWeight="semibold">Optimization Product</s-text>
-                    <s-text variant="bodySm" tone="subdued" data-testid="text-result-optimization-name">
+                <Box padding="400">
+                  <BlockStack gap="200">
+                    <Text as="p" variant="bodySm" fontWeight="semibold">Optimization Product</Text>
+                    <Text as="p" variant="bodySm" tone="subdued" data-testid="text-result-optimization-name">
                       {lastSimulationResult.optimizationName}
-                    </s-text>
-                  </s-stack>
-                </s-box>
+                    </Text>
+                  </BlockStack>
+                </Box>
 
-                {/* Batch Simulation Results with Allocation Evolution */}
                 {lastSimulationResult.type === "batch" && lastSimulationResult.variantPerformance && (
-                  <s-stack direction="block" gap="base">
-                    {/* Allocation Evolution */}
+                  <BlockStack gap="400">
                     {lastSimulationResult.allocationBefore && lastSimulationResult.allocationAfter && (
-                      <s-box padding="base" border="base" borderRadius="large">
-                        <s-stack direction="block" gap="base">
-                          <s-text variant="headingSm">Traffic Allocation Evolution</s-text>
-                          <s-grid columns="2" gap="base">
-                            <s-stack direction="block" gap="small">
-                              <s-text variant="bodyXs" tone="subdued">Before Simulation</s-text>
-                              <s-stack direction="inline" gap="base">
-                                <s-stack direction="block" align="center">
-                                  <s-text variant="headingMd" fontWeight="bold" data-testid="text-allocation-before-control">
+                      <Box padding="400">
+                        <BlockStack gap="400">
+                          <Text as="h3" variant="headingSm">Traffic Allocation Evolution</Text>
+                          <InlineGrid columns={2} gap="400">
+                            <BlockStack gap="200">
+                              <Text as="span" variant="bodyXs" tone="subdued">Before Simulation</Text>
+                              <InlineStack gap="400">
+                                <BlockStack>
+                                  <Text as="h2" variant="headingMd" fontWeight="bold" data-testid="text-allocation-before-control">
                                     {lastSimulationResult.allocationBefore.control.toFixed(1)}%
-                                  </s-text>
-                                  <s-text variant="bodyXs" tone="subdued">Control</s-text>
-                                </s-stack>
-                                <s-stack direction="block" align="center">
-                                  <s-text variant="headingMd" fontWeight="bold" data-testid="text-allocation-before-variant">
+                                  </Text>
+                                  <Text as="span" variant="bodyXs" tone="subdued">Control</Text>
+                                </BlockStack>
+                                <BlockStack>
+                                  <Text as="h2" variant="headingMd" fontWeight="bold" data-testid="text-allocation-before-variant">
                                     {lastSimulationResult.allocationBefore.variant.toFixed(1)}%
-                                  </s-text>
-                                  <s-text variant="bodyXs" tone="subdued">Variant</s-text>
-                                </s-stack>
-                              </s-stack>
-                            </s-stack>
-                            <s-stack direction="block" gap="small">
-                              <s-text variant="bodyXs" tone="subdued">After Simulation</s-text>
-                              <s-stack direction="inline" gap="base">
-                                <s-stack direction="block" align="center">
-                                  <s-text variant="headingMd" fontWeight="bold" data-testid="text-allocation-after-control">
+                                  </Text>
+                                  <Text as="span" variant="bodyXs" tone="subdued">Variant</Text>
+                                </BlockStack>
+                              </InlineStack>
+                            </BlockStack>
+                            <BlockStack gap="200">
+                              <Text as="span" variant="bodyXs" tone="subdued">After Simulation</Text>
+                              <InlineStack gap="400">
+                                <BlockStack>
+                                  <Text as="h2" variant="headingMd" fontWeight="bold" data-testid="text-allocation-after-control">
                                     {lastSimulationResult.allocationAfter.control.toFixed(1)}%
-                                  </s-text>
-                                  <s-text variant="bodyXs" tone="subdued">Control</s-text>
-                                </s-stack>
-                                <s-stack direction="block" align="center">
-                                  <s-text variant="headingMd" fontWeight="bold" data-testid="text-allocation-after-variant">
+                                  </Text>
+                                  <Text as="span" variant="bodyXs" tone="subdued">Control</Text>
+                                </BlockStack>
+                                <BlockStack>
+                                  <Text as="h2" variant="headingMd" fontWeight="bold" data-testid="text-allocation-after-variant">
                                     {lastSimulationResult.allocationAfter.variant.toFixed(1)}%
-                                  </s-text>
-                                  <s-text variant="bodyXs" tone="subdued">Variant</s-text>
-                                </s-stack>
-                              </s-stack>
-                            </s-stack>
-                          </s-grid>
+                                  </Text>
+                                  <Text as="span" variant="bodyXs" tone="subdued">Variant</Text>
+                                </BlockStack>
+                              </InlineStack>
+                            </BlockStack>
+                          </InlineGrid>
                           {Math.abs(lastSimulationResult.allocationAfter.control - lastSimulationResult.allocationBefore.control) > 0.1 ? (
-                            <s-banner tone="info">
-                              <s-text variant="bodyXs">Bayesian engine shifted traffic based on performance</s-text>
-                            </s-banner>
+                            <Banner tone="info">
+                              <Text as="span" variant="bodyXs">Bayesian engine shifted traffic based on performance</Text>
+                            </Banner>
                           ) : (
-                            <s-banner tone="warning">
-                              <s-text variant="bodyXs">No allocation shift (need more data or similar performance)</s-text>
-                            </s-banner>
+                            <Banner tone="warning">
+                              <Text as="span" variant="bodyXs">No allocation shift (need more data or similar performance)</Text>
+                            </Banner>
                           )}
-                        </s-stack>
-                      </s-box>
+                        </BlockStack>
+                      </Box>
                     )}
 
-                    {/* Variant Performance Comparison */}
-                    <s-box padding="base" border="base" borderRadius="large">
-                      <s-stack direction="block" gap="base">
-                        <s-text variant="headingSm">Variant Performance</s-text>
-                        <s-grid columns="2" gap="large">
-                          <s-stack direction="block" gap="small">
-                            <s-text variant="bodyXs" fontWeight="semibold" tone="subdued">Control</s-text>
-                            <s-stack direction="block" gap="small">
-                              <s-stack direction="inline" align="space-between">
-                                <s-text variant="bodyXs" tone="subdued">Impressions:</s-text>
-                                <s-text variant="bodySm" fontWeight="semibold" data-testid="text-control-impressions-new">
-                                  {lastSimulationResult.variantPerformance.control.impressions}
-                                </s-text>
-                              </s-stack>
-                              <s-stack direction="inline" align="space-between">
-                                <s-text variant="bodyXs" tone="subdued">Conversions:</s-text>
-                                <s-text variant="bodySm" fontWeight="semibold" data-testid="text-control-conversions">
-                                  {lastSimulationResult.variantPerformance.control.conversions}
-                                </s-text>
-                              </s-stack>
-                              <s-stack direction="inline" align="space-between">
-                                <s-text variant="bodyXs" tone="subdued">Conv. Rate:</s-text>
-                                <s-text variant="bodySm" fontWeight="semibold" data-testid="text-control-cr">
+                    <Box padding="400">
+                      <BlockStack gap="400">
+                        <Text as="h3" variant="headingSm">Variant Performance</Text>
+                        <InlineGrid columns={2} gap="600">
+                          <BlockStack gap="200">
+                            <Text as="span" variant="bodyXs" fontWeight="semibold" tone="subdued">Control</Text>
+                            <BlockStack gap="200">
+                              <InlineStack align="space-between">
+                                <Text as="span" variant="bodyXs" tone="subdued">Impressions:</Text>
+                                <Text as="p" variant="bodySm" fontWeight="semibold" data-testid="text-control-impressions-new">
+                                  {String(lastSimulationResult.variantPerformance.control.impressions)}
+                                </Text>
+                              </InlineStack>
+                              <InlineStack align="space-between">
+                                <Text as="span" variant="bodyXs" tone="subdued">Conversions:</Text>
+                                <Text as="p" variant="bodySm" fontWeight="semibold" data-testid="text-control-conversions">
+                                  {String(lastSimulationResult.variantPerformance.control.conversions)}
+                                </Text>
+                              </InlineStack>
+                              <InlineStack align="space-between">
+                                <Text as="span" variant="bodyXs" tone="subdued">Conv. Rate:</Text>
+                                <Text as="p" variant="bodySm" fontWeight="semibold" data-testid="text-control-cr">
                                   {lastSimulationResult.variantPerformance.control.conversionRate}%
-                                </s-text>
-                              </s-stack>
-                              <s-stack direction="inline" align="space-between">
-                                <s-text variant="bodyXs" tone="subdued">Revenue:</s-text>
-                                <s-text variant="bodySm" fontWeight="semibold" data-testid="text-control-revenue">
+                                </Text>
+                              </InlineStack>
+                              <InlineStack align="space-between">
+                                <Text as="span" variant="bodyXs" tone="subdued">Revenue:</Text>
+                                <Text as="p" variant="bodySm" fontWeight="semibold" data-testid="text-control-revenue">
                                   ${lastSimulationResult.variantPerformance.control.revenue}
-                                </s-text>
-                              </s-stack>
-                              <s-stack direction="inline" align="space-between">
-                                <s-text variant="bodyXs" tone="subdued">RPV:</s-text>
-                                <s-text variant="bodySm" fontWeight="semibold" data-testid="text-control-rpv">
+                                </Text>
+                              </InlineStack>
+                              <InlineStack align="space-between">
+                                <Text as="span" variant="bodyXs" tone="subdued">RPV:</Text>
+                                <Text as="p" variant="bodySm" fontWeight="semibold" data-testid="text-control-rpv">
                                   ${lastSimulationResult.variantPerformance.control.arpu}
-                                </s-text>
-                              </s-stack>
-                            </s-stack>
-                          </s-stack>
-                          <s-stack direction="block" gap="small">
-                            <s-text variant="bodyXs" fontWeight="semibold" tone="subdued">Variant</s-text>
-                            <s-stack direction="block" gap="small">
-                              <s-stack direction="inline" align="space-between">
-                                <s-text variant="bodyXs" tone="subdued">Impressions:</s-text>
-                                <s-text variant="bodySm" fontWeight="semibold" data-testid="text-variant-impressions-new">
-                                  {lastSimulationResult.variantPerformance.variant.impressions}
-                                </s-text>
-                              </s-stack>
-                              <s-stack direction="inline" align="space-between">
-                                <s-text variant="bodyXs" tone="subdued">Conversions:</s-text>
-                                <s-text variant="bodySm" fontWeight="semibold" data-testid="text-variant-conversions">
-                                  {lastSimulationResult.variantPerformance.variant.conversions}
-                                </s-text>
-                              </s-stack>
-                              <s-stack direction="inline" align="space-between">
-                                <s-text variant="bodyXs" tone="subdued">Conv. Rate:</s-text>
-                                <s-text variant="bodySm" fontWeight="semibold" data-testid="text-variant-cr">
+                                </Text>
+                              </InlineStack>
+                            </BlockStack>
+                          </BlockStack>
+                          <BlockStack gap="200">
+                            <Text as="span" variant="bodyXs" fontWeight="semibold" tone="subdued">Variant</Text>
+                            <BlockStack gap="200">
+                              <InlineStack align="space-between">
+                                <Text as="span" variant="bodyXs" tone="subdued">Impressions:</Text>
+                                <Text as="p" variant="bodySm" fontWeight="semibold" data-testid="text-variant-impressions-new">
+                                  {String(lastSimulationResult.variantPerformance.variant.impressions)}
+                                </Text>
+                              </InlineStack>
+                              <InlineStack align="space-between">
+                                <Text as="span" variant="bodyXs" tone="subdued">Conversions:</Text>
+                                <Text as="p" variant="bodySm" fontWeight="semibold" data-testid="text-variant-conversions">
+                                  {String(lastSimulationResult.variantPerformance.variant.conversions)}
+                                </Text>
+                              </InlineStack>
+                              <InlineStack align="space-between">
+                                <Text as="span" variant="bodyXs" tone="subdued">Conv. Rate:</Text>
+                                <Text as="p" variant="bodySm" fontWeight="semibold" data-testid="text-variant-cr">
                                   {lastSimulationResult.variantPerformance.variant.conversionRate}%
-                                </s-text>
-                              </s-stack>
-                              <s-stack direction="inline" align="space-between">
-                                <s-text variant="bodyXs" tone="subdued">Revenue:</s-text>
-                                <s-text variant="bodySm" fontWeight="semibold" data-testid="text-variant-revenue">
+                                </Text>
+                              </InlineStack>
+                              <InlineStack align="space-between">
+                                <Text as="span" variant="bodyXs" tone="subdued">Revenue:</Text>
+                                <Text as="p" variant="bodySm" fontWeight="semibold" data-testid="text-variant-revenue">
                                   ${lastSimulationResult.variantPerformance.variant.revenue}
-                                </s-text>
-                              </s-stack>
-                              <s-stack direction="inline" align="space-between">
-                                <s-text variant="bodyXs" tone="subdued">RPV:</s-text>
-                                <s-text variant="bodySm" fontWeight="semibold" data-testid="text-variant-rpv">
+                                </Text>
+                              </InlineStack>
+                              <InlineStack align="space-between">
+                                <Text as="span" variant="bodyXs" tone="subdued">RPV:</Text>
+                                <Text as="p" variant="bodySm" fontWeight="semibold" data-testid="text-variant-rpv">
                                   ${lastSimulationResult.variantPerformance.variant.arpu}
-                                </s-text>
-                              </s-stack>
-                            </s-stack>
-                          </s-stack>
-                        </s-grid>
-                      </s-stack>
-                    </s-box>
+                                </Text>
+                              </InlineStack>
+                            </BlockStack>
+                          </BlockStack>
+                        </InlineGrid>
+                      </BlockStack>
+                    </Box>
 
-                    {/* Bayesian Update Info */}
                     {lastSimulationResult.bayesianUpdate && (
-                      <s-banner tone="info" heading="Bayesian Engine Update">
-                        <s-text variant="bodyXs" data-testid="text-bayesian-reasoning">
+                      <Banner title="Bayesian Engine Update" tone="info">
+                        <Text as="span" variant="bodyXs" data-testid="text-bayesian-reasoning">
                           {lastSimulationResult.bayesianUpdate.reasoning}
-                        </s-text>
-                      </s-banner>
+                        </Text>
+                      </Banner>
                     )}
-                  </s-stack>
+                  </BlockStack>
                 )}
 
-                {/* OLD: Batch Simulation Results (fallback for old API response) */}
                 {lastSimulationResult.type === "batch" && lastSimulationResult.allocation && !lastSimulationResult.variantPerformance && (
-                  <s-stack direction="block" gap="base">
-                    <s-text variant="headingSm">A/B Optimization Allocation Verification</s-text>
+                  <BlockStack gap="400">
+                    <Text as="h3" variant="headingSm">A/B Optimization Allocation Verification</Text>
                     
-                    {/* Impressions Allocation */}
-                    <s-box padding="base" border="base" borderRadius="large">
-                      <s-stack direction="block" gap="base">
-                        <s-text variant="headingSm">Traffic Distribution</s-text>
-                        <s-grid columns="2" gap="base">
-                          <s-stack direction="block" gap="small">
-                            <s-text variant="bodyXs" tone="subdued">Control</s-text>
-                            <s-text variant="heading2xl" fontWeight="bold" data-testid="text-control-impressions">
-                              {lastSimulationResult.allocation.control.impressions}
-                            </s-text>
-                            <s-text variant="bodyXs" tone="subdued">
+                    <Box padding="400">
+                      <BlockStack gap="400">
+                        <Text as="h3" variant="headingSm">Traffic Distribution</Text>
+                        <InlineGrid columns={2} gap="400">
+                          <BlockStack gap="200">
+                            <Text as="span" variant="bodyXs" tone="subdued">Control</Text>
+                            <Text as="h1" variant="heading2xl" fontWeight="bold" data-testid="text-control-impressions">
+                              {String(lastSimulationResult.allocation.control.impressions)}
+                            </Text>
+                            <Text as="span" variant="bodyXs" tone="subdued">
                               {calculateAllocationPercentage(
                                 lastSimulationResult.allocation.control.impressions || 0,
                                 lastSimulationResult.allocation.variant.impressions || 0
                               ).control}% of traffic
-                            </s-text>
-                          </s-stack>
-                          <s-stack direction="block" gap="small">
-                            <s-text variant="bodyXs" tone="subdued">Variant</s-text>
-                            <s-text variant="heading2xl" fontWeight="bold" data-testid="text-variant-impressions">
-                              {lastSimulationResult.allocation.variant.impressions}
-                            </s-text>
-                            <s-text variant="bodyXs" tone="subdued">
+                            </Text>
+                          </BlockStack>
+                          <BlockStack gap="200">
+                            <Text as="span" variant="bodyXs" tone="subdued">Variant</Text>
+                            <Text as="h1" variant="heading2xl" fontWeight="bold" data-testid="text-variant-impressions">
+                              {String(lastSimulationResult.allocation.variant.impressions)}
+                            </Text>
+                            <Text as="span" variant="bodyXs" tone="subdued">
                               {calculateAllocationPercentage(
                                 lastSimulationResult.allocation.control.impressions || 0,
                                 lastSimulationResult.allocation.variant.impressions || 0
                               ).variant}% of traffic
-                            </s-text>
-                          </s-stack>
-                        </s-grid>
+                            </Text>
+                          </BlockStack>
+                        </InlineGrid>
                         {Math.abs(
                           (lastSimulationResult.allocation.control.impressions || 0) - 
                           (lastSimulationResult.allocation.variant.impressions || 0)
                         ) <= 1 ? (
-                          <s-banner tone="success" data-testid="text-allocation-status">
-                            <s-text variant="bodyXs">Perfect 50/50 split achieved</s-text>
-                          </s-banner>
+                          <Banner tone="success" data-testid="text-allocation-status">
+                            <Text as="span" variant="bodyXs">Perfect 50/50 split achieved</Text>
+                          </Banner>
                         ) : (
-                          <s-banner tone="warning">
-                            <s-text variant="bodyXs">Minor variance from 50/50 (expected with random allocation)</s-text>
-                          </s-banner>
+                          <Banner tone="warning">
+                            <Text as="span" variant="bodyXs">Minor variance from 50/50 (expected with random allocation)</Text>
+                          </Banner>
                         )}
-                      </s-stack>
-                    </s-box>
+                      </BlockStack>
+                    </Box>
 
-                    {/* Orders Allocation */}
-                    <s-box padding="base" border="base" borderRadius="large">
-                      <s-stack direction="block" gap="base">
-                        <s-text variant="headingSm">Conversion Distribution</s-text>
-                        <s-grid columns="2" gap="base">
-                          <s-stack direction="block" gap="small">
-                            <s-text variant="bodyXs" tone="subdued">Control</s-text>
-                            <s-text variant="heading2xl" fontWeight="bold" data-testid="text-control-orders">
-                              {lastSimulationResult.allocation.control.orders}
-                            </s-text>
-                            <s-text variant="bodyXs" tone="subdued">
+                    <Box padding="400">
+                      <BlockStack gap="400">
+                        <Text as="h3" variant="headingSm">Conversion Distribution</Text>
+                        <InlineGrid columns={2} gap="400">
+                          <BlockStack gap="200">
+                            <Text as="span" variant="bodyXs" tone="subdued">Control</Text>
+                            <Text as="h1" variant="heading2xl" fontWeight="bold" data-testid="text-control-orders">
+                              {String(lastSimulationResult.allocation.control.orders)}
+                            </Text>
+                            <Text as="span" variant="bodyXs" tone="subdued">
                               {calculateAllocationPercentage(
                                 lastSimulationResult.allocation.control.orders || 0,
                                 lastSimulationResult.allocation.variant.orders || 0
                               ).control}% of orders
-                            </s-text>
-                          </s-stack>
-                          <s-stack direction="block" gap="small">
-                            <s-text variant="bodyXs" tone="subdued">Variant</s-text>
-                            <s-text variant="heading2xl" fontWeight="bold" data-testid="text-variant-orders">
-                              {lastSimulationResult.allocation.variant.orders}
-                            </s-text>
-                            <s-text variant="bodyXs" tone="subdued">
+                            </Text>
+                          </BlockStack>
+                          <BlockStack gap="200">
+                            <Text as="span" variant="bodyXs" tone="subdued">Variant</Text>
+                            <Text as="h1" variant="heading2xl" fontWeight="bold" data-testid="text-variant-orders">
+                              {String(lastSimulationResult.allocation.variant.orders)}
+                            </Text>
+                            <Text as="span" variant="bodyXs" tone="subdued">
                               {calculateAllocationPercentage(
                                 lastSimulationResult.allocation.control.orders || 0,
                                 lastSimulationResult.allocation.variant.orders || 0
                               ).variant}% of orders
-                            </s-text>
-                          </s-stack>
-                        </s-grid>
-                      </s-stack>
-                    </s-box>
+                            </Text>
+                          </BlockStack>
+                        </InlineGrid>
+                      </BlockStack>
+                    </Box>
 
-                    {/* Updated Metrics */}
                     {lastSimulationResult.metrics && (
-                      <s-box padding="base" border="base" borderRadius="large">
-                        <s-stack direction="block" gap="base">
-                          <s-text variant="headingSm">Updated Optimization Metrics</s-text>
-                          <s-grid columns="4" gap="base">
-                            <s-stack direction="block" gap="small">
-                              <s-text variant="bodyXs" tone="subdued">Total Impressions</s-text>
-                              <s-text variant="headingMd" fontWeight="bold" data-testid="text-total-impressions">
-                                {lastSimulationResult.metrics.totalImpressions}
-                              </s-text>
-                            </s-stack>
-                            <s-stack direction="block" gap="small">
-                              <s-text variant="bodyXs" tone="subdued">Total Conversions</s-text>
-                              <s-text variant="headingMd" fontWeight="bold" data-testid="text-total-conversions">
-                                {lastSimulationResult.metrics.totalConversions}
-                              </s-text>
-                            </s-stack>
-                            <s-stack direction="block" gap="small">
-                              <s-text variant="bodyXs" tone="subdued">Total Revenue</s-text>
-                              <s-text variant="headingMd" fontWeight="bold" data-testid="text-total-revenue">
+                      <Box padding="400">
+                        <BlockStack gap="400">
+                          <Text as="h3" variant="headingSm">Updated Optimization Metrics</Text>
+                          <InlineGrid columns={4} gap="400">
+                            <BlockStack gap="200">
+                              <Text as="span" variant="bodyXs" tone="subdued">Total Impressions</Text>
+                              <Text as="h2" variant="headingMd" fontWeight="bold" data-testid="text-total-impressions">
+                                {String(lastSimulationResult.metrics.totalImpressions)}
+                              </Text>
+                            </BlockStack>
+                            <BlockStack gap="200">
+                              <Text as="span" variant="bodyXs" tone="subdued">Total Conversions</Text>
+                              <Text as="h2" variant="headingMd" fontWeight="bold" data-testid="text-total-conversions">
+                                {String(lastSimulationResult.metrics.totalConversions)}
+                              </Text>
+                            </BlockStack>
+                            <BlockStack gap="200">
+                              <Text as="span" variant="bodyXs" tone="subdued">Total Revenue</Text>
+                              <Text as="h2" variant="headingMd" fontWeight="bold" data-testid="text-total-revenue">
                                 ${lastSimulationResult.metrics.totalRevenue}
-                              </s-text>
-                            </s-stack>
-                            <s-stack direction="block" gap="small">
-                              <s-text variant="bodyXs" tone="subdued">RPV</s-text>
-                              <s-text variant="headingMd" fontWeight="bold" data-testid="text-result-rpv">
+                              </Text>
+                            </BlockStack>
+                            <BlockStack gap="200">
+                              <Text as="span" variant="bodyXs" tone="subdued">RPV</Text>
+                              <Text as="h2" variant="headingMd" fontWeight="bold" data-testid="text-result-rpv">
                                 ${lastSimulationResult.metrics.arpu}
-                              </s-text>
-                            </s-stack>
-                          </s-grid>
-                          <s-text variant="bodyXs" tone="subdued">
+                              </Text>
+                            </BlockStack>
+                          </InlineGrid>
+                          <Text as="span" variant="bodyXs" tone="subdued">
                             Revenue includes ±20% variance per order for realistic simulation
-                          </s-text>
-                        </s-stack>
-                      </s-box>
+                          </Text>
+                        </BlockStack>
+                      </Box>
                     )}
-                  </s-stack>
+                  </BlockStack>
                 )}
-              </s-stack>
-            </s-stack>
-          </s-section>
+              </BlockStack>
+            </BlockStack>
+          </Card>
         )}
 
-        {/* Batch Simulation */}
-        <s-section data-testid="card-batch-simulation">
-          <s-stack direction="block" gap="base">
-            <s-text variant="headingMd">Batch Simulation</s-text>
-            <s-text variant="bodySm" tone="subdued">
+        <Card data-testid="card-batch-simulation">
+          <BlockStack gap="400">
+            <Text as="h2" variant="headingMd">Batch Simulation</Text>
+            <Text as="p" variant="bodySm" tone="subdued">
               Simulate realistic traffic and conversions in one click. Perfect for validating A/B optimization allocation.
-            </s-text>
-            <s-divider />
+            </Text>
+            <Divider />
 
-            <s-grid columns="2" gap="base">
-              <s-text-field
+            <InlineGrid columns={2} gap="400">
+              <TextField
                 label="Visitors"
                 type="number"
                 value={String(visitors)}
-                min="10"
-                max="100000"
-                onInput={handleVisitorsChange}
+                min={10}
+                max={100000}
+                onChange={(value) => setVisitors(Number(value))}
                 data-testid="input-visitors"
                 disabled={!canSimulate}
                 helpText="Number of product page views (split 50/50 between control and variant)"
+                autoComplete="off"
               />
-              <s-text-field
+              <TextField
                 label="Control Conversion Rate (%)"
                 type="number"
                 value={String(controlConversionRate)}
-                min="0"
-                max="100"
-                step="0.1"
-                onInput={handleControlCRChange}
+                min={0}
+                max={100}
+                step={0.1}
+                onChange={(value) => setControlConversionRate(Number(value))}
                 data-testid="input-control-conversion-rate"
                 disabled={!canSimulate}
                 helpText="Control conversion rate (baseline performance)"
+                autoComplete="off"
               />
-            </s-grid>
+            </InlineGrid>
 
-            <s-grid columns="2" gap="base">
-              <s-text-field
+            <InlineGrid columns={2} gap="400">
+              <TextField
                 label="Variant Conversion Rate (%)"
                 type="number"
                 value={String(variantConversionRate)}
-                min="0"
-                max="100"
-                step="0.1"
-                onInput={handleVariantCRChange}
+                min={0}
+                max={100}
+                step={0.1}
+                onChange={(value) => setVariantConversionRate(Number(value))}
                 data-testid="input-variant-conversion-rate"
                 disabled={!canSimulate}
                 helpText="Variant conversion rate (set higher to simulate lift)"
+                autoComplete="off"
               />
-              <s-stack direction="block" gap="small">
-                <s-text variant="bodySm" fontWeight="semibold" tone="subdued">Expected Lift</s-text>
-                <s-box padding="base" background="bg-surface-secondary" borderRadius="large">
-                  <s-text variant="bodySm" fontWeight="semibold" data-testid="text-expected-lift">
+              <BlockStack gap="200">
+                <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued">Expected Lift</Text>
+                <Box padding="400">
+                  <Text as="p" variant="bodySm" fontWeight="semibold" data-testid="text-expected-lift">
                     {controlConversionRate > 0 
                       ? `${(((variantConversionRate - controlConversionRate) / controlConversionRate) * 100).toFixed(1)}%`
                       : '0%'}
-                  </s-text>
-                </s-box>
-                <s-text variant="bodyXs" tone="subdued">
+                  </Text>
+                </Box>
+                <Text as="span" variant="bodyXs" tone="subdued">
                   Relative improvement from control to variant
-                </s-text>
-              </s-stack>
-            </s-grid>
+                </Text>
+              </BlockStack>
+            </InlineGrid>
 
-            {/* Live Mode Toggle */}
-            <s-box padding="base" background="bg-surface-secondary" borderRadius="large">
-              <s-stack direction="inline" align="space-between" blockAlign="center">
-                <s-stack direction="block" gap="small">
-                  <s-text variant="bodySm" fontWeight="semibold">Live Streaming Mode</s-text>
-                  <s-text variant="bodyXs" tone="subdued">
+            <Box padding="400">
+              <InlineStack align="space-between" blockAlign="center">
+                <BlockStack gap="200">
+                  <Text as="p" variant="bodySm" fontWeight="semibold">Live Streaming Mode</Text>
+                  <Text as="span" variant="bodyXs" tone="subdued">
                     Watch charts update in real-time as the simulation runs
-                  </s-text>
-                </s-stack>
-                <s-switch
+                  </Text>
+                </BlockStack>
+                <Checkbox
                   label=""
                   checked={liveMode}
-                  onChange={handleLiveModeChange}
+                  onChange={(checked) => setLiveMode(checked)}
                   data-testid="toggle-live-mode"
                   disabled={isSimulating}
                 />
-              </s-stack>
-            </s-box>
+              </InlineStack>
+            </Box>
 
-            {/* Progress Indicator */}
             {isStreaming && (
-              <s-stack direction="block" gap="small">
-                <s-stack direction="inline" align="space-between">
-                  <s-text variant="bodySm" tone="subdued">Simulation Progress</s-text>
-                  <s-text variant="bodySm" fontWeight="semibold">{streamProgress}%</s-text>
-                </s-stack>
-                <s-progress-bar
+              <BlockStack gap="200">
+                <InlineStack align="space-between">
+                  <Text as="p" variant="bodySm" tone="subdued">Simulation Progress</Text>
+                  <Text as="p" variant="bodySm" fontWeight="semibold">{streamProgress}%</Text>
+                </InlineStack>
+                <ProgressBar
                   progress={streamProgress}
                   tone="primary"
                   size="small"
                   data-testid="progress-simulation"
-                  accessibilityLabel={`Simulation progress: ${streamProgress}%`}
                 />
-                <s-text variant="bodyXs" tone="subdued" alignment="center">
+                <Text as="span" variant="bodyXs" tone="subdued">
                   Streaming real-time updates...
-                </s-text>
-              </s-stack>
+                </Text>
+              </BlockStack>
             )}
 
             {!selectedOptimizationId && (
-              <s-banner tone="warning">
-                <s-text variant="bodySm">Please select an active optimization above to run simulations</s-text>
-              </s-banner>
+              <Banner tone="warning">
+                <Text as="p" variant="bodySm">Please select an active optimization above to run simulations</Text>
+              </Banner>
             )}
 
-            <s-button
+            <Button
               variant="primary"
               onClick={handleRunSimulation}
               disabled={!canSimulate}
@@ -790,36 +770,35 @@ export default function Simulator() {
               {isSimulating 
                 ? (liveMode ? `Streaming... ${streamProgress}%` : "Simulating...") 
                 : (liveMode ? "Start Live Simulation" : "Run Batch Simulation")}
-            </s-button>
-          </s-stack>
-        </s-section>
+            </Button>
+          </BlockStack>
+        </Card>
 
-        {/* Information Card */}
-        <s-section data-testid="card-info">
-          <s-stack direction="block" gap="base">
-            <s-text variant="headingMd">How It Works</s-text>
-            <s-divider />
-            <s-stack direction="block" gap="base">
-              <s-text variant="bodySm" tone="subdued">
+        <Card data-testid="card-info">
+          <BlockStack gap="400">
+            <Text as="h2" variant="headingMd">How It Works</Text>
+            <Divider />
+            <BlockStack gap="400">
+              <Text as="p" variant="bodySm" tone="subdued">
                 <strong>Batch Simulation:</strong> Generates realistic traffic and conversions in one step. 
                 Visitors are allocated using the optimization's current Bayesian allocation (Thompson Sampling), and conversions are calculated based on your specified rates.
-              </s-text>
-              <s-text variant="bodySm" tone="subdued">
+              </Text>
+              <Text as="p" variant="bodySm" tone="subdued">
                 <strong>Live Streaming Mode:</strong> Watch the simulation unfold in real-time! Charts update progressively every 100 visitors, 
                 letting you see how the Bayesian engine adapts traffic allocation as performance data accumulates. Perfect for understanding Thompson Sampling in action.
-              </s-text>
-              <s-text variant="bodySm" tone="subdued">
+              </Text>
+              <Text as="p" variant="bodySm" tone="subdued">
                 <strong>Evolution Charts:</strong> Track how RPV and traffic allocation change over time as the Bayesian engine learns which variant performs better.
                 The x-axis shows impressions (every 100), while the y-axes show RPV and allocation percentages respectively.
-              </s-text>
-              <s-text variant="bodySm" tone="subdued">
+              </Text>
+              <Text as="p" variant="bodySm" tone="subdued">
                 <strong>Allocation Verification:</strong> The simulation uses the optimization's current allocation percentages, 
                 adapting dynamically based on performance. Results include detailed breakdowns to confirm proper distribution.
-              </s-text>
-            </s-stack>
-          </s-stack>
-        </s-section>
-      </s-stack>
-    </s-page>
+              </Text>
+            </BlockStack>
+          </BlockStack>
+        </Card>
+      </BlockStack>
+    </Page>
   );
 }

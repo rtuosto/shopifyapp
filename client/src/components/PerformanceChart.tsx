@@ -1,4 +1,5 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { Card, Text, Box } from "@shopify/polaris";
 
 interface DataPoint {
   date: string;
@@ -12,9 +13,9 @@ interface PerformanceChartProps {
 
 export default function PerformanceChart({ data, title = "Revenue Trend (30 Days)" }: PerformanceChartProps) {
   return (
-    <s-section data-testid="card-performance-chart">
-      <s-text variant="headingSm" fontWeight="semibold" data-testid="text-chart-title">{title}</s-text>
-      <s-box padding="base none">
+    <Card data-testid="card-performance-chart">
+      <Text as="h2" variant="headingSm" fontWeight="semibold" data-testid="text-chart-title">{title}</Text>
+      <Box paddingBlockStart="400" paddingBlockEnd="0">
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
@@ -47,7 +48,7 @@ export default function PerformanceChart({ data, title = "Revenue Trend (30 Days
             />
           </LineChart>
         </ResponsiveContainer>
-      </s-box>
-    </s-section>
+      </Box>
+    </Card>
   );
 }

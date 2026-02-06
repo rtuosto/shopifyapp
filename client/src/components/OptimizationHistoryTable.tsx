@@ -1,3 +1,6 @@
+import { Card, Text, Box, InlineStack, Badge, Button } from "@shopify/polaris";
+import { PlayIcon, StopCircleIcon, ViewIcon } from "@shopify/polaris-icons";
+
 interface Optimization {
   id: string;
   productName: string;
@@ -28,9 +31,9 @@ function getStatusTone(status: string): "info" | "success" | "read-only" | undef
 
 export default function OptimizationHistoryTable({ optimizations, onViewOptimization, onStartOptimization, onStopOptimization }: OptimizationHistoryTableProps) {
   return (
-    <s-section data-testid="card-optimization-history">
-      <s-text variant="headingSm" fontWeight="semibold" data-testid="text-table-title">Recent Optimizations</s-text>
-      <s-box padding="base none">
+    <Card data-testid="card-optimization-history">
+      <Text as="h2" variant="headingSm" fontWeight="semibold" data-testid="text-table-title">Recent Optimizations</Text>
+      <Box paddingBlockStart="400" paddingBlockEnd="0">
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
@@ -58,9 +61,9 @@ export default function OptimizationHistoryTable({ optimizations, onViewOptimiza
                     {optimization.optimizationType}
                   </td>
                   <td style={{ padding: '10px 12px' }}>
-                    <s-badge tone={getStatusTone(optimization.status)} data-testid={`badge-status-${index}`}>
+                    <Badge tone={getStatusTone(optimization.status)} data-testid={`badge-status-${index}`}>
                       {optimization.status}
-                    </s-badge>
+                    </Badge>
                   </td>
                   <td style={{ padding: '10px 12px', textAlign: 'right', fontSize: '13px', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }} data-testid={`text-arpu-${index}`}>
                     {optimization.arpu > 0 ? `$${optimization.arpu.toFixed(2)}` : '$0.00'}
@@ -72,45 +75,43 @@ export default function OptimizationHistoryTable({ optimizations, onViewOptimiza
                     {optimization.startDate}
                   </td>
                   <td style={{ padding: '10px 12px' }}>
-                    <s-stack direction="inline" gap="small" align="end">
+                    <InlineStack gap="200" align="end">
                       {optimization.status === "draft" && onStartOptimization && (
-                        <s-button
-                          variant="secondary"
+                        <Button
                           size="slim"
-                          icon="play"
-                          onClick={(e: any) => { e.stopPropagation(); onStartOptimization(optimization.id); }}
+                          icon={PlayIcon}
+                          onClick={() => onStartOptimization(optimization.id)}
                           data-testid={`button-start-optimization-${index}`}
                         >
                           Start
-                        </s-button>
+                        </Button>
                       )}
                       {optimization.status === "active" && onStopOptimization && (
-                        <s-button
-                          variant="secondary"
+                        <Button
                           size="slim"
-                          icon="stop-circle"
-                          onClick={(e: any) => { e.stopPropagation(); onStopOptimization(optimization.id); }}
+                          icon={StopCircleIcon}
+                          onClick={() => onStopOptimization(optimization.id)}
                           data-testid={`button-stop-optimization-${index}`}
                         >
                           Stop
-                        </s-button>
+                        </Button>
                       )}
-                      <s-button
-                        variant="tertiary"
+                      <Button
+                        variant="plain"
                         size="slim"
-                        icon="view"
+                        icon={ViewIcon}
                         onClick={() => onViewOptimization?.(optimization.id)}
                         data-testid={`button-view-optimization-${index}`}
                         accessibilityLabel="View optimization"
                       />
-                    </s-stack>
+                    </InlineStack>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </s-box>
-    </s-section>
+      </Box>
+    </Card>
   );
 }

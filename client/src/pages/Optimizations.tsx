@@ -14,6 +14,22 @@ import {
 } from "recharts";
 import type { Optimization, Product, OptimizationEvolutionSnapshot } from "@shared/schema";
 import { formatOptimizationType } from "@/lib/optimizationTypeFormatter";
+import {
+  Page,
+  Card,
+  Text,
+  BlockStack,
+  InlineStack,
+  InlineGrid,
+  Box,
+  Divider,
+  Spinner,
+  Badge,
+  Banner,
+  Button,
+  TextField,
+  Select,
+} from "@shopify/polaris";
 
 interface EnrichedOptimization extends Optimization {
   productName: string;
@@ -45,15 +61,15 @@ function OptimizationEvolutionCharts({ optimizationId }: OptimizationEvolutionCh
 
   if (isLoading) {
     return (
-      <s-box padding="base">
-        <s-divider />
-        <s-box padding="base">
-          <s-stack direction="block" gap="small" align="center">
-            <s-spinner size="small" accessibilityLabel="Loading evolution data" />
-            <s-text variant="bodySm" tone="subdued">Loading evolution data...</s-text>
-          </s-stack>
-        </s-box>
-      </s-box>
+      <Box padding="400">
+        <Divider />
+        <Box padding="400">
+          <BlockStack gap="200" align="center">
+            <Spinner size="small" accessibilityLabel="Loading evolution data" />
+            <Text as="p" variant="bodySm" tone="subdued">Loading evolution data...</Text>
+          </BlockStack>
+        </Box>
+      </Box>
     );
   }
 
@@ -62,18 +78,18 @@ function OptimizationEvolutionCharts({ optimizationId }: OptimizationEvolutionCh
   }
 
   return (
-    <s-box padding="base">
-      <s-divider />
-      <s-stack direction="block" gap="base">
-        <s-text variant="headingSm" fontWeight="semibold">Performance Evolution</s-text>
+    <Box padding="400">
+      <Divider />
+      <BlockStack gap="400">
+        <Text as="h3" variant="headingSm" fontWeight="semibold">Performance Evolution</Text>
 
-        <s-section>
-          <s-box padding="base" data-testid={`chart-rpv-evolution-${optimizationId}`}>
-            <s-stack direction="block" gap="small">
-              <s-text variant="bodySm" fontWeight="medium">RPV Evolution Over Time</s-text>
-              <s-text variant="bodyXs" tone="subdued">
+        <Card>
+          <Box padding="400" data-testid={`chart-rpv-evolution-${optimizationId}`}>
+            <BlockStack gap="200">
+              <Text as="p" variant="bodySm" fontWeight="medium">RPV Evolution Over Time</Text>
+              <Text as="span" variant="bodyXs" tone="subdued">
                 Cumulative revenue per visitor tracked at 100-impression intervals
-              </s-text>
+              </Text>
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart
                   data={chartData}
@@ -120,17 +136,17 @@ function OptimizationEvolutionCharts({ optimizationId }: OptimizationEvolutionCh
                   />
                 </LineChart>
               </ResponsiveContainer>
-            </s-stack>
-          </s-box>
-        </s-section>
+            </BlockStack>
+          </Box>
+        </Card>
 
-        <s-section>
-          <s-box padding="base" data-testid={`chart-allocation-evolution-${optimizationId}`}>
-            <s-stack direction="block" gap="small">
-              <s-text variant="bodySm" fontWeight="medium">Traffic Allocation Evolution</s-text>
-              <s-text variant="bodyXs" tone="subdued">
+        <Card>
+          <Box padding="400" data-testid={`chart-allocation-evolution-${optimizationId}`}>
+            <BlockStack gap="200">
+              <Text as="p" variant="bodySm" fontWeight="medium">Traffic Allocation Evolution</Text>
+              <Text as="span" variant="bodyXs" tone="subdued">
                 Cumulative traffic split adjustments tracked at 100-impression intervals
-              </s-text>
+              </Text>
               <ResponsiveContainer width="100%" height={260}>
                 <LineChart
                   data={chartData}
@@ -176,11 +192,11 @@ function OptimizationEvolutionCharts({ optimizationId }: OptimizationEvolutionCh
                   />
                 </LineChart>
               </ResponsiveContainer>
-            </s-stack>
-          </s-box>
-        </s-section>
-      </s-stack>
-    </s-box>
+            </BlockStack>
+          </Box>
+        </Card>
+      </BlockStack>
+    </Box>
   );
 }
 
@@ -370,152 +386,152 @@ export default function Optimizations() {
   };
 
   return (
-    <s-page data-testid="text-page-title">
-      <s-stack direction="block" gap="large">
-        <s-stack direction="block" gap="small">
-          <s-text variant="headingLg" data-testid="text-page-title">Optimizations</s-text>
-          <s-text variant="bodySm" tone="subdued" data-testid="text-page-description">
+    <Page data-testid="text-page-title">
+      <BlockStack gap="600">
+        <BlockStack gap="200">
+          <Text as="h1" variant="headingLg" data-testid="text-page-title">Optimizations</Text>
+          <Text as="p" variant="bodySm" tone="subdued" data-testid="text-page-description">
             Manage all your A/B optimizations - draft, active, paused, and completed
-          </s-text>
-        </s-stack>
+          </Text>
+        </BlockStack>
 
-        {/* Filter Controls */}
-        <s-section data-testid="card-filters">
-          <s-box padding="base">
-            <s-stack direction="block" gap="base">
-              <s-stack direction="inline" gap="small" align="space-between" blockAlign="center">
-                <s-text variant="bodySm" fontWeight="semibold">Filters:</s-text>
+        <Card data-testid="card-filters">
+          <Box padding="400">
+            <BlockStack gap="400">
+              <InlineStack gap="200" align="space-between" blockAlign="center">
+                <Text as="p" variant="bodySm" fontWeight="semibold">Filters:</Text>
                 {hasActiveFilters && (
-                  <s-button
-                    variant="tertiary"
+                  <Button
+                    variant="plain"
                     size="slim"
                     onClick={handleClearFilters}
                     data-testid="button-clear-filters"
                   >
                     Clear
-                  </s-button>
+                  </Button>
                 )}
-              </s-stack>
+              </InlineStack>
 
-              <s-grid columns="3" gap="base">
-                <s-select
+              <InlineGrid columns={3} gap="400">
+                <Select
                   label="Status"
                   value={statusFilter}
-                  onChange={(e: any) => setStatusFilter(e.target.value)}
+                  onChange={(value) => setStatusFilter(value)}
                   data-testid="select-status-filter"
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="draft">Draft</option>
-                  <option value="active">Live</option>
-                  <option value="paused">Paused</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
-                </s-select>
+                  options={[
+                    { label: "All Statuses", value: "all" },
+                    { label: "Draft", value: "draft" },
+                    { label: "Live", value: "active" },
+                    { label: "Paused", value: "paused" },
+                    { label: "Completed", value: "completed" },
+                    { label: "Cancelled", value: "cancelled" },
+                  ]}
+                />
 
-                <s-select
+                <Select
                   label="Optimization Type"
                   value={typeFilter}
-                  onChange={(e: any) => setTypeFilter(e.target.value)}
+                  onChange={(value) => setTypeFilter(value)}
                   data-testid="select-type-filter"
-                >
-                  <option value="all">All Types</option>
-                  <option value="price">Price</option>
-                  <option value="title">Title</option>
-                  <option value="description">Description</option>
-                </s-select>
+                  options={[
+                    { label: "All Types", value: "all" },
+                    { label: "Price", value: "price" },
+                    { label: "Title", value: "title" },
+                    { label: "Description", value: "description" },
+                  ]}
+                />
 
-                <s-text-field
+                <TextField
                   label="Product"
                   placeholder="Search products..."
                   value={productSearch}
-                  onInput={(e: any) => setProductSearch(e.target.value)}
+                  onChange={(value) => setProductSearch(value)}
                   data-testid="input-product-search"
+                  autoComplete="off"
                 />
-              </s-grid>
-            </s-stack>
-          </s-box>
-        </s-section>
+              </InlineGrid>
+            </BlockStack>
+          </Box>
+        </Card>
 
-        {/* Summary Metrics */}
         {trulyActiveOptimizations.length > 0 && (
-          <s-grid columns="4" gap="base">
-            <s-section data-testid="card-metric-optimizations">
-              <s-box padding="base">
-                <s-stack direction="block" gap="small">
-                  <s-text variant="bodyXs" tone="subdued">Active Optimizations</s-text>
-                  <s-text variant="headingLg" fontWeight="bold">
-                    {trulyActiveOptimizations.length}
-                  </s-text>
-                  <s-text variant="bodyXs" tone="subdued">Running experiments</s-text>
-                </s-stack>
-              </s-box>
-            </s-section>
+          <InlineGrid columns={4} gap="400">
+            <Card data-testid="card-metric-optimizations">
+              <Box padding="400">
+                <BlockStack gap="200">
+                  <Text as="span" variant="bodyXs" tone="subdued">Active Optimizations</Text>
+                  <Text as="h2" variant="headingLg" fontWeight="bold">
+                    {String(trulyActiveOptimizations.length)}
+                  </Text>
+                  <Text as="span" variant="bodyXs" tone="subdued">Running experiments</Text>
+                </BlockStack>
+              </Box>
+            </Card>
 
-            <s-section data-testid="card-metric-impressions">
-              <s-box padding="base">
-                <s-stack direction="block" gap="small">
-                  <s-text variant="bodyXs" tone="subdued">Total Impressions</s-text>
-                  <s-text variant="headingLg" fontWeight="bold">
+            <Card data-testid="card-metric-impressions">
+              <Box padding="400">
+                <BlockStack gap="200">
+                  <Text as="span" variant="bodyXs" tone="subdued">Total Impressions</Text>
+                  <Text as="h2" variant="headingLg" fontWeight="bold">
                     {totalImpressions.toLocaleString()}
-                  </s-text>
-                  <s-text variant="bodyXs" tone="subdued">Product page views</s-text>
-                </s-stack>
-              </s-box>
-            </s-section>
+                  </Text>
+                  <Text as="span" variant="bodyXs" tone="subdued">Product page views</Text>
+                </BlockStack>
+              </Box>
+            </Card>
 
-            <s-section data-testid="card-metric-conversions">
-              <s-box padding="base">
-                <s-stack direction="block" gap="small">
-                  <s-text variant="bodyXs" tone="subdued">Total Conversions</s-text>
-                  <s-text variant="headingLg" fontWeight="bold">{totalConversions}</s-text>
-                  <s-text variant="bodyXs" tone="subdued">
+            <Card data-testid="card-metric-conversions">
+              <Box padding="400">
+                <BlockStack gap="200">
+                  <Text as="span" variant="bodyXs" tone="subdued">Total Conversions</Text>
+                  <Text as="h2" variant="headingLg" fontWeight="bold">{String(totalConversions)}</Text>
+                  <Text as="span" variant="bodyXs" tone="subdued">
                     {averageConversionRate.toFixed(2)}% conversion rate
-                  </s-text>
-                </s-stack>
-              </s-box>
-            </s-section>
+                  </Text>
+                </BlockStack>
+              </Box>
+            </Card>
 
-            <s-section data-testid="card-metric-rpv">
-              <s-box padding="base">
-                <s-stack direction="block" gap="small">
-                  <s-text variant="bodyXs" tone="subdued">Average RPV</s-text>
-                  <s-text variant="headingLg" fontWeight="bold">
+            <Card data-testid="card-metric-rpv">
+              <Box padding="400">
+                <BlockStack gap="200">
+                  <Text as="span" variant="bodyXs" tone="subdued">Average RPV</Text>
+                  <Text as="h2" variant="headingLg" fontWeight="bold">
                     ${averageRpv.toFixed(2)}
-                  </s-text>
-                  <s-text variant="bodyXs" tone="subdued">Revenue per visitor</s-text>
-                </s-stack>
-              </s-box>
-            </s-section>
-          </s-grid>
+                  </Text>
+                  <Text as="span" variant="bodyXs" tone="subdued">Revenue per visitor</Text>
+                </BlockStack>
+              </Box>
+            </Card>
+          </InlineGrid>
         )}
 
-        {/* Optimizations List */}
         {optimizationsLoading ? (
-          <s-section data-testid="card-loading">
-            <s-box padding="base">
-              <s-stack direction="block" gap="base" align="center">
-                <s-spinner size="large" accessibilityLabel="Loading optimizations" />
-                <s-text variant="bodySm" tone="subdued">Loading optimizations...</s-text>
-              </s-stack>
-            </s-box>
-          </s-section>
+          <Card data-testid="card-loading">
+            <Box padding="400">
+              <BlockStack gap="400" align="center">
+                <Spinner size="large" accessibilityLabel="Loading optimizations" />
+                <Text as="p" variant="bodySm" tone="subdued">Loading optimizations...</Text>
+              </BlockStack>
+            </Box>
+          </Card>
         ) : activeAndDraftOptimizations.length === 0 ? (
-          <s-section data-testid="card-no-optimizations">
-            <s-box padding="base">
-              <s-stack direction="block" gap="base" align="center">
-                <s-text variant="headingSm">No Optimizations Yet</s-text>
-                <s-text variant="bodySm" tone="subdued">
+          <Card data-testid="card-no-optimizations">
+            <Box padding="400">
+              <BlockStack gap="400" align="center">
+                <Text as="h3" variant="headingSm">No Optimizations Yet</Text>
+                <Text as="p" variant="bodySm" tone="subdued">
                   Create an optimization from an AI recommendation to get started
-                </s-text>
-              </s-stack>
-            </s-box>
-          </s-section>
+                </Text>
+              </BlockStack>
+            </Box>
+          </Card>
         ) : (
-          <s-stack direction="block" gap="base">
-            <s-text variant="headingMd" data-testid="text-optimizations-heading">
+          <BlockStack gap="400">
+            <Text as="h2" variant="headingMd" data-testid="text-optimizations-heading">
               Optimizations
-            </s-text>
-            <s-stack direction="block" gap="base">
+            </Text>
+            <BlockStack gap="400">
               {activeAndDraftOptimizations.map((optimization, index) => {
                 const impressions = optimization.impressions || 0;
                 const conversions = optimization.conversions || 0;
@@ -550,27 +566,27 @@ export default function Optimizations() {
                     const controlPrice = controlData.variantPrices?.[0]?.price || controlData.price;
                     const variantPrice = variantData.variantPrices?.[0]?.price || variantData.price;
                     return (
-                      <s-stack direction="inline" gap="small" blockAlign="center">
-                        <s-text variant="bodySm" fontWeight="medium">${controlPrice}</s-text>
-                        <s-text variant="bodySm" tone="subdued">&rarr;</s-text>
-                        <s-text variant="bodySm" fontWeight="medium" tone="success">${variantPrice}</s-text>
-                      </s-stack>
+                      <InlineStack gap="200" blockAlign="center">
+                        <Text as="p" variant="bodySm" fontWeight="medium">${controlPrice}</Text>
+                        <Text as="p" variant="bodySm" tone="subdued">&rarr;</Text>
+                        <Text as="p" variant="bodySm" fontWeight="medium" tone="success">${variantPrice}</Text>
+                      </InlineStack>
                     );
                   } else if (optimizationType === "title") {
                     return (
-                      <s-stack direction="inline" gap="small" blockAlign="center">
-                        <s-text variant="bodySm" fontWeight="medium" truncate>{controlData.title}</s-text>
-                        <s-text variant="bodySm" tone="subdued">&rarr;</s-text>
-                        <s-text variant="bodySm" fontWeight="medium" tone="success" truncate>{variantData.title}</s-text>
-                      </s-stack>
+                      <InlineStack gap="200" blockAlign="center">
+                        <Text as="p" variant="bodySm" fontWeight="medium" truncate>{controlData.title}</Text>
+                        <Text as="p" variant="bodySm" tone="subdued">&rarr;</Text>
+                        <Text as="p" variant="bodySm" fontWeight="medium" tone="success" truncate>{variantData.title}</Text>
+                      </InlineStack>
                     );
                   } else if (optimizationType === "description") {
                     return (
-                      <s-stack direction="inline" gap="small" blockAlign="center">
-                        <s-text variant="bodySm" truncate>{controlData.description?.substring(0, 30)}...</s-text>
-                        <s-text variant="bodySm" tone="subdued">&rarr;</s-text>
-                        <s-text variant="bodySm" tone="success" truncate>{variantData.description?.substring(0, 30)}...</s-text>
-                      </s-stack>
+                      <InlineStack gap="200" blockAlign="center">
+                        <Text as="p" variant="bodySm" truncate>{controlData.description?.substring(0, 30)}...</Text>
+                        <Text as="p" variant="bodySm" tone="subdued">&rarr;</Text>
+                        <Text as="p" variant="bodySm" tone="success" truncate>{variantData.description?.substring(0, 30)}...</Text>
+                      </InlineStack>
                     );
                   }
                   return null;
@@ -579,55 +595,53 @@ export default function Optimizations() {
                 const status = (optimization.status || "").toLowerCase();
 
                 return (
-                  <s-section key={optimization.id} data-testid={`card-test-${index}`}>
-                    <s-box padding="base">
-                      <s-stack direction="block" gap="base">
-                        {/* Title Row */}
-                        <s-stack direction="inline" gap="small" blockAlign="center" wrap>
-                          <s-text
+                  <Card key={optimization.id} data-testid={`card-test-${index}`}>
+                    <Box padding="400">
+                      <BlockStack gap="400">
+                        <InlineStack gap="200" blockAlign="center" wrap>
+                          <Text
+                            as="h3"
                             variant="headingSm"
                             data-testid={`text-product-name-${index}`}
                           >
                             {optimization.productName}
-                          </s-text>
-                          <s-badge
+                          </Text>
+                          <Badge
                             tone={getStatusBadgeTone(status)}
                             data-testid={`badge-status-${index}`}
                           >
                             {getStatusLabel(status)}
-                          </s-badge>
+                          </Badge>
                           {isReadyToDecide && status === "active" && (
-                            <s-badge tone="success">Ready to Decide</s-badge>
+                            <Badge tone="success">Ready to Decide</Badge>
                           )}
                           {!isReadyToDecide && status === "active" && (
-                            <s-badge tone="read-only">Still Learning</s-badge>
+                            <Badge tone="read-only">Still Learning</Badge>
                           )}
-                        </s-stack>
+                        </InlineStack>
 
-                        {/* Change Preview and Test Info */}
-                        <s-stack direction="block" gap="small">
-                          <s-stack direction="inline" gap="small" blockAlign="center">
-                            <s-text variant="bodySm" fontWeight="medium">
+                        <BlockStack gap="200">
+                          <InlineStack gap="200" blockAlign="center">
+                            <Text as="p" variant="bodySm" fontWeight="medium">
                               {formatOptimizationType(optimization.optimizationType)}
-                            </s-text>
-                            <s-text variant="bodySm" tone="subdued">&#8226;</s-text>
+                            </Text>
+                            <Text as="p" variant="bodySm" tone="subdued">&#8226;</Text>
                             {renderChangePreview()}
-                          </s-stack>
+                          </InlineStack>
 
                           {optimization.startDate && (
-                            <s-text variant="bodyXs" tone="subdued">
+                            <Text as="span" variant="bodyXs" tone="subdued">
                               Started {new Date(optimization.startDate).toLocaleDateString()}
                               {optimization.endDate && (
                                 <> &#8226; Ended {new Date(optimization.endDate).toLocaleDateString()}</>
                               )}
-                            </s-text>
+                            </Text>
                           )}
-                        </s-stack>
+                        </BlockStack>
 
-                        {/* Action Buttons */}
-                        <s-stack direction="inline" gap="small">
+                        <InlineStack gap="200">
                           {status === "draft" && (
-                            <s-button
+                            <Button
                               variant="primary"
                               size="slim"
                               onClick={() => activateOptimizationMutation.mutate(optimization.id)}
@@ -636,13 +650,12 @@ export default function Optimizations() {
                               data-testid={`button-activate-test-${index}`}
                             >
                               Activate Optimization
-                            </s-button>
+                            </Button>
                           )}
 
                           {status === "active" && (
                             <>
-                              <s-button
-                                variant="secondary"
+                              <Button
                                 size="slim"
                                 onClick={() => pauseOptimizationMutation.mutate(optimization.id)}
                                 disabled={pauseOptimizationMutation.isPending}
@@ -650,9 +663,8 @@ export default function Optimizations() {
                                 data-testid={`button-pause-test-${index}`}
                               >
                                 Pause
-                              </s-button>
-                              <s-button
-                                variant="secondary"
+                              </Button>
+                              <Button
                                 size="slim"
                                 onClick={() => deactivateOptimizationMutation.mutate(optimization.id)}
                                 disabled={deactivateOptimizationMutation.isPending}
@@ -660,13 +672,13 @@ export default function Optimizations() {
                                 data-testid={`button-cancel-test-${index}`}
                               >
                                 Cancel
-                              </s-button>
+                              </Button>
                             </>
                           )}
 
                           {status === "paused" && (
                             <>
-                              <s-button
+                              <Button
                                 variant="primary"
                                 size="slim"
                                 onClick={() => resumeOptimizationMutation.mutate(optimization.id)}
@@ -675,9 +687,8 @@ export default function Optimizations() {
                                 data-testid={`button-resume-test-${index}`}
                               >
                                 Resume
-                              </s-button>
-                              <s-button
-                                variant="secondary"
+                              </Button>
+                              <Button
                                 size="slim"
                                 onClick={() => deactivateOptimizationMutation.mutate(optimization.id)}
                                 disabled={deactivateOptimizationMutation.isPending}
@@ -685,36 +696,34 @@ export default function Optimizations() {
                                 data-testid={`button-cancel-test-${index}`}
                               >
                                 Cancel
-                              </s-button>
+                              </Button>
                             </>
                           )}
-                        </s-stack>
+                        </InlineStack>
 
-                        <s-divider />
+                        <Divider />
 
-                        {/* Control vs Variant Comparison */}
-                        <s-grid columns="2" gap="base">
-                          {/* Control Column */}
-                          <s-stack direction="block" gap="base">
-                            <s-stack direction="inline" gap="small" blockAlign="center">
+                        <InlineGrid columns={2} gap="400">
+                          <BlockStack gap="400">
+                            <InlineStack gap="200" blockAlign="center">
                               <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", backgroundColor: "#3b82f6" }} />
-                              <s-text variant="bodySm" fontWeight="semibold">Control (Original)</s-text>
-                            </s-stack>
+                              <Text as="p" variant="bodySm" fontWeight="semibold">Control (Original)</Text>
+                            </InlineStack>
 
-                            <s-stack direction="block" gap="base">
-                              <s-stack direction="block" gap="small">
-                                <s-text variant="bodyXs" tone="subdued">Impressions</s-text>
-                                <s-text variant="headingMd" fontWeight="bold" data-testid={`text-control-impressions-${index}`}>
+                            <BlockStack gap="400">
+                              <BlockStack gap="200">
+                                <Text as="span" variant="bodyXs" tone="subdued">Impressions</Text>
+                                <Text as="h2" variant="headingMd" fontWeight="bold" data-testid={`text-control-impressions-${index}`}>
                                   {(optimization.controlImpressions || 0).toLocaleString()}
-                                </s-text>
-                              </s-stack>
+                                </Text>
+                              </BlockStack>
 
-                              <s-stack direction="block" gap="small">
-                                <s-text variant="bodyXs" tone="subdued">Conversions</s-text>
-                                <s-text variant="headingMd" fontWeight="bold" data-testid={`text-control-conversions-${index}`}>
-                                  {optimization.controlConversions || 0}
-                                </s-text>
-                                <s-text variant="bodyXs" tone="subdued">
+                              <BlockStack gap="200">
+                                <Text as="span" variant="bodyXs" tone="subdued">Conversions</Text>
+                                <Text as="h2" variant="headingMd" fontWeight="bold" data-testid={`text-control-conversions-${index}`}>
+                                  {String(optimization.controlConversions || 0)}
+                                </Text>
+                                <Text as="span" variant="bodyXs" tone="subdued">
                                   {(optimization.controlImpressions || 0) > 0
                                     ? (
                                         ((optimization.controlConversions || 0) /
@@ -723,12 +732,12 @@ export default function Optimizations() {
                                       ).toFixed(2)
                                     : "0.00"}
                                   % rate
-                                </s-text>
-                              </s-stack>
+                                </Text>
+                              </BlockStack>
 
-                              <s-stack direction="block" gap="small">
-                                <s-text variant="bodyXs" tone="subdued">RPV (Revenue Per Visitor)</s-text>
-                                <s-text variant="headingMd" fontWeight="bold" data-testid={`text-control-rpv-${index}`}>
+                              <BlockStack gap="200">
+                                <Text as="span" variant="bodyXs" tone="subdued">RPV (Revenue Per Visitor)</Text>
+                                <Text as="h2" variant="headingMd" fontWeight="bold" data-testid={`text-control-rpv-${index}`}>
                                   $
                                   {(() => {
                                     const impressions = optimization.controlImpressions || 0;
@@ -738,8 +747,8 @@ export default function Optimizations() {
                                     const rpv = impressions > 0 ? revenue / impressions : 0;
                                     return (isNaN(rpv) ? 0 : rpv).toFixed(2);
                                   })()}
-                                </s-text>
-                                <s-text variant="bodyXs" tone="subdued">
+                                </Text>
+                                <Text as="span" variant="bodyXs" tone="subdued">
                                   AOV: $
                                   {(() => {
                                     const conversions = optimization.controlConversions || 0;
@@ -749,32 +758,31 @@ export default function Optimizations() {
                                     const aov = conversions > 0 ? revenue / conversions : 0;
                                     return (isNaN(aov) ? 0 : aov).toFixed(2);
                                   })()}
-                                </s-text>
-                              </s-stack>
-                            </s-stack>
-                          </s-stack>
+                                </Text>
+                              </BlockStack>
+                            </BlockStack>
+                          </BlockStack>
 
-                          {/* Variant Column */}
-                          <s-stack direction="block" gap="base">
-                            <s-stack direction="inline" gap="small" blockAlign="center">
+                          <BlockStack gap="400">
+                            <InlineStack gap="200" blockAlign="center">
                               <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", backgroundColor: "#22c55e" }} />
-                              <s-text variant="bodySm" fontWeight="semibold">Variant (New)</s-text>
-                            </s-stack>
+                              <Text as="p" variant="bodySm" fontWeight="semibold">Variant (New)</Text>
+                            </InlineStack>
 
-                            <s-stack direction="block" gap="base">
-                              <s-stack direction="block" gap="small">
-                                <s-text variant="bodyXs" tone="subdued">Impressions</s-text>
-                                <s-text variant="headingMd" fontWeight="bold" data-testid={`text-variant-impressions-${index}`}>
+                            <BlockStack gap="400">
+                              <BlockStack gap="200">
+                                <Text as="span" variant="bodyXs" tone="subdued">Impressions</Text>
+                                <Text as="h2" variant="headingMd" fontWeight="bold" data-testid={`text-variant-impressions-${index}`}>
                                   {(optimization.variantImpressions || 0).toLocaleString()}
-                                </s-text>
-                              </s-stack>
+                                </Text>
+                              </BlockStack>
 
-                              <s-stack direction="block" gap="small">
-                                <s-text variant="bodyXs" tone="subdued">Conversions</s-text>
-                                <s-text variant="headingMd" fontWeight="bold" data-testid={`text-variant-conversions-${index}`}>
-                                  {optimization.variantConversions || 0}
-                                </s-text>
-                                <s-text variant="bodyXs" tone="subdued">
+                              <BlockStack gap="200">
+                                <Text as="span" variant="bodyXs" tone="subdued">Conversions</Text>
+                                <Text as="h2" variant="headingMd" fontWeight="bold" data-testid={`text-variant-conversions-${index}`}>
+                                  {String(optimization.variantConversions || 0)}
+                                </Text>
+                                <Text as="span" variant="bodyXs" tone="subdued">
                                   {(optimization.variantImpressions || 0) > 0
                                     ? (
                                         ((optimization.variantConversions || 0) /
@@ -783,12 +791,12 @@ export default function Optimizations() {
                                       ).toFixed(2)
                                     : "0.00"}
                                   % rate
-                                </s-text>
-                              </s-stack>
+                                </Text>
+                              </BlockStack>
 
-                              <s-stack direction="block" gap="small">
-                                <s-text variant="bodyXs" tone="subdued">RPV (Revenue Per Visitor)</s-text>
-                                <s-text variant="headingMd" fontWeight="bold" tone="success" data-testid={`text-variant-rpv-${index}`}>
+                              <BlockStack gap="200">
+                                <Text as="span" variant="bodyXs" tone="subdued">RPV (Revenue Per Visitor)</Text>
+                                <Text as="h2" variant="headingMd" fontWeight="bold" tone="success" data-testid={`text-variant-rpv-${index}`}>
                                   $
                                   {(() => {
                                     const impressions = optimization.variantImpressions || 0;
@@ -798,7 +806,7 @@ export default function Optimizations() {
                                     const rpv = impressions > 0 ? revenue / impressions : 0;
                                     return (isNaN(rpv) ? 0 : rpv).toFixed(2);
                                   })()}
-                                </s-text>
+                                </Text>
                                 {(() => {
                                   const controlImpressions = optimization.controlImpressions || 0;
                                   const controlRevenue = optimization.controlRevenue
@@ -824,17 +832,18 @@ export default function Optimizations() {
 
                                   return (
                                     hasData && (
-                                      <s-text
+                                      <Text
+                                        as="p"
                                         variant="bodySm"
                                         fontWeight="semibold"
                                         tone={lift > 0 ? "success" : lift < 0 ? "critical" : "subdued"}
                                       >
                                         {lift >= 0 ? "+" : ""}{lift.toFixed(1)}% vs control
-                                      </s-text>
+                                      </Text>
                                     )
                                   );
                                 })()}
-                                <s-text variant="bodyXs" tone="subdued">
+                                <Text as="span" variant="bodyXs" tone="subdued">
                                   AOV: $
                                   {(() => {
                                     const conversions = optimization.variantConversions || 0;
@@ -844,53 +853,52 @@ export default function Optimizations() {
                                     const aov = conversions > 0 ? revenue / conversions : 0;
                                     return (isNaN(aov) ? 0 : aov).toFixed(2);
                                   })()}
-                                </s-text>
-                              </s-stack>
-                            </s-stack>
-                          </s-stack>
-                        </s-grid>
-                      </s-stack>
-                    </s-box>
-                  </s-section>
+                                </Text>
+                              </BlockStack>
+                            </BlockStack>
+                          </BlockStack>
+                        </InlineGrid>
+                      </BlockStack>
+                    </Box>
+                  </Card>
                 );
               })}
-            </s-stack>
-          </s-stack>
+            </BlockStack>
+          </BlockStack>
         )}
 
-        {/* Info Card */}
-        <s-section data-testid="card-info">
-          <s-box padding="base">
-            <s-stack direction="block" gap="base">
-              <s-text variant="headingSm">About Optimizations</s-text>
-              <s-stack direction="block" gap="small">
-                <s-text variant="bodySm" tone="subdued">
+        <Card data-testid="card-info">
+          <Box padding="400">
+            <BlockStack gap="400">
+              <Text as="h3" variant="headingSm">About Optimizations</Text>
+              <BlockStack gap="200">
+                <Text as="p" variant="bodySm" tone="subdued">
                   This page shows all your A/B optimizations across all statuses - drafts waiting to be activated,
                   live optimizations collecting data, paused optimizations, and completed experiments. Use the filters above
                   to find specific optimizations. Metrics update automatically every 2 seconds.
-                </s-text>
-                <s-text variant="bodySm" tone="subdued">
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
                   <strong>Control vs Variant:</strong> Each optimization shows side-by-side
                   performance metrics. The Control represents your original product,
                   while the Variant shows the proposed changes.
-                </s-text>
-                <s-text variant="bodySm" tone="subdued">
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
                   <strong>RPV (Revenue Per Visitor):</strong> The primary metric
                   optimized by our smart allocation system. RPV = Total Revenue ÷ Total
                   Impressions. A variant can win with higher RPV even if it has lower
                   AOV, by converting visitors at a higher rate. AOV (Average Order
                   Value) is shown as a secondary metric.
-                </s-text>
-                <s-text variant="bodySm" tone="subdued">
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
                   <strong>Stopping an optimization:</strong> Deactivates the optimization and stops
                   showing variants to customers. All collected metrics are preserved
                   for analysis.
-                </s-text>
-              </s-stack>
-            </s-stack>
-          </s-box>
-        </s-section>
-      </s-stack>
-    </s-page>
+                </Text>
+              </BlockStack>
+            </BlockStack>
+          </Box>
+        </Card>
+      </BlockStack>
+    </Page>
   );
 }

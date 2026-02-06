@@ -1,3 +1,5 @@
+import { Card, BlockStack, InlineStack, Text } from "@shopify/polaris";
+
 interface MetricCardProps {
   title: string;
   value: string;
@@ -11,27 +13,27 @@ export default function MetricCard({ title, value, change, trend = "neutral", su
   const valueTone = valueClassName?.includes('green') ? 'success' : valueClassName?.includes('red') ? 'critical' : undefined;
 
   return (
-    <s-section data-testid={`card-metric-${title.toLowerCase().replace(/\s+/g, '-')}`}>
-      <s-stack direction="block" gap="small">
-        <s-text variant="bodySm" tone="subdued" fontWeight="medium" data-testid="text-metric-title">
+    <Card data-testid={`card-metric-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+      <BlockStack gap="200">
+        <Text as="p" variant="bodySm" tone="subdued" fontWeight="medium" data-testid="text-metric-title">
           {title}
-        </s-text>
-        <s-stack direction="inline" gap="small" blockAlign="baseline" align="space-between">
-          <s-text variant="headingLg" fontWeight="bold" tone={valueTone} data-testid="text-metric-value">
+        </Text>
+        <InlineStack gap="200" blockAlign="baseline" align="space-between">
+          <Text as="p" variant="headingLg" fontWeight="bold" tone={valueTone} data-testid="text-metric-value">
             {value}
-          </s-text>
+          </Text>
           {change !== undefined && (
-            <s-text variant="bodySm" fontWeight="semibold" tone={trend === "up" ? "success" : trend === "down" ? "critical" : "subdued"} data-testid="text-metric-change">
+            <Text as="span" variant="bodySm" fontWeight="semibold" tone={trend === "up" ? "success" : trend === "down" ? "critical" : "subdued"} data-testid="text-metric-change">
               {trend === "up" ? "+" : trend === "down" ? "-" : ""}{Math.abs(change)}%
-            </s-text>
+            </Text>
           )}
-        </s-stack>
+        </InlineStack>
         {subtitle && (
-          <s-text variant="bodyXs" tone="subdued" data-testid="text-metric-subtitle">
+          <Text as="p" variant="bodyXs" tone="subdued" data-testid="text-metric-subtitle">
             {subtitle}
-          </s-text>
+          </Text>
         )}
-      </s-stack>
-    </s-section>
+      </BlockStack>
+    </Card>
   );
 }
