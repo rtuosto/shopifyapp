@@ -1,8 +1,3 @@
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Eye, TrendingUp, TrendingDown, Play, StopCircle } from "lucide-react";
-
 interface Optimization {
   id: string;
   productName: string;
@@ -22,130 +17,100 @@ interface OptimizationHistoryTableProps {
   onStopOptimization?: (optimizationId: string) => void;
 }
 
+function getStatusTone(status: string): "info" | "success" | "read-only" | undefined {
+  switch (status) {
+    case "active": return "success";
+    case "completed": return "info";
+    case "draft": return "read-only";
+    default: return "read-only";
+  }
+}
+
 export default function OptimizationHistoryTable({ optimizations, onViewOptimization, onStartOptimization, onStopOptimization }: OptimizationHistoryTableProps) {
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case "active":
-        return "default";
-      case "completed":
-        return "secondary";
-      case "draft":
-        return "outline";
-      default:
-        return "outline";
-    }
-  };
-
-  const getPerformanceColor = (performance: number) => {
-    if (performance > 0) return "text-chart-4";
-    if (performance < 0) return "text-destructive";
-    return "text-muted-foreground";
-  };
-
-  const handleViewOptimization = (optimizationId: string) => {
-    onViewOptimization?.(optimizationId);
-    console.log("Viewing optimization:", optimizationId);
-  };
-
-  const handleStartOptimization = (optimizationId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    onStartOptimization?.(optimizationId);
-  };
-
-  const handleStopOptimization = (optimizationId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    onStopOptimization?.(optimizationId);
-  };
-
   return (
-    <Card data-testid="card-optimization-history">
-      <div className="p-4 md:p-6">
-        <h3 className="text-base md:text-lg font-semibold mb-3 md:mb-4" data-testid="text-table-title">Recent Optimizations</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full table-fixed lg:table-auto">
+    <s-section data-testid="card-optimization-history">
+      <s-text variant="headingSm" fontWeight="semibold" data-testid="text-table-title">Recent Optimizations</s-text>
+      <s-box padding="base none">
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr className="border-b text-left text-xs md:text-sm text-muted-foreground">
-                <th className="pb-3 font-medium w-2/5 lg:w-auto">Product</th>
-                <th className="pb-3 font-medium hidden md:table-cell w-24 lg:w-auto">Type</th>
-                <th className="pb-3 font-medium w-20 lg:w-auto">Status</th>
-                <th className="pb-3 font-medium text-right w-20 lg:w-auto">ARPU</th>
-                <th className="pb-3 font-medium text-right hidden sm:table-cell w-24 lg:w-auto">Conversions</th>
-                <th className="pb-3 font-medium hidden lg:table-cell">Started</th>
-                <th className="pb-3 font-medium text-right w-16 lg:w-auto">Actions</th>
+              <tr style={{ borderBottom: '1px solid var(--p-color-border)' }}>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '13px', fontWeight: 500, color: 'var(--p-color-text-secondary)' }}>Product</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '13px', fontWeight: 500, color: 'var(--p-color-text-secondary)' }}>Type</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '13px', fontWeight: 500, color: 'var(--p-color-text-secondary)' }}>Status</th>
+                <th style={{ padding: '8px 12px', textAlign: 'right', fontSize: '13px', fontWeight: 500, color: 'var(--p-color-text-secondary)' }}>ARPU</th>
+                <th style={{ padding: '8px 12px', textAlign: 'right', fontSize: '13px', fontWeight: 500, color: 'var(--p-color-text-secondary)' }}>Conversions</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '13px', fontWeight: 500, color: 'var(--p-color-text-secondary)' }}>Started</th>
+                <th style={{ padding: '8px 12px', textAlign: 'right', fontSize: '13px', fontWeight: 500, color: 'var(--p-color-text-secondary)' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {optimizations.map((optimization, index) => (
                 <tr 
                   key={optimization.id} 
-                  className="border-b last:border-0 hover-elevate"
+                  style={{ borderBottom: '1px solid var(--p-color-border)' }}
                   data-testid={`row-optimization-${index}`}
                 >
-                  <td className="py-3 text-xs md:text-sm font-medium break-words" data-testid={`text-product-${index}`}>
-                    <div className="line-clamp-2">{optimization.productName}</div>
+                  <td style={{ padding: '10px 12px', fontSize: '13px', fontWeight: 500 }} data-testid={`text-product-${index}`}>
+                    {optimization.productName}
                   </td>
-                  <td className="py-3 text-xs md:text-sm text-muted-foreground hidden md:table-cell" data-testid={`text-optimization-type-${index}`}>
+                  <td style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--p-color-text-secondary)' }} data-testid={`text-optimization-type-${index}`}>
                     {optimization.optimizationType}
                   </td>
-                  <td className="py-3">
-                    <Badge variant={getStatusVariant(optimization.status)} data-testid={`badge-status-${index}`} className="text-xs">
+                  <td style={{ padding: '10px 12px' }}>
+                    <s-badge tone={getStatusTone(optimization.status)} data-testid={`badge-status-${index}`}>
                       {optimization.status}
-                    </Badge>
+                    </s-badge>
                   </td>
-                  <td className="py-3 text-right text-xs md:text-sm font-semibold tabular-nums" data-testid={`text-arpu-${index}`}>
+                  <td style={{ padding: '10px 12px', textAlign: 'right', fontSize: '13px', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }} data-testid={`text-arpu-${index}`}>
                     {optimization.arpu > 0 ? `$${optimization.arpu.toFixed(2)}` : '$0.00'}
                   </td>
-                  <td className="py-3 text-right text-xs md:text-sm tabular-nums text-muted-foreground hidden sm:table-cell" data-testid={`text-conversions-${index}`}>
+                  <td style={{ padding: '10px 12px', textAlign: 'right', fontSize: '13px', color: 'var(--p-color-text-secondary)', fontVariantNumeric: 'tabular-nums' }} data-testid={`text-conversions-${index}`}>
                     {optimization.conversions}
                   </td>
-                  <td className="py-3 text-xs md:text-sm text-muted-foreground hidden lg:table-cell" data-testid={`text-date-${index}`}>
+                  <td style={{ padding: '10px 12px', fontSize: '13px', color: 'var(--p-color-text-secondary)' }} data-testid={`text-date-${index}`}>
                     {optimization.startDate}
                   </td>
-                  <td className="py-3">
-                    <div className="flex items-center justify-end gap-1 md:gap-2">
+                  <td style={{ padding: '10px 12px' }}>
+                    <s-stack direction="inline" gap="small" align="end">
                       {optimization.status === "draft" && onStartOptimization && (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={(e) => handleStartOptimization(optimization.id, e)}
+                        <s-button
+                          variant="secondary"
+                          size="slim"
+                          icon="play"
+                          onClick={(e: any) => { e.stopPropagation(); onStartOptimization(optimization.id); }}
                           data-testid={`button-start-optimization-${index}`}
-                          className="gap-1 hidden sm:flex"
                         >
-                          <Play className="w-3 h-3" />
-                          <span className="hidden lg:inline">Start Optimization</span>
-                          <span className="lg:hidden">Start</span>
-                        </Button>
+                          Start
+                        </s-button>
                       )}
                       {optimization.status === "active" && onStopOptimization && (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={(e) => handleStopOptimization(optimization.id, e)}
+                        <s-button
+                          variant="secondary"
+                          size="slim"
+                          icon="stop-circle"
+                          onClick={(e: any) => { e.stopPropagation(); onStopOptimization(optimization.id); }}
                           data-testid={`button-stop-optimization-${index}`}
-                          className="gap-1 hidden sm:flex"
                         >
-                          <StopCircle className="w-3 h-3" />
-                          <span className="hidden lg:inline">Stop Optimization</span>
-                          <span className="lg:hidden">Stop</span>
-                        </Button>
+                          Stop
+                        </s-button>
                       )}
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => handleViewOptimization(optimization.id)}
+                      <s-button
+                        variant="tertiary"
+                        size="slim"
+                        icon="view"
+                        onClick={() => onViewOptimization?.(optimization.id)}
                         data-testid={`button-view-optimization-${index}`}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                    </div>
+                        accessibilityLabel="View optimization"
+                      />
+                    </s-stack>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </div>
-    </Card>
+      </s-box>
+    </s-section>
   );
 }

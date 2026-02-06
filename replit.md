@@ -45,7 +45,17 @@ This distinction ensures clarity in documentation, code comments, and user-facin
   - App security is a top priority - never expose secrets, security keys, or personal information to the storefront or app UI.
 
 ## System Architecture
-Shoptimizer employs a full-stack architecture featuring a React frontend with Shadcn UI, Wouter, and TanStack Query, integrated via Shopify App Bridge. The backend is built with Express.js and uses PostgreSQL with Drizzle ORM for multi-tenant data storage. It integrates with the Shopify Admin GraphQL API for product management and leverages webhooks for conversion tracking. OpenAI's GPT-5-mini powers the AI-driven recommendation system.
+Shoptimizer employs a full-stack architecture featuring a React frontend with Shopify Polaris Web Components (CDN-delivered `<s-*>` tags), Wouter, and TanStack Query, integrated via Shopify App Bridge. The backend is built with Express.js and uses PostgreSQL with Drizzle ORM for multi-tenant data storage. It integrates with the Shopify Admin GraphQL API for product management and leverages webhooks for conversion tracking. OpenAI's GPT-5-mini powers the AI-driven recommendation system.
+
+**UI Framework (Polaris Web Components)**:
+- All frontend UI uses Shopify Polaris Web Components (`<s-page>`, `<s-section>`, `<s-button>`, `<s-text>`, `<s-badge>`, `<s-stack>`, `<s-grid>`, `<s-box>`, `<s-banner>`, `<s-modal>`, etc.)
+- Delivered via CDN scripts in `client/index.html`: `app-bridge.js` and `polaris.js`
+- TypeScript declarations for all Polaris web components in `client/src/types/polaris-wc.d.ts`
+- Dual-mode navigation: `<ui-nav-menu>` for embedded Shopify admin, micro button bar for dev mode
+- Environment detection via `client/src/lib/shopify.ts` (`isEmbedded()` utility)
+- Recharts retained for data visualization (Polaris has no chart components)
+- Shadcn Toaster retained for toast notifications (kept in `components/ui/` for compatibility)
+- Migrated from Shadcn UI + Tailwind CSS to Polaris Web Components (Feb 2026)
 
 **Key Architectural Decisions & Features:**
 - **Multi-Tenant PostgreSQL**: Ensures data isolation between Shopify stores with shop-scoped data.
@@ -69,7 +79,7 @@ Shoptimizer employs a full-stack architecture featuring a React frontend with Sh
 - **Shopify Billing API Integration**: Manages Free, Growth, and Pro subscription plans with a 14-day free trial, all via Shopify's Billing API.
 - **Security Headers**: Implements CSP and anti-clickjacking headers for embedded Shopify app compliance.
 - **CORS Configuration**: App Proxy endpoints are configured with CORS headers.
-- **UI/UX**: Utilizes Shadcn UI components and Tailwind CSS for an embedded Shopify app experience.
+- **UI/UX**: Utilizes Shopify Polaris Web Components for native Shopify admin look and feel.
 - **GDPR Compliance (Level 1 Protected Customer Data)**: Implements mandatory Shopify GDPR webhooks for data requests and redaction, with a focus on data minimization.
 - **Theme App Extension Architecture**: Implements Shopify App Store compliant A/B testing using Theme App Extensions (`cro-embed.liquid`, `experiment-slot.liquid`) and a lightweight `runtime.js` script, rendering content only inside owned App Block containers.
 
@@ -79,6 +89,7 @@ Shoptimizer employs a full-stack architecture featuring a React frontend with Sh
 - **PostgreSQL (Neon)**: Used for persistent multi-tenant data storage.
 - **Shopify App Bridge**: Facilitates the embedded app experience within Shopify.
 - **Wouter**: Client-side routing library.
-- **Shadcn UI & Tailwind CSS**: UI component library and styling framework.
+- **Shopify Polaris Web Components**: Native Shopify UI components via CDN (`<s-*>` tags).
+- **Shadcn Toaster**: Retained for toast notifications only (legacy, in `components/ui/`).
 - **TanStack Query**: For data fetching, caching, and state management.
 - **Recharts**: Used for data visualization and charting.

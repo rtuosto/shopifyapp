@@ -1,15 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Play, Zap, CheckCircle2, AlertCircle, Radio } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
-import { Progress } from "@/components/ui/progress";
 import type { Optimization, Product } from "@shared/schema";
 
 interface EnrichedOptimization extends Optimization {
@@ -84,20 +76,16 @@ export default function Simulator() {
   const [selectedOptimizationId, setSelectedOptimizationId] = useState<string>("");
   const [lastSimulationResult, setLastSimulationResult] = useState<SimulationResult | null>(null);
   
-  // Batch simulation parameters
   const [visitors, setVisitors] = useState(1000);
   const [controlConversionRate, setControlConversionRate] = useState(3.0);
   const [variantConversionRate, setVariantConversionRate] = useState(3.5);
   
-  // Streaming state
   const [liveMode, setLiveMode] = useState(true);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamProgress, setStreamProgress] = useState(0);
   
-  // Store EventSource instance for cleanup
   const eventSourceRef = useRef<EventSource | null>(null);
   
-  // Cleanup EventSource on unmount
   useEffect(() => {
     return () => {
       if (eventSourceRef.current) {
@@ -107,18 +95,15 @@ export default function Simulator() {
     };
   }, []);
 
-  // Fetch active optimizations
   const { data: optimizations = [], isLoading: optimizationsLoading } = useQuery<EnrichedOptimization[]>({
     queryKey: ["/api/optimizations"],
     select: (data) => data.filter((t: Optimization) => t.status === "active"),
   });
 
-  // Fetch all products to enrich optimization data
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["/api/products"],
   });
 
-  // Enrich optimizations with product names
   const enrichedOptimizations = optimizations.map((optimization) => ({
     ...optimization,
     productName: products.find((p) => p.id === optimization.productId)?.title || "Unknown Product",
@@ -126,7 +111,6 @@ export default function Simulator() {
 
   const selectedOptimization = enrichedOptimizations.find((t) => t.id === selectedOptimizationId);
 
-  // Batch simulation mutation
   const batchSimulation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/simulate/batch", {
@@ -171,11 +155,9 @@ export default function Simulator() {
     },
   });
 
-  // Streaming simulation handler using EventSource API for proper SSE
   const startStreamingSimulation = () => {
     if (!selectedOptimizationId) return;
     
-    // Close any existing EventSource
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
@@ -185,7 +167,6 @@ export default function Simulator() {
     setStreamProgress(0);
     setLastSimulationResult(null);
 
-    // Build URL with query parameters (EventSource only supports GET)
     const params = new URLSearchParams({
       optimizationId: selectedOptimizationId,
       visitors: visitors.toString(),
@@ -242,17 +223,13 @@ export default function Simulator() {
       console.error('[SSE Client] Connection error:', event);
       setIsStreaming(false);
       
-      // EventSource error events don't have data payload
-      // Check readyState to determine error type
       if (eventSource.readyState === EventSource.CONNECTING) {
-        // Connection lost, will auto-retry
         toast({
           title: "Connection Lost",
           description: "Attempting to reconnect...",
           variant: "destructive",
         });
       } else if (eventSource.readyState === EventSource.CLOSED) {
-        // Connection failed, likely server error
         toast({
           title: "Connection Failed",
           description: "Failed to connect to streaming server. Please check parameters and try again.",
@@ -275,7 +252,6 @@ export default function Simulator() {
   const isSimulating = batchSimulation.isPending || isStreaming;
   const canSimulate = !!selectedOptimizationId && !isSimulating;
 
-  // Calculate allocation percentages
   const calculateAllocationPercentage = (control: number, variant: number) => {
     const total = control + variant;
     if (total === 0) return { control: 0, variant: 0 };
@@ -285,549 +261,565 @@ export default function Simulator() {
     };
   };
 
+  const handleSelectChange = (e: Event) => {
+    const target = e.target as HTMLSelectElement;
+    setSelectedOptimizationId(target.value);
+  };
+
+  const handleVisitorsChange = (e: Event) => {
+    const target = e.target as HTMLInputElement;
+    setVisitors(Number(target.value));
+  };
+
+  const handleControlCRChange = (e: Event) => {
+    const target = e.target as HTMLInputElement;
+    setControlConversionRate(Number(target.value));
+  };
+
+  const handleVariantCRChange = (e: Event) => {
+    const target = e.target as HTMLInputElement;
+    setVariantConversionRate(Number(target.value));
+  };
+
+  const handleLiveModeChange = (e: Event) => {
+    const target = e.target as HTMLInputElement;
+    setLiveMode(target.checked);
+  };
+
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold" data-testid="text-page-title">Optimization Simulator</h1>
-        <p className="text-muted-foreground" data-testid="text-page-description">
-          Simulate traffic and conversions to verify A/B optimization allocation and performance tracking
-        </p>
-      </div>
+    <s-page>
+      <s-stack direction="block" gap="large">
+        <s-stack direction="block" gap="small">
+          <s-text variant="heading2xl" data-testid="text-page-title">Optimization Simulator</s-text>
+          <s-text variant="bodyMd" tone="subdued" data-testid="text-page-description">
+            Simulate traffic and conversions to verify A/B optimization allocation and performance tracking
+          </s-text>
+        </s-stack>
 
-      {/* Optimization Selection */}
-      <Card data-testid="card-optimization-selection">
-        <CardHeader>
-          <CardTitle>Select Active Optimization</CardTitle>
-          <CardDescription>Choose an optimization to simulate traffic and conversions</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {optimizationsLoading ? (
-            <div className="text-sm text-muted-foreground">Loading optimizations...</div>
-          ) : enrichedOptimizations.length === 0 ? (
-            <div className="text-sm text-muted-foreground" data-testid="text-no-optimizations">
-              No active optimizations available. Create and activate an optimization from the Dashboard first.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="test-select">Active Optimization</Label>
-                <Select value={selectedOptimizationId} onValueChange={setSelectedOptimizationId}>
-                  <SelectTrigger id="test-select" data-testid="select-optimization">
-                    <SelectValue placeholder="Select an optimization" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {enrichedOptimizations.map((optimization) => (
-                      <SelectItem key={optimization.id} value={optimization.id} data-testid={`option-optimization-${optimization.id}`}>
-                        {optimization.productName} - {optimization.optimizationType}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+        {/* Optimization Selection */}
+        <s-section data-testid="card-optimization-selection">
+          <s-stack direction="block" gap="base">
+            <s-text variant="headingMd">Select Active Optimization</s-text>
+            <s-text variant="bodySm" tone="subdued">Choose an optimization to simulate traffic and conversions</s-text>
+            <s-divider />
+            {optimizationsLoading ? (
+              <s-spinner size="small" accessibilityLabel="Loading optimizations" />
+            ) : enrichedOptimizations.length === 0 ? (
+              <s-text variant="bodySm" tone="subdued" data-testid="text-no-optimizations">
+                No active optimizations available. Create and activate an optimization from the Dashboard first.
+              </s-text>
+            ) : (
+              <s-stack direction="block" gap="base">
+                <s-select
+                  label="Active Optimization"
+                  value={selectedOptimizationId}
+                  onChange={handleSelectChange}
+                  data-testid="select-optimization"
+                >
+                  <option value="">Select an optimization</option>
+                  {enrichedOptimizations.map((optimization) => (
+                    <option key={optimization.id} value={optimization.id} data-testid={`option-optimization-${optimization.id}`}>
+                      {optimization.productName} - {optimization.optimizationType}
+                    </option>
+                  ))}
+                </s-select>
 
-              {selectedOptimization && (
-                <div className="p-4 bg-muted rounded-lg space-y-2" data-testid="card-optimization-info">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Product:</span>
-                    <span className="text-sm font-medium" data-testid="text-product-name">{selectedOptimization.productName}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Optimization Type:</span>
-                    <span className="text-sm font-medium" data-testid="text-optimization-type">{selectedOptimization.optimizationType}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Current Impressions:</span>
-                    <span className="text-sm font-medium" data-testid="text-current-impressions">{selectedOptimization.impressions || 0}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Current Conversions:</span>
-                    <span className="text-sm font-medium" data-testid="text-current-conversions">{selectedOptimization.conversions || 0}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Current RPV:</span>
-                    <span className="text-sm font-medium" data-testid="text-current-rpv">${selectedOptimization.arpu || "0.00"}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                {selectedOptimization && (
+                  <s-box padding="base" background="bg-surface-secondary" borderRadius="large" data-testid="card-optimization-info">
+                    <s-stack direction="block" gap="small">
+                      <s-stack direction="inline" align="space-between">
+                        <s-text variant="bodySm" tone="subdued">Product:</s-text>
+                        <s-text variant="bodySm" fontWeight="semibold" data-testid="text-product-name">{selectedOptimization.productName}</s-text>
+                      </s-stack>
+                      <s-stack direction="inline" align="space-between">
+                        <s-text variant="bodySm" tone="subdued">Optimization Type:</s-text>
+                        <s-text variant="bodySm" fontWeight="semibold" data-testid="text-optimization-type">{selectedOptimization.optimizationType}</s-text>
+                      </s-stack>
+                      <s-stack direction="inline" align="space-between">
+                        <s-text variant="bodySm" tone="subdued">Current Impressions:</s-text>
+                        <s-text variant="bodySm" fontWeight="semibold" data-testid="text-current-impressions">{selectedOptimization.impressions || 0}</s-text>
+                      </s-stack>
+                      <s-stack direction="inline" align="space-between">
+                        <s-text variant="bodySm" tone="subdued">Current Conversions:</s-text>
+                        <s-text variant="bodySm" fontWeight="semibold" data-testid="text-current-conversions">{selectedOptimization.conversions || 0}</s-text>
+                      </s-stack>
+                      <s-stack direction="inline" align="space-between">
+                        <s-text variant="bodySm" tone="subdued">Current RPV:</s-text>
+                        <s-text variant="bodySm" fontWeight="semibold" data-testid="text-current-rpv">${selectedOptimization.arpu || "0.00"}</s-text>
+                      </s-stack>
+                    </s-stack>
+                  </s-box>
+                )}
+              </s-stack>
+            )}
+          </s-stack>
+        </s-section>
 
-      {/* Latest Simulation Results */}
-      {lastSimulationResult && (
-        <Card data-testid="card-simulation-results">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Simulation Complete</CardTitle>
-                <CardDescription>
-                  {lastSimulationResult.type.charAt(0).toUpperCase() + lastSimulationResult.type.slice(1)} simulation at {lastSimulationResult.timestamp}
-                </CardDescription>
-              </div>
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {/* Summary */}
-              {lastSimulationResult.type === "batch" && lastSimulationResult.variantPerformance && (
-                <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg space-y-2">
-                  <div className="text-sm font-medium text-blue-900 dark:text-blue-100">Data Generation Summary</div>
-                  <div className="space-y-1">
-                    <div className="text-sm text-blue-700 dark:text-blue-300" data-testid="text-visitors-added">
-                      Added {lastSimulationResult.variantPerformance.control.impressions + lastSimulationResult.variantPerformance.variant.impressions} visitors to optimization
-                    </div>
-                    {selectedOptimization && (
-                      <div className="text-sm text-blue-700 dark:text-blue-300" data-testid="text-total-impressions">
-                        Optimization now has {selectedOptimization.impressions || 0} total impressions
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+        {/* Latest Simulation Results */}
+        {lastSimulationResult && (
+          <s-section data-testid="card-simulation-results">
+            <s-stack direction="block" gap="base">
+              <s-stack direction="inline" align="space-between" blockAlign="center">
+                <s-stack direction="block" gap="small">
+                  <s-text variant="headingMd">Simulation Complete</s-text>
+                  <s-text variant="bodySm" tone="subdued">
+                    {lastSimulationResult.type.charAt(0).toUpperCase() + lastSimulationResult.type.slice(1)} simulation at {lastSimulationResult.timestamp}
+                  </s-text>
+                </s-stack>
+                <s-badge tone="success">Complete</s-badge>
+              </s-stack>
+              <s-divider />
 
-              {/* Optimization Info */}
-              <div className="p-3 bg-muted rounded-lg">
-                <div className="text-sm font-medium mb-1">Optimization Product</div>
-                <div className="text-sm text-muted-foreground" data-testid="text-result-optimization-name">
-                  {lastSimulationResult.optimizationName}
-                </div>
-              </div>
-
-              {/* NEW: Batch Simulation Results with Allocation Evolution */}
-              {lastSimulationResult.type === "batch" && lastSimulationResult.variantPerformance && (
-                <div className="space-y-4">
-                  {/* Allocation Evolution */}
-                  {lastSimulationResult.allocationBefore && lastSimulationResult.allocationAfter && (
-                    <div className="p-4 border rounded-lg space-y-3">
-                      <div className="text-sm font-medium">Traffic Allocation Evolution</div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <div className="text-xs text-muted-foreground">Before Simulation</div>
-                          <div className="flex gap-2">
-                            <div className="flex-1 text-center">
-                              <div className="text-lg font-bold" data-testid="text-allocation-before-control">
-                                {lastSimulationResult.allocationBefore.control.toFixed(1)}%
-                              </div>
-                              <div className="text-xs text-muted-foreground">Control</div>
-                            </div>
-                            <div className="flex-1 text-center">
-                              <div className="text-lg font-bold" data-testid="text-allocation-before-variant">
-                                {lastSimulationResult.allocationBefore.variant.toFixed(1)}%
-                              </div>
-                              <div className="text-xs text-muted-foreground">Variant</div>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="text-xs text-muted-foreground">After Simulation</div>
-                          <div className="flex gap-2">
-                            <div className="flex-1 text-center">
-                              <div className="text-lg font-bold" data-testid="text-allocation-after-control">
-                                {lastSimulationResult.allocationAfter.control.toFixed(1)}%
-                              </div>
-                              <div className="text-xs text-muted-foreground">Control</div>
-                            </div>
-                            <div className="flex-1 text-center">
-                              <div className="text-lg font-bold" data-testid="text-allocation-after-variant">
-                                {lastSimulationResult.allocationAfter.variant.toFixed(1)}%
-                              </div>
-                              <div className="text-xs text-muted-foreground">Variant</div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      {Math.abs(lastSimulationResult.allocationAfter.control - lastSimulationResult.allocationBefore.control) > 0.1 ? (
-                        <div className="flex items-center gap-2 text-xs text-blue-600">
-                          <CheckCircle2 className="w-4 h-4" />
-                          Bayesian engine shifted traffic based on performance
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <AlertCircle className="w-4 h-4" />
-                          No allocation shift (need more data or similar performance)
-                        </div>
+              <s-stack direction="block" gap="base">
+                {/* Summary */}
+                {lastSimulationResult.type === "batch" && lastSimulationResult.variantPerformance && (
+                  <s-banner tone="info" heading="Data Generation Summary">
+                    <s-stack direction="block" gap="small">
+                      <s-text variant="bodySm" data-testid="text-visitors-added">
+                        Added {lastSimulationResult.variantPerformance.control.impressions + lastSimulationResult.variantPerformance.variant.impressions} visitors to optimization
+                      </s-text>
+                      {selectedOptimization && (
+                        <s-text variant="bodySm" data-testid="text-total-impressions">
+                          Optimization now has {selectedOptimization.impressions || 0} total impressions
+                        </s-text>
                       )}
-                    </div>
-                  )}
+                    </s-stack>
+                  </s-banner>
+                )}
 
-                  {/* Variant Performance Comparison */}
-                  <div className="p-4 border rounded-lg space-y-3">
-                    <div className="text-sm font-medium">Variant Performance</div>
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-3">
-                        <div className="text-xs font-medium text-muted-foreground">Control</div>
-                        <div className="space-y-2">
-                          <div className="flex justify-between">
-                            <span className="text-xs text-muted-foreground">Impressions:</span>
-                            <span className="text-sm font-medium" data-testid="text-control-impressions-new">
-                              {lastSimulationResult.variantPerformance.control.impressions}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-xs text-muted-foreground">Conversions:</span>
-                            <span className="text-sm font-medium" data-testid="text-control-conversions">
-                              {lastSimulationResult.variantPerformance.control.conversions}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-xs text-muted-foreground">Conv. Rate:</span>
-                            <span className="text-sm font-medium" data-testid="text-control-cr">
-                              {lastSimulationResult.variantPerformance.control.conversionRate}%
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-xs text-muted-foreground">Revenue:</span>
-                            <span className="text-sm font-medium" data-testid="text-control-revenue">
-                              ${lastSimulationResult.variantPerformance.control.revenue}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-xs text-muted-foreground">RPV:</span>
-                            <span className="text-sm font-medium" data-testid="text-control-rpv">
-                              ${lastSimulationResult.variantPerformance.control.arpu}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="text-xs font-medium text-muted-foreground">Variant</div>
-                        <div className="space-y-2">
-                          <div className="flex justify-between">
-                            <span className="text-xs text-muted-foreground">Impressions:</span>
-                            <span className="text-sm font-medium" data-testid="text-variant-impressions-new">
-                              {lastSimulationResult.variantPerformance.variant.impressions}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-xs text-muted-foreground">Conversions:</span>
-                            <span className="text-sm font-medium" data-testid="text-variant-conversions">
-                              {lastSimulationResult.variantPerformance.variant.conversions}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-xs text-muted-foreground">Conv. Rate:</span>
-                            <span className="text-sm font-medium" data-testid="text-variant-cr">
-                              {lastSimulationResult.variantPerformance.variant.conversionRate}%
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-xs text-muted-foreground">Revenue:</span>
-                            <span className="text-sm font-medium" data-testid="text-variant-revenue">
-                              ${lastSimulationResult.variantPerformance.variant.revenue}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-xs text-muted-foreground">RPV:</span>
-                            <span className="text-sm font-medium" data-testid="text-variant-rpv">
-                              ${lastSimulationResult.variantPerformance.variant.arpu}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                {/* Optimization Info */}
+                <s-box padding="base" background="bg-surface-secondary" borderRadius="large">
+                  <s-stack direction="block" gap="small">
+                    <s-text variant="bodySm" fontWeight="semibold">Optimization Product</s-text>
+                    <s-text variant="bodySm" tone="subdued" data-testid="text-result-optimization-name">
+                      {lastSimulationResult.optimizationName}
+                    </s-text>
+                  </s-stack>
+                </s-box>
 
-                  {/* Bayesian Update Info */}
-                  {lastSimulationResult.bayesianUpdate && (
-                    <div className="p-4 border rounded-lg space-y-2 bg-blue-50 dark:bg-blue-950">
-                      <div className="text-sm font-medium text-blue-900 dark:text-blue-100">Bayesian Engine Update</div>
-                      <p className="text-xs text-blue-700 dark:text-blue-300" data-testid="text-bayesian-reasoning">
-                        {lastSimulationResult.bayesianUpdate.reasoning}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* OLD: Batch Simulation Results (fallback for old API response) */}
-              {lastSimulationResult.type === "batch" && lastSimulationResult.allocation && !lastSimulationResult.variantPerformance && (
-                <div className="space-y-3">
-                  <div className="font-medium">A/B Optimization Allocation Verification</div>
-                  
-                  {/* Impressions Allocation */}
-                  <div className="p-4 border rounded-lg space-y-3">
-                    <div className="text-sm font-medium">Traffic Distribution</div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <div className="text-xs text-muted-foreground">Control</div>
-                        <div className="text-2xl font-bold" data-testid="text-control-impressions">
-                          {lastSimulationResult.allocation.control.impressions}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {calculateAllocationPercentage(
-                            lastSimulationResult.allocation.control.impressions || 0,
-                            lastSimulationResult.allocation.variant.impressions || 0
-                          ).control}% of traffic
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-xs text-muted-foreground">Variant</div>
-                        <div className="text-2xl font-bold" data-testid="text-variant-impressions">
-                          {lastSimulationResult.allocation.variant.impressions}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {calculateAllocationPercentage(
-                            lastSimulationResult.allocation.control.impressions || 0,
-                            lastSimulationResult.allocation.variant.impressions || 0
-                          ).variant}% of traffic
-                        </div>
-                      </div>
-                    </div>
-                    {Math.abs(
-                      (lastSimulationResult.allocation.control.impressions || 0) - 
-                      (lastSimulationResult.allocation.variant.impressions || 0)
-                    ) <= 1 ? (
-                      <div className="flex items-center gap-2 text-xs text-green-600" data-testid="text-allocation-status">
-                        <CheckCircle2 className="w-4 h-4" />
-                        Perfect 50/50 split achieved
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 text-xs text-yellow-600">
-                        <AlertCircle className="w-4 h-4" />
-                        Minor variance from 50/50 (expected with random allocation)
-                      </div>
+                {/* Batch Simulation Results with Allocation Evolution */}
+                {lastSimulationResult.type === "batch" && lastSimulationResult.variantPerformance && (
+                  <s-stack direction="block" gap="base">
+                    {/* Allocation Evolution */}
+                    {lastSimulationResult.allocationBefore && lastSimulationResult.allocationAfter && (
+                      <s-box padding="base" border="base" borderRadius="large">
+                        <s-stack direction="block" gap="base">
+                          <s-text variant="headingSm">Traffic Allocation Evolution</s-text>
+                          <s-grid columns="2" gap="base">
+                            <s-stack direction="block" gap="small">
+                              <s-text variant="bodyXs" tone="subdued">Before Simulation</s-text>
+                              <s-stack direction="inline" gap="base">
+                                <s-stack direction="block" align="center">
+                                  <s-text variant="headingMd" fontWeight="bold" data-testid="text-allocation-before-control">
+                                    {lastSimulationResult.allocationBefore.control.toFixed(1)}%
+                                  </s-text>
+                                  <s-text variant="bodyXs" tone="subdued">Control</s-text>
+                                </s-stack>
+                                <s-stack direction="block" align="center">
+                                  <s-text variant="headingMd" fontWeight="bold" data-testid="text-allocation-before-variant">
+                                    {lastSimulationResult.allocationBefore.variant.toFixed(1)}%
+                                  </s-text>
+                                  <s-text variant="bodyXs" tone="subdued">Variant</s-text>
+                                </s-stack>
+                              </s-stack>
+                            </s-stack>
+                            <s-stack direction="block" gap="small">
+                              <s-text variant="bodyXs" tone="subdued">After Simulation</s-text>
+                              <s-stack direction="inline" gap="base">
+                                <s-stack direction="block" align="center">
+                                  <s-text variant="headingMd" fontWeight="bold" data-testid="text-allocation-after-control">
+                                    {lastSimulationResult.allocationAfter.control.toFixed(1)}%
+                                  </s-text>
+                                  <s-text variant="bodyXs" tone="subdued">Control</s-text>
+                                </s-stack>
+                                <s-stack direction="block" align="center">
+                                  <s-text variant="headingMd" fontWeight="bold" data-testid="text-allocation-after-variant">
+                                    {lastSimulationResult.allocationAfter.variant.toFixed(1)}%
+                                  </s-text>
+                                  <s-text variant="bodyXs" tone="subdued">Variant</s-text>
+                                </s-stack>
+                              </s-stack>
+                            </s-stack>
+                          </s-grid>
+                          {Math.abs(lastSimulationResult.allocationAfter.control - lastSimulationResult.allocationBefore.control) > 0.1 ? (
+                            <s-banner tone="info">
+                              <s-text variant="bodyXs">Bayesian engine shifted traffic based on performance</s-text>
+                            </s-banner>
+                          ) : (
+                            <s-banner tone="warning">
+                              <s-text variant="bodyXs">No allocation shift (need more data or similar performance)</s-text>
+                            </s-banner>
+                          )}
+                        </s-stack>
+                      </s-box>
                     )}
-                  </div>
 
-                  {/* Orders Allocation */}
-                  <div className="p-4 border rounded-lg space-y-3">
-                    <div className="text-sm font-medium">Conversion Distribution</div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <div className="text-xs text-muted-foreground">Control</div>
-                        <div className="text-2xl font-bold" data-testid="text-control-orders">
-                          {lastSimulationResult.allocation.control.orders}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {calculateAllocationPercentage(
-                            lastSimulationResult.allocation.control.orders || 0,
-                            lastSimulationResult.allocation.variant.orders || 0
-                          ).control}% of orders
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-xs text-muted-foreground">Variant</div>
-                        <div className="text-2xl font-bold" data-testid="text-variant-orders">
-                          {lastSimulationResult.allocation.variant.orders}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {calculateAllocationPercentage(
-                            lastSimulationResult.allocation.control.orders || 0,
-                            lastSimulationResult.allocation.variant.orders || 0
-                          ).variant}% of orders
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                    {/* Variant Performance Comparison */}
+                    <s-box padding="base" border="base" borderRadius="large">
+                      <s-stack direction="block" gap="base">
+                        <s-text variant="headingSm">Variant Performance</s-text>
+                        <s-grid columns="2" gap="large">
+                          <s-stack direction="block" gap="small">
+                            <s-text variant="bodyXs" fontWeight="semibold" tone="subdued">Control</s-text>
+                            <s-stack direction="block" gap="small">
+                              <s-stack direction="inline" align="space-between">
+                                <s-text variant="bodyXs" tone="subdued">Impressions:</s-text>
+                                <s-text variant="bodySm" fontWeight="semibold" data-testid="text-control-impressions-new">
+                                  {lastSimulationResult.variantPerformance.control.impressions}
+                                </s-text>
+                              </s-stack>
+                              <s-stack direction="inline" align="space-between">
+                                <s-text variant="bodyXs" tone="subdued">Conversions:</s-text>
+                                <s-text variant="bodySm" fontWeight="semibold" data-testid="text-control-conversions">
+                                  {lastSimulationResult.variantPerformance.control.conversions}
+                                </s-text>
+                              </s-stack>
+                              <s-stack direction="inline" align="space-between">
+                                <s-text variant="bodyXs" tone="subdued">Conv. Rate:</s-text>
+                                <s-text variant="bodySm" fontWeight="semibold" data-testid="text-control-cr">
+                                  {lastSimulationResult.variantPerformance.control.conversionRate}%
+                                </s-text>
+                              </s-stack>
+                              <s-stack direction="inline" align="space-between">
+                                <s-text variant="bodyXs" tone="subdued">Revenue:</s-text>
+                                <s-text variant="bodySm" fontWeight="semibold" data-testid="text-control-revenue">
+                                  ${lastSimulationResult.variantPerformance.control.revenue}
+                                </s-text>
+                              </s-stack>
+                              <s-stack direction="inline" align="space-between">
+                                <s-text variant="bodyXs" tone="subdued">RPV:</s-text>
+                                <s-text variant="bodySm" fontWeight="semibold" data-testid="text-control-rpv">
+                                  ${lastSimulationResult.variantPerformance.control.arpu}
+                                </s-text>
+                              </s-stack>
+                            </s-stack>
+                          </s-stack>
+                          <s-stack direction="block" gap="small">
+                            <s-text variant="bodyXs" fontWeight="semibold" tone="subdued">Variant</s-text>
+                            <s-stack direction="block" gap="small">
+                              <s-stack direction="inline" align="space-between">
+                                <s-text variant="bodyXs" tone="subdued">Impressions:</s-text>
+                                <s-text variant="bodySm" fontWeight="semibold" data-testid="text-variant-impressions-new">
+                                  {lastSimulationResult.variantPerformance.variant.impressions}
+                                </s-text>
+                              </s-stack>
+                              <s-stack direction="inline" align="space-between">
+                                <s-text variant="bodyXs" tone="subdued">Conversions:</s-text>
+                                <s-text variant="bodySm" fontWeight="semibold" data-testid="text-variant-conversions">
+                                  {lastSimulationResult.variantPerformance.variant.conversions}
+                                </s-text>
+                              </s-stack>
+                              <s-stack direction="inline" align="space-between">
+                                <s-text variant="bodyXs" tone="subdued">Conv. Rate:</s-text>
+                                <s-text variant="bodySm" fontWeight="semibold" data-testid="text-variant-cr">
+                                  {lastSimulationResult.variantPerformance.variant.conversionRate}%
+                                </s-text>
+                              </s-stack>
+                              <s-stack direction="inline" align="space-between">
+                                <s-text variant="bodyXs" tone="subdued">Revenue:</s-text>
+                                <s-text variant="bodySm" fontWeight="semibold" data-testid="text-variant-revenue">
+                                  ${lastSimulationResult.variantPerformance.variant.revenue}
+                                </s-text>
+                              </s-stack>
+                              <s-stack direction="inline" align="space-between">
+                                <s-text variant="bodyXs" tone="subdued">RPV:</s-text>
+                                <s-text variant="bodySm" fontWeight="semibold" data-testid="text-variant-rpv">
+                                  ${lastSimulationResult.variantPerformance.variant.arpu}
+                                </s-text>
+                              </s-stack>
+                            </s-stack>
+                          </s-stack>
+                        </s-grid>
+                      </s-stack>
+                    </s-box>
 
-                  {/* Updated Metrics */}
-                  {lastSimulationResult.metrics && (
-                    <div className="p-4 border rounded-lg space-y-3">
-                      <div className="text-sm font-medium">Updated Optimization Metrics</div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="space-y-1">
-                          <div className="text-xs text-muted-foreground">Total Impressions</div>
-                          <div className="text-lg font-bold" data-testid="text-total-impressions">
-                            {lastSimulationResult.metrics.totalImpressions}
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="text-xs text-muted-foreground">Total Conversions</div>
-                          <div className="text-lg font-bold" data-testid="text-total-conversions">
-                            {lastSimulationResult.metrics.totalConversions}
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="text-xs text-muted-foreground">Total Revenue</div>
-                          <div className="text-lg font-bold" data-testid="text-total-revenue">
-                            ${lastSimulationResult.metrics.totalRevenue}
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="text-xs text-muted-foreground">RPV</div>
-                          <div className="text-lg font-bold" data-testid="text-result-rpv">
-                            ${lastSimulationResult.metrics.arpu}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Revenue includes ±20% variance per order for realistic simulation
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+                    {/* Bayesian Update Info */}
+                    {lastSimulationResult.bayesianUpdate && (
+                      <s-banner tone="info" heading="Bayesian Engine Update">
+                        <s-text variant="bodyXs" data-testid="text-bayesian-reasoning">
+                          {lastSimulationResult.bayesianUpdate.reasoning}
+                        </s-text>
+                      </s-banner>
+                    )}
+                  </s-stack>
+                )}
 
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                {/* OLD: Batch Simulation Results (fallback for old API response) */}
+                {lastSimulationResult.type === "batch" && lastSimulationResult.allocation && !lastSimulationResult.variantPerformance && (
+                  <s-stack direction="block" gap="base">
+                    <s-text variant="headingSm">A/B Optimization Allocation Verification</s-text>
+                    
+                    {/* Impressions Allocation */}
+                    <s-box padding="base" border="base" borderRadius="large">
+                      <s-stack direction="block" gap="base">
+                        <s-text variant="headingSm">Traffic Distribution</s-text>
+                        <s-grid columns="2" gap="base">
+                          <s-stack direction="block" gap="small">
+                            <s-text variant="bodyXs" tone="subdued">Control</s-text>
+                            <s-text variant="heading2xl" fontWeight="bold" data-testid="text-control-impressions">
+                              {lastSimulationResult.allocation.control.impressions}
+                            </s-text>
+                            <s-text variant="bodyXs" tone="subdued">
+                              {calculateAllocationPercentage(
+                                lastSimulationResult.allocation.control.impressions || 0,
+                                lastSimulationResult.allocation.variant.impressions || 0
+                              ).control}% of traffic
+                            </s-text>
+                          </s-stack>
+                          <s-stack direction="block" gap="small">
+                            <s-text variant="bodyXs" tone="subdued">Variant</s-text>
+                            <s-text variant="heading2xl" fontWeight="bold" data-testid="text-variant-impressions">
+                              {lastSimulationResult.allocation.variant.impressions}
+                            </s-text>
+                            <s-text variant="bodyXs" tone="subdued">
+                              {calculateAllocationPercentage(
+                                lastSimulationResult.allocation.control.impressions || 0,
+                                lastSimulationResult.allocation.variant.impressions || 0
+                              ).variant}% of traffic
+                            </s-text>
+                          </s-stack>
+                        </s-grid>
+                        {Math.abs(
+                          (lastSimulationResult.allocation.control.impressions || 0) - 
+                          (lastSimulationResult.allocation.variant.impressions || 0)
+                        ) <= 1 ? (
+                          <s-banner tone="success" data-testid="text-allocation-status">
+                            <s-text variant="bodyXs">Perfect 50/50 split achieved</s-text>
+                          </s-banner>
+                        ) : (
+                          <s-banner tone="warning">
+                            <s-text variant="bodyXs">Minor variance from 50/50 (expected with random allocation)</s-text>
+                          </s-banner>
+                        )}
+                      </s-stack>
+                    </s-box>
 
-      {/* Batch Simulation - Easy Mode */}
-      <Card data-testid="card-batch-simulation">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Zap className="w-5 h-5 text-primary" />
-            <CardTitle>Batch Simulation</CardTitle>
-          </div>
-          <CardDescription>
-            Simulate realistic traffic and conversions in one click. Perfect for validating A/B optimization allocation.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="visitors">Visitors</Label>
-                <Input
-                  id="visitors"
-                  type="number"
-                  value={visitors}
-                  onChange={(e) => setVisitors(Number(e.target.value))}
-                  min={10}
-                  max={100000}
-                  data-testid="input-visitors"
-                  disabled={!canSimulate}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Number of product page views (split 50/50 between control and variant)
-                </p>
-              </div>
+                    {/* Orders Allocation */}
+                    <s-box padding="base" border="base" borderRadius="large">
+                      <s-stack direction="block" gap="base">
+                        <s-text variant="headingSm">Conversion Distribution</s-text>
+                        <s-grid columns="2" gap="base">
+                          <s-stack direction="block" gap="small">
+                            <s-text variant="bodyXs" tone="subdued">Control</s-text>
+                            <s-text variant="heading2xl" fontWeight="bold" data-testid="text-control-orders">
+                              {lastSimulationResult.allocation.control.orders}
+                            </s-text>
+                            <s-text variant="bodyXs" tone="subdued">
+                              {calculateAllocationPercentage(
+                                lastSimulationResult.allocation.control.orders || 0,
+                                lastSimulationResult.allocation.variant.orders || 0
+                              ).control}% of orders
+                            </s-text>
+                          </s-stack>
+                          <s-stack direction="block" gap="small">
+                            <s-text variant="bodyXs" tone="subdued">Variant</s-text>
+                            <s-text variant="heading2xl" fontWeight="bold" data-testid="text-variant-orders">
+                              {lastSimulationResult.allocation.variant.orders}
+                            </s-text>
+                            <s-text variant="bodyXs" tone="subdued">
+                              {calculateAllocationPercentage(
+                                lastSimulationResult.allocation.control.orders || 0,
+                                lastSimulationResult.allocation.variant.orders || 0
+                              ).variant}% of orders
+                            </s-text>
+                          </s-stack>
+                        </s-grid>
+                      </s-stack>
+                    </s-box>
 
-              <div className="space-y-2">
-                <Label htmlFor="control-conversion-rate">Control Conversion Rate (%)</Label>
-                <Input
-                  id="control-conversion-rate"
-                  type="number"
-                  value={controlConversionRate}
-                  onChange={(e) => setControlConversionRate(Number(e.target.value))}
-                  min={0}
-                  max={100}
-                  step={0.1}
-                  data-testid="input-control-conversion-rate"
-                  disabled={!canSimulate}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Control conversion rate (baseline performance)
-                </p>
-              </div>
-            </div>
+                    {/* Updated Metrics */}
+                    {lastSimulationResult.metrics && (
+                      <s-box padding="base" border="base" borderRadius="large">
+                        <s-stack direction="block" gap="base">
+                          <s-text variant="headingSm">Updated Optimization Metrics</s-text>
+                          <s-grid columns="4" gap="base">
+                            <s-stack direction="block" gap="small">
+                              <s-text variant="bodyXs" tone="subdued">Total Impressions</s-text>
+                              <s-text variant="headingMd" fontWeight="bold" data-testid="text-total-impressions">
+                                {lastSimulationResult.metrics.totalImpressions}
+                              </s-text>
+                            </s-stack>
+                            <s-stack direction="block" gap="small">
+                              <s-text variant="bodyXs" tone="subdued">Total Conversions</s-text>
+                              <s-text variant="headingMd" fontWeight="bold" data-testid="text-total-conversions">
+                                {lastSimulationResult.metrics.totalConversions}
+                              </s-text>
+                            </s-stack>
+                            <s-stack direction="block" gap="small">
+                              <s-text variant="bodyXs" tone="subdued">Total Revenue</s-text>
+                              <s-text variant="headingMd" fontWeight="bold" data-testid="text-total-revenue">
+                                ${lastSimulationResult.metrics.totalRevenue}
+                              </s-text>
+                            </s-stack>
+                            <s-stack direction="block" gap="small">
+                              <s-text variant="bodyXs" tone="subdued">RPV</s-text>
+                              <s-text variant="headingMd" fontWeight="bold" data-testid="text-result-rpv">
+                                ${lastSimulationResult.metrics.arpu}
+                              </s-text>
+                            </s-stack>
+                          </s-grid>
+                          <s-text variant="bodyXs" tone="subdued">
+                            Revenue includes ±20% variance per order for realistic simulation
+                          </s-text>
+                        </s-stack>
+                      </s-box>
+                    )}
+                  </s-stack>
+                )}
+              </s-stack>
+            </s-stack>
+          </s-section>
+        )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="variant-conversion-rate">Variant Conversion Rate (%)</Label>
-                <Input
-                  id="variant-conversion-rate"
-                  type="number"
-                  value={variantConversionRate}
-                  onChange={(e) => setVariantConversionRate(Number(e.target.value))}
-                  min={0}
-                  max={100}
-                  step={0.1}
-                  data-testid="input-variant-conversion-rate"
-                  disabled={!canSimulate}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Variant conversion rate (set higher to simulate lift)
-                </p>
-              </div>
+        {/* Batch Simulation */}
+        <s-section data-testid="card-batch-simulation">
+          <s-stack direction="block" gap="base">
+            <s-text variant="headingMd">Batch Simulation</s-text>
+            <s-text variant="bodySm" tone="subdued">
+              Simulate realistic traffic and conversions in one click. Perfect for validating A/B optimization allocation.
+            </s-text>
+            <s-divider />
 
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">Expected Lift</Label>
-                <div className="h-10 flex items-center px-3 border rounded-md bg-muted">
-                  <span className="text-sm font-medium" data-testid="text-expected-lift">
+            <s-grid columns="2" gap="base">
+              <s-text-field
+                label="Visitors"
+                type="number"
+                value={String(visitors)}
+                min="10"
+                max="100000"
+                onInput={handleVisitorsChange}
+                data-testid="input-visitors"
+                disabled={!canSimulate}
+                helpText="Number of product page views (split 50/50 between control and variant)"
+              />
+              <s-text-field
+                label="Control Conversion Rate (%)"
+                type="number"
+                value={String(controlConversionRate)}
+                min="0"
+                max="100"
+                step="0.1"
+                onInput={handleControlCRChange}
+                data-testid="input-control-conversion-rate"
+                disabled={!canSimulate}
+                helpText="Control conversion rate (baseline performance)"
+              />
+            </s-grid>
+
+            <s-grid columns="2" gap="base">
+              <s-text-field
+                label="Variant Conversion Rate (%)"
+                type="number"
+                value={String(variantConversionRate)}
+                min="0"
+                max="100"
+                step="0.1"
+                onInput={handleVariantCRChange}
+                data-testid="input-variant-conversion-rate"
+                disabled={!canSimulate}
+                helpText="Variant conversion rate (set higher to simulate lift)"
+              />
+              <s-stack direction="block" gap="small">
+                <s-text variant="bodySm" fontWeight="semibold" tone="subdued">Expected Lift</s-text>
+                <s-box padding="base" background="bg-surface-secondary" borderRadius="large">
+                  <s-text variant="bodySm" fontWeight="semibold" data-testid="text-expected-lift">
                     {controlConversionRate > 0 
                       ? `${(((variantConversionRate - controlConversionRate) / controlConversionRate) * 100).toFixed(1)}%`
                       : '0%'}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground">
+                  </s-text>
+                </s-box>
+                <s-text variant="bodyXs" tone="subdued">
                   Relative improvement from control to variant
-                </p>
-              </div>
-            </div>
+                </s-text>
+              </s-stack>
+            </s-grid>
 
             {/* Live Mode Toggle */}
-            <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
-              <div className="flex items-center gap-2">
-                <Radio className="w-4 h-4 text-primary" />
-                <div>
-                  <div className="text-sm font-medium">Live Streaming Mode</div>
-                  <div className="text-xs text-muted-foreground">
+            <s-box padding="base" background="bg-surface-secondary" borderRadius="large">
+              <s-stack direction="inline" align="space-between" blockAlign="center">
+                <s-stack direction="block" gap="small">
+                  <s-text variant="bodySm" fontWeight="semibold">Live Streaming Mode</s-text>
+                  <s-text variant="bodyXs" tone="subdued">
                     Watch charts update in real-time as the simulation runs
-                  </div>
-                </div>
-              </div>
-              <Switch
-                checked={liveMode}
-                onCheckedChange={setLiveMode}
-                data-testid="toggle-live-mode"
-                disabled={isSimulating}
-              />
-            </div>
+                  </s-text>
+                </s-stack>
+                <s-switch
+                  label=""
+                  checked={liveMode}
+                  onChange={handleLiveModeChange}
+                  data-testid="toggle-live-mode"
+                  disabled={isSimulating}
+                />
+              </s-stack>
+            </s-box>
 
             {/* Progress Indicator */}
             {isStreaming && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Simulation Progress</span>
-                  <span className="font-medium">{streamProgress}%</span>
-                </div>
-                <Progress value={streamProgress} className="h-2" data-testid="progress-simulation" />
-                <p className="text-xs text-muted-foreground text-center">
+              <s-stack direction="block" gap="small">
+                <s-stack direction="inline" align="space-between">
+                  <s-text variant="bodySm" tone="subdued">Simulation Progress</s-text>
+                  <s-text variant="bodySm" fontWeight="semibold">{streamProgress}%</s-text>
+                </s-stack>
+                <s-progress-bar
+                  progress={streamProgress}
+                  tone="primary"
+                  size="small"
+                  data-testid="progress-simulation"
+                  accessibilityLabel={`Simulation progress: ${streamProgress}%`}
+                />
+                <s-text variant="bodyXs" tone="subdued" alignment="center">
                   Streaming real-time updates...
-                </p>
-              </div>
+                </s-text>
+              </s-stack>
             )}
 
             {!selectedOptimizationId && (
-              <div className="flex items-center gap-2 text-sm text-yellow-600 bg-yellow-50 dark:bg-yellow-950 p-3 rounded-lg">
-                <AlertCircle className="w-4 h-4" />
-                Please select an active optimization above to run simulations
-              </div>
+              <s-banner tone="warning">
+                <s-text variant="bodySm">Please select an active optimization above to run simulations</s-text>
+              </s-banner>
             )}
 
-            <Button
+            <s-button
+              variant="primary"
               onClick={handleRunSimulation}
               disabled={!canSimulate}
-              className="w-full gap-2"
+              loading={isSimulating}
+              fullWidth
               data-testid="button-run-batch"
             >
-              {liveMode ? <Radio className="w-4 h-4" /> : <Play className="w-4 h-4" />}
               {isSimulating 
                 ? (liveMode ? `Streaming... ${streamProgress}%` : "Simulating...") 
                 : (liveMode ? "Start Live Simulation" : "Run Batch Simulation")}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+            </s-button>
+          </s-stack>
+        </s-section>
 
-      {/* Information Card */}
-      <Card data-testid="card-info">
-        <CardHeader>
-          <CardTitle>How It Works</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>
-            <strong>Batch Simulation:</strong> Generates realistic traffic and conversions in one step. 
-            Visitors are allocated using the optimization's current Bayesian allocation (Thompson Sampling), and conversions are calculated based on your specified rates.
-          </p>
-          <p>
-            <strong>Live Streaming Mode:</strong> Watch the simulation unfold in real-time! Charts update progressively every 100 visitors, 
-            letting you see how the Bayesian engine adapts traffic allocation as performance data accumulates. Perfect for understanding Thompson Sampling in action.
-          </p>
-          <p>
-            <strong>Evolution Charts:</strong> Track how RPV and traffic allocation change over time as the Bayesian engine learns which variant performs better.
-            The x-axis shows impressions (every 100), while the y-axes show RPV and allocation percentages respectively.
-          </p>
-          <p>
-            <strong>Allocation Verification:</strong> The simulation uses the optimization's current allocation percentages, 
-            adapting dynamically based on performance. Results include detailed breakdowns to confirm proper distribution.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+        {/* Information Card */}
+        <s-section data-testid="card-info">
+          <s-stack direction="block" gap="base">
+            <s-text variant="headingMd">How It Works</s-text>
+            <s-divider />
+            <s-stack direction="block" gap="base">
+              <s-text variant="bodySm" tone="subdued">
+                <strong>Batch Simulation:</strong> Generates realistic traffic and conversions in one step. 
+                Visitors are allocated using the optimization's current Bayesian allocation (Thompson Sampling), and conversions are calculated based on your specified rates.
+              </s-text>
+              <s-text variant="bodySm" tone="subdued">
+                <strong>Live Streaming Mode:</strong> Watch the simulation unfold in real-time! Charts update progressively every 100 visitors, 
+                letting you see how the Bayesian engine adapts traffic allocation as performance data accumulates. Perfect for understanding Thompson Sampling in action.
+              </s-text>
+              <s-text variant="bodySm" tone="subdued">
+                <strong>Evolution Charts:</strong> Track how RPV and traffic allocation change over time as the Bayesian engine learns which variant performs better.
+                The x-axis shows impressions (every 100), while the y-axes show RPV and allocation percentages respectively.
+              </s-text>
+              <s-text variant="bodySm" tone="subdued">
+                <strong>Allocation Verification:</strong> The simulation uses the optimization's current allocation percentages, 
+                adapting dynamically based on performance. Results include detailed breakdowns to confirm proper distribution.
+              </s-text>
+            </s-stack>
+          </s-stack>
+        </s-section>
+      </s-stack>
+    </s-page>
   );
 }

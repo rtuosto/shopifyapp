@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import DashboardHeader from "@/components/DashboardHeader";
 import MetricCard from "@/components/MetricCard";
 import OptimizationHistoryTable from "@/components/OptimizationHistoryTable";
@@ -46,12 +44,10 @@ interface EnrichedOptimization extends Optimization {
 export default function Dashboard() {
   const { toast } = useToast();
 
-  // Track automation state to prevent infinite loops
   const prevSyncStatusRef = useRef<SyncStatus | undefined>();
   const hasAutoSyncedRef = useRef(false);
-  const syncAttemptedRef = useRef(false);  // Track if we've attempted sync (prevents retry loops)
+  const syncAttemptedRef = useRef(false);
 
-  // Sync products from Shopify
   const syncMutation = useMutation({
     mutationFn: async () => {
       try {
@@ -62,11 +58,8 @@ export default function Dashboard() {
         }
         return data;
       } catch (error: any) {
-        // apiRequest throws Response object on error, parse it
         if (error instanceof Response) {
           let errorMessage = `HTTP ${error.status}: Failed to sync products`;
-          
-          // Try to parse error body (JSON or text) exactly once
           try {
             const errorData = await error.json();
             errorMessage = errorData.error || errorData.message || errorMessage;
@@ -74,30 +67,23 @@ export default function Dashboard() {
             try {
               const errorText = await error.text();
               errorMessage = errorText || errorMessage;
-            } catch {
-              // Use default message if both parsing attempts fail
-            }
+            } catch {}
           }
-          
           throw new Error(errorMessage);
         }
-        // If it's already an Error, rethrow it
         throw error;
       }
     },
     onSuccess: (data: any) => {
-      // Set auto-sync flag on success to prevent repeated attempts
       hasAutoSyncedRef.current = true;
       toast({
         title: "Products Synced",
         description: data.message || `Successfully synced ${data.syncedCount} products`,
       });
-      // Invalidate relevant queries to refresh data
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
     },
     onError: (error: Error) => {
-      // Keep auto-sync flag false so it can retry on next render
       toast({
         title: "Sync Failed",
         description: error.message || "Failed to sync products from Shopify. Please try again or reinstall the app if the problem persists.",
@@ -106,7 +92,6 @@ export default function Dashboard() {
     },
   });
 
-  // Create optimization from recommendation mutation
   const createOptimizationMutation = useMutation({
     mutationFn: async ({ recommendationId, productId }: { recommendationId: string; productId: string }) => {
       const recommendation = recommendations.find(r => r.id === recommendationId);
@@ -116,14 +101,12 @@ export default function Dashboard() {
         throw new Error("Recommendation or product not found");
       }
 
-      // Build control data (current product state)
       const controlData: Record<string, any> = {
         title: product.title,
         description: product.description,
         price: parseFloat(product.price),
       };
 
-      // For price optimizations, store all variant prices in control and variant data
       if (recommendation.optimizationType === "price" && product.variants && product.variants.length > 0) {
         controlData.variantPrices = product.variants.map((v: any) => ({
           id: v.id,
@@ -131,13 +114,11 @@ export default function Dashboard() {
         }));
       }
 
-      // Build variant data (proposed changes)
       const variantData: Record<string, any> = {
         ...controlData,
         ...recommendation.proposedChanges,
       };
 
-      // For price optimizations, calculate proportional price changes for all variants
       if (recommendation.optimizationType === "price" && controlData.variantPrices) {
         const priceMultiplier = variantData.price / controlData.price;
         variantData.variantPrices = controlData.variantPrices.map((v: any) => ({
@@ -164,15 +145,11 @@ export default function Dashboard() {
       return res.json();
     },
     onSuccess: async (data, variables) => {
-      // Update recommendation status to "testing"
       await apiRequest("PATCH", `/api/recommendations/${variables.recommendationId}`, { status: "testing" });
-      
       toast({
         title: "Optimization Created",
         description: "Your A/B optimization has been created successfully",
       });
-      
-      // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: ["/api/optimizations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/recommendations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
@@ -186,7 +163,6 @@ export default function Dashboard() {
     },
   });
 
-  // Activate optimization mutation
   const activateOptimizationMutation = useMutation({
     mutationFn: async (optimizationId: string) => {
       const res = await apiRequest("POST", `/api/optimizations/${optimizationId}/activate`);
@@ -197,7 +173,6 @@ export default function Dashboard() {
         title: "Optimization Activated",
         description: "Optimization is now live in your Shopify store",
       });
-      
       queryClient.invalidateQueries({ queryKey: ["/api/optimizations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
     },
@@ -210,7 +185,6 @@ export default function Dashboard() {
     },
   });
 
-  // Deactivate optimization mutation
   const deactivateOptimizationMutation = useMutation({
     mutationFn: async (optimizationId: string) => {
       const res = await apiRequest("POST", `/api/optimizations/${optimizationId}/deactivate`);
@@ -221,7 +195,6 @@ export default function Dashboard() {
         title: "Optimization Deactivated",
         description: "Product reverted to original values",
       });
-      
       queryClient.invalidateQueries({ queryKey: ["/api/optimizations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
     },
@@ -234,17 +207,14 @@ export default function Dashboard() {
     },
   });
 
-  // Fetch dashboard data (poll more frequently if syncing)
   const { data: dashboardData } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
     refetchInterval: (query) => {
       const data = query.state.data as DashboardData | undefined;
-      // Poll every 2 seconds if syncing, otherwise every 30 seconds
       return data?.syncStatus?.syncing ? 2000 : 30000;
     },
   });
 
-  // Fetch quota data
   const { data: quotaData } = useQuery<{
     quota: number;
     used: number;
@@ -255,12 +225,10 @@ export default function Dashboard() {
     queryKey: ["/api/quota"],
   });
 
-  // Fetch products (for preview and auto-generation logic)
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ["/api/products"],
   });
 
-  // Fetch recommendations
   const { data: recommendations = [] } = useQuery<Recommendation[]>({
     queryKey: ["/api/recommendations"],
     queryFn: async () => {
@@ -270,12 +238,10 @@ export default function Dashboard() {
     },
   });
 
-  // Fetch optimizations
   const { data: optimizations = [] } = useQuery<EnrichedOptimization[]>({
     queryKey: ["/api/optimizations"],
   });
 
-  // Fetch metrics for chart
   const { data: metricsData = [] } = useQuery<Metric[]>({
     queryKey: ["/api/metrics"],
     queryFn: async () => {
@@ -285,22 +251,17 @@ export default function Dashboard() {
     },
   });
 
-  
   useEffect(() => {
     const currentStatus = dashboardData?.syncStatus;
     const prevStatus = prevSyncStatusRef.current;
     
-    // Detect sync completion or failure
     if (prevStatus && currentStatus) {
-      // Sync just completed successfully
       if (prevStatus.syncing && !currentStatus.syncing && currentStatus.lastSyncSuccess) {
         toast({
           title: "Products Synced",
           description: `Successfully synced ${currentStatus.productCount} products from Shopify`,
         });
       }
-      
-      // Sync just failed
       if (prevStatus.syncing && !currentStatus.syncing && currentStatus.lastSyncSuccess === false) {
         toast({
           title: "Sync Failed",
@@ -309,19 +270,13 @@ export default function Dashboard() {
         });
       }
     }
-    
     prevSyncStatusRef.current = currentStatus;
   }, [dashboardData?.syncStatus, toast]);
 
-  // Auto-sync products on dashboard load if none exist
   useEffect(() => {
     if (dashboardData && !hasAutoSyncedRef.current && !syncAttemptedRef.current && !syncMutation.isPending) {
       const hasProducts = dashboardData.totalProducts > 0;
       const isSyncing = dashboardData.syncStatus?.syncing;
-      
-      // Only auto-sync if no products and not already syncing
-      // Mark as attempted immediately to prevent retry loops
-      // Will be marked as successful in onSuccess if it works
       if (!hasProducts && !isSyncing) {
         syncAttemptedRef.current = true;
         syncMutation.mutate();
@@ -330,8 +285,7 @@ export default function Dashboard() {
   }, [dashboardData, syncMutation.isPending]);
 
   const latestMetric = dashboardData?.latestMetric || metricsData[0];
-  
-  // Format chart data
+
   const chartData = metricsData
     .slice(0, 30)
     .reverse()
@@ -340,16 +294,9 @@ export default function Dashboard() {
       revenue: parseFloat(m.revenue),
     }));
 
-  // Calculate metrics from latest data and active optimizations
   const activeOptimizations = optimizations.filter(t => t.status === 'active');
-  const totalRevenue = activeOptimizations.reduce((sum, t) => sum + parseFloat(t.revenue || "0"), 0);
-  const totalConversions = activeOptimizations.reduce((sum, t) => sum + (t.conversions || 0), 0);
-  const currentArpu = totalConversions > 0 ? totalRevenue / totalConversions : 0;
-  
-  const revenueLift = latestMetric?.revenueLift ? '$' + parseFloat(latestMetric.revenueLift).toFixed(0) : '$0';
   const activeOptimizationsCount = dashboardData?.activeOptimizations || activeOptimizations.length;
 
-  // Format optimizations for table - show only completed optimizations on dashboard
   const completedOptimizations = optimizations.filter(t => t.status === 'completed');
   const formattedOptimizations = completedOptimizations.map(test => ({
     id: test.id,
@@ -363,179 +310,106 @@ export default function Dashboard() {
     startDate: test.startDate ? new Date(test.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not started',
   }));
 
-  // Calculate last sync time
-  const getLastSyncText = () => {
-    const syncStatus = dashboardData?.syncStatus;
-    if (syncStatus?.syncing) return "Syncing...";
-    if (!syncStatus?.lastSyncTime) return "Never";
-    
-    const lastSync = new Date(syncStatus.lastSyncTime);
-    const now = new Date();
-    const diffMs = now.getTime() - lastSync.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins} min ago`;
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return lastSync.toLocaleDateString();
-  };
-
-  // Helper to format incremental values with proper sign and styling
   const formatIncrementalValue = (value: number, decimals: number = 2): { text: string; className: string } => {
     if (value >= 0) {
-      return {
-        text: `+$${value.toFixed(decimals)}`,
-        className: 'text-green-600 dark:text-green-500'
-      };
+      return { text: `+$${value.toFixed(decimals)}`, className: 'text-green-600' };
     } else {
-      return {
-        text: `-$${Math.abs(value).toFixed(decimals)}`,
-        className: 'text-red-600 dark:text-red-500'
-      };
+      return { text: `-$${Math.abs(value).toFixed(decimals)}`, className: 'text-red-600' };
     }
   };
 
-  // Helper to format incremental conversions with proper sign and styling
   const formatIncrementalConversions = (value: number): { text: string; className: string } => {
     const rounded = Math.round(value);
     if (rounded >= 0) {
-      return {
-        text: `+${rounded}`,
-        className: 'text-green-600 dark:text-green-500'
-      };
+      return { text: `+${rounded}`, className: 'text-green-600' };
     } else {
-      return {
-        text: `${rounded}`, // Negative sign already included
-        className: 'text-red-600 dark:text-red-500'
-      };
+      return { text: `${rounded}`, className: 'text-red-600' };
     }
   };
 
   return (
-    <div className="space-y-4 md:space-y-6 max-w-full overflow-hidden">
+    <s-page size="large">
       <DashboardHeader 
         activeOptimizations={activeOptimizationsCount} 
-        lastSync={getLastSyncText()}
+        lastSync={(() => {
+          const syncStatus = dashboardData?.syncStatus;
+          if (syncStatus?.syncing) return "Syncing...";
+          if (!syncStatus?.lastSyncTime) return "Never";
+          const lastSync = new Date(syncStatus.lastSyncTime);
+          const now = new Date();
+          const diffMs = now.getTime() - lastSync.getTime();
+          const diffMins = Math.floor(diffMs / 60000);
+          if (diffMins < 1) return "Just now";
+          if (diffMins < 60) return `${diffMins} min ago`;
+          const diffHours = Math.floor(diffMins / 60);
+          if (diffHours < 24) return `${diffHours}h ago`;
+          return lastSync.toLocaleDateString();
+        })()}
         quotaUsed={quotaData?.used}
         quotaTotal={quotaData?.quota}
       />
       
-      {/* All-Time Performance */}
-      <div>
-        <h3 className="text-xs md:text-sm font-semibold text-muted-foreground mb-2 md:mb-3" data-testid="text-all-time-heading">
+      <s-section>
+        <s-text variant="headingSm" tone="subdued" data-testid="text-all-time-heading">
           All-Time Performance
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        </s-text>
+        <s-grid columns="4" gap="base">
           <MetricCard 
             title="Optimizations Run" 
             value={dashboardData?.allTimeMetrics?.optimizationCount?.toString() || '0'}
             subtitle="total experiments"
-            data-testid="card-all-time-optimizations"
           />
           <MetricCard 
             title="Incremental RPV" 
-            value={(() => {
-              const irpv = dashboardData?.allTimeMetrics?.incrementalRPV || 0;
-              return formatIncrementalValue(irpv, 2).text;
-            })()}
+            value={formatIncrementalValue(dashboardData?.allTimeMetrics?.incrementalRPV || 0, 2).text}
             subtitle="avg lift per visitor"
-            valueClassName={(() => {
-              const irpv = dashboardData?.allTimeMetrics?.incrementalRPV || 0;
-              return formatIncrementalValue(irpv, 2).className;
-            })()}
-            data-testid="card-all-time-irpv"
+            valueClassName={formatIncrementalValue(dashboardData?.allTimeMetrics?.incrementalRPV || 0, 2).className}
           />
           <MetricCard 
             title="Revenue Impact" 
-            value={(() => {
-              if (!dashboardData?.allTimeMetrics) return '$0';
-              const { incrementalRevenue } = dashboardData.allTimeMetrics;
-              return formatIncrementalValue(incrementalRevenue, 0).text;
-            })()}
-            valueClassName={(() => {
-              if (!dashboardData?.allTimeMetrics) return '';
-              const { incrementalRevenue } = dashboardData.allTimeMetrics;
-              return formatIncrementalValue(incrementalRevenue, 0).className;
-            })()}
+            value={dashboardData?.allTimeMetrics ? formatIncrementalValue(dashboardData.allTimeMetrics.incrementalRevenue, 0).text : '$0'}
+            valueClassName={dashboardData?.allTimeMetrics ? formatIncrementalValue(dashboardData.allTimeMetrics.incrementalRevenue, 0).className : ''}
             subtitle="lift from optimizations"
-            data-testid="card-all-time-revenue"
           />
           <MetricCard 
             title="Conversion Impact" 
-            value={(() => {
-              if (!dashboardData?.allTimeMetrics) return '0';
-              const { incrementalConversions } = dashboardData.allTimeMetrics;
-              return formatIncrementalConversions(incrementalConversions).text;
-            })()}
-            valueClassName={(() => {
-              if (!dashboardData?.allTimeMetrics) return '';
-              const { incrementalConversions } = dashboardData.allTimeMetrics;
-              return formatIncrementalConversions(incrementalConversions).className;
-            })()}
+            value={dashboardData?.allTimeMetrics ? formatIncrementalConversions(dashboardData.allTimeMetrics.incrementalConversions).text : '0'}
+            valueClassName={dashboardData?.allTimeMetrics ? formatIncrementalConversions(dashboardData.allTimeMetrics.incrementalConversions).className : ''}
             subtitle="lift from optimizations"
-            data-testid="card-all-time-conversions"
           />
-        </div>
-      </div>
+        </s-grid>
+      </s-section>
 
-      {/* Currently Active */}
-      <div>
-        <h3 className="text-xs md:text-sm font-semibold text-muted-foreground mb-2 md:mb-3" data-testid="text-active-heading">
+      <s-section>
+        <s-text variant="headingSm" tone="subdued" data-testid="text-active-heading">
           Currently Active
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        </s-text>
+        <s-grid columns="4" gap="base">
           <MetricCard 
             title="Active Optimizations" 
             value={dashboardData?.activeMetrics?.optimizationCount?.toString() || '0'}
             subtitle="running now"
-            data-testid="card-active-optimizations"
           />
           <MetricCard 
             title="Incremental RPV" 
-            value={(() => {
-              const irpv = dashboardData?.activeMetrics?.incrementalRPV || 0;
-              return formatIncrementalValue(irpv, 2).text;
-            })()}
+            value={formatIncrementalValue(dashboardData?.activeMetrics?.incrementalRPV || 0, 2).text}
             subtitle="current lift per visitor"
-            valueClassName={(() => {
-              const irpv = dashboardData?.activeMetrics?.incrementalRPV || 0;
-              return formatIncrementalValue(irpv, 2).className;
-            })()}
-            data-testid="card-active-irpv"
+            valueClassName={formatIncrementalValue(dashboardData?.activeMetrics?.incrementalRPV || 0, 2).className}
           />
           <MetricCard 
             title="Revenue Impact" 
-            value={(() => {
-              if (!dashboardData?.activeMetrics) return '$0';
-              const { incrementalRevenue } = dashboardData.activeMetrics;
-              return formatIncrementalValue(incrementalRevenue, 0).text;
-            })()}
-            valueClassName={(() => {
-              if (!dashboardData?.activeMetrics) return '';
-              const { incrementalRevenue } = dashboardData.activeMetrics;
-              return formatIncrementalValue(incrementalRevenue, 0).className;
-            })()}
+            value={dashboardData?.activeMetrics ? formatIncrementalValue(dashboardData.activeMetrics.incrementalRevenue, 0).text : '$0'}
+            valueClassName={dashboardData?.activeMetrics ? formatIncrementalValue(dashboardData.activeMetrics.incrementalRevenue, 0).className : ''}
             subtitle="lift from optimizations"
-            data-testid="card-active-revenue"
           />
           <MetricCard 
             title="Conversion Impact" 
-            value={(() => {
-              if (!dashboardData?.activeMetrics) return '0';
-              const { incrementalConversions } = dashboardData.activeMetrics;
-              return formatIncrementalConversions(incrementalConversions).text;
-            })()}
-            valueClassName={(() => {
-              if (!dashboardData?.activeMetrics) return '';
-              const { incrementalConversions } = dashboardData.activeMetrics;
-              return formatIncrementalConversions(incrementalConversions).className;
-            })()}
+            value={dashboardData?.activeMetrics ? formatIncrementalConversions(dashboardData.activeMetrics.incrementalConversions).text : '0'}
+            valueClassName={dashboardData?.activeMetrics ? formatIncrementalConversions(dashboardData.activeMetrics.incrementalConversions).className : ''}
             subtitle="lift from optimizations"
-            data-testid="card-active-conversions"
           />
-        </div>
-      </div>
+        </s-grid>
+      </s-section>
 
       {activeOptimizationsCount === 0 && completedOptimizations.length === 0 && (
         <SetupGuide />
@@ -546,35 +420,33 @@ export default function Dashboard() {
       )}
 
       {activeOptimizationsCount > 0 && (
-        <Card>
-          <CardContent className="p-4 md:p-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div>
-                <h3 className="text-base md:text-lg font-semibold mb-1">Active Optimizations</h3>
-                <p className="text-xs md:text-sm text-muted-foreground">
-                  You have {activeOptimizationsCount} optimization{activeOptimizationsCount === 1 ? '' : 's'} running live
-                </p>
-              </div>
-              <Link href="/optimizations">
-                <Button variant="outline" size="sm" className="w-full sm:w-auto" data-testid="button-view-optimizations">
-                  View All
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
+        <s-section>
+          <s-stack direction="inline" align="space-between" blockAlign="center" gap="base">
+            <s-stack direction="block" gap="small">
+              <s-text variant="headingSm">Active Optimizations</s-text>
+              <s-text variant="bodySm" tone="subdued">
+                You have {activeOptimizationsCount} optimization{activeOptimizationsCount === 1 ? '' : 's'} running live
+              </s-text>
+            </s-stack>
+            <Link href="/optimizations">
+              <s-button variant="secondary" data-testid="button-view-optimizations">
+                View All
+              </s-button>
+            </Link>
+          </s-stack>
+        </s-section>
       )}
 
       {formattedOptimizations.length > 0 && (
-        <div>
-          <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4">Completed Optimizations</h2>
+        <s-section>
+          <s-text variant="headingMd">Completed Optimizations</s-text>
           <OptimizationHistoryTable 
             optimizations={formattedOptimizations} 
             onStartOptimization={(optimizationId) => activateOptimizationMutation.mutate(optimizationId)}
             onStopOptimization={(optimizationId) => deactivateOptimizationMutation.mutate(optimizationId)}
           />
-        </div>
+        </s-section>
       )}
-    </div>
+    </s-page>
   );
 }

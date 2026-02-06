@@ -1,11 +1,8 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Link, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/AppSidebar";
-import ThemeToggle from "@/components/ThemeToggle";
+import { isEmbedded } from "@/lib/shopify";
 import Dashboard from "@/pages/Dashboard";
 import Optimizations from "@/pages/Optimizations";
 import AIRecommendations from "@/pages/AIRecommendations";
@@ -13,6 +10,59 @@ import Simulator from "@/pages/Simulator";
 import Settings from "@/pages/Settings";
 import Billing from "@/pages/Billing";
 import NotFound from "@/pages/NotFound";
+
+const navItems = [
+  { label: "Dashboard", path: "/" },
+  { label: "Optimizations", path: "/optimizations" },
+  { label: "AI Recommendations", path: "/recommendations" },
+  { label: "Simulator", path: "/simulator" },
+  { label: "Plans & Billing", path: "/billing" },
+  { label: "Settings", path: "/settings" },
+];
+
+function EmbeddedNav() {
+  return (
+    <ui-nav-menu>
+      <Link href="/" data-testid="nav-dashboard">Dashboard</Link>
+      <Link href="/optimizations" data-testid="nav-optimizations">Optimizations</Link>
+      <Link href="/recommendations" data-testid="nav-recommendations">AI Recommendations</Link>
+      <Link href="/simulator" data-testid="nav-simulator">Simulator</Link>
+      <Link href="/billing" data-testid="nav-billing">Plans & Billing</Link>
+      <Link href="/settings" data-testid="nav-settings">Settings</Link>
+    </ui-nav-menu>
+  );
+}
+
+function DevNav() {
+  const [location] = useLocation();
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px',
+      padding: '8px 16px',
+      borderBottom: '1px solid var(--p-color-border)',
+      background: 'var(--p-color-bg-surface)',
+      flexWrap: 'wrap',
+    }}>
+      <s-text variant="bodySm" fontWeight="semibold" style={{ marginRight: '12px' }}>
+        Shoptimizer
+      </s-text>
+      {navItems.map((item) => (
+        <Link key={item.path} href={item.path}>
+          <s-button
+            variant={location === item.path ? "secondary" : "tertiary"}
+            size="micro"
+            data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+          >
+            {item.label}
+          </s-button>
+        </Link>
+      ))}
+    </div>
+  );
+}
 
 function Router() {
   return (
@@ -29,31 +79,13 @@ function Router() {
 }
 
 export default function App() {
-  const style = {
-    "--sidebar-width": "16rem",
-  };
+  const embedded = isEmbedded();
 
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <SidebarProvider style={style as React.CSSProperties}>
-          <div className="flex h-screen w-full">
-            <AppSidebar />
-            <div className="flex flex-col flex-1 min-w-0">
-              <header className="flex items-center justify-between p-3 md:p-4 border-b bg-card shrink-0">
-                <SidebarTrigger data-testid="button-sidebar-toggle" />
-                <ThemeToggle />
-              </header>
-              <main className="flex-1 overflow-auto p-3 md:p-6 bg-background">
-                <div className="max-w-full">
-                  <Router />
-                </div>
-              </main>
-            </div>
-          </div>
-        </SidebarProvider>
-        <Toaster />
-      </TooltipProvider>
+      {embedded ? <EmbeddedNav /> : <DevNav />}
+      <Router />
+      <Toaster />
     </QueryClientProvider>
   );
 }

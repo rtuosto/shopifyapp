@@ -1,4 +1,3 @@
-import { Card } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 interface DataPoint {
@@ -13,40 +12,42 @@ interface PerformanceChartProps {
 
 export default function PerformanceChart({ data, title = "Revenue Trend (30 Days)" }: PerformanceChartProps) {
   return (
-    <Card className="p-6" data-testid="card-performance-chart">
-      <h3 className="text-lg font-semibold mb-4" data-testid="text-chart-title">{title}</h3>
-      <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-          <XAxis 
-            dataKey="date" 
-            stroke="hsl(var(--muted-foreground))" 
-            fontSize={12}
-            tickLine={false}
-          />
-          <YAxis 
-            stroke="hsl(var(--muted-foreground))" 
-            fontSize={12}
-            tickLine={false}
-            tickFormatter={(value) => `$${(value / 1000).toFixed(1)}k`}
-          />
-          <Tooltip 
-            contentStyle={{
-              backgroundColor: "hsl(var(--card))",
-              border: "1px solid hsl(var(--border))",
-              borderRadius: "6px",
-            }}
-            formatter={(value: number) => [`$${value.toLocaleString()}`, "Revenue"]}
-          />
-          <Line 
-            type="monotone" 
-            dataKey="revenue" 
-            stroke="hsl(var(--chart-1))" 
-            strokeWidth={2}
-            dot={false}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </Card>
+    <s-section data-testid="card-performance-chart">
+      <s-text variant="headingSm" fontWeight="semibold" data-testid="text-chart-title">{title}</s-text>
+      <s-box padding="base none">
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+            <XAxis 
+              dataKey="date" 
+              stroke="#8c9196" 
+              fontSize={12}
+              tickLine={false}
+            />
+            <YAxis 
+              stroke="#8c9196" 
+              fontSize={12}
+              tickLine={false}
+              tickFormatter={(value) => `$${(value / 1000).toFixed(1)}k`}
+            />
+            <Tooltip 
+              contentStyle={{
+                backgroundColor: "#fff",
+                border: "1px solid #e0e0e0",
+                borderRadius: "8px",
+              }}
+              formatter={(value: number) => [`$${value.toLocaleString()}`, "Revenue"]}
+            />
+            <Line 
+              type="monotone" 
+              dataKey="revenue" 
+              stroke="#2c6ecb"
+              strokeWidth={2}
+              dot={false}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </s-box>
+    </s-section>
   );
 }

@@ -1,6 +1,3 @@
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { CheckCircle2, XCircle, Eye } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { formatOptimizationType } from "@/lib/optimizationTypeFormatter";
 
@@ -34,7 +31,7 @@ export default function AIRecommendationCard({
   onPreview,
   headerBadge,
   customActions,
-  borderColor = "border-l-chart-3",
+  borderColor,
   imageOpacity = "",
 }: AIRecommendationCardProps) {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -62,85 +59,86 @@ export default function AIRecommendationCard({
   };
 
   return (
-    <Card className={`p-4 border-l-4 ${borderColor}`} data-testid={`card-recommendation-${id}`}>
-      <div className="space-y-3">
-        <div className="flex gap-3">
+    <s-section data-testid={`card-recommendation-${id}`}>
+      <s-stack direction="block" gap="base">
+        <s-stack direction="inline" gap="base" blockAlign="start">
           {productImage && (
-            <div className="shrink-0">
+            <s-box borderRadius="base" overflow="hidden" inlineSize="64px" blockSize="64px">
               <img 
                 src={productImage} 
                 alt={productName}
-                className={`w-16 h-16 object-cover rounded-md ${imageOpacity}`}
+                style={{ width: '64px', height: '64px', objectFit: 'cover', opacity: imageOpacity === 'opacity-60' ? 0.6 : 1 }}
                 data-testid={`img-product-${id}`}
               />
-            </div>
+            </s-box>
           )}
-          <div className="flex-1 min-w-0">
+          <s-stack direction="block" gap="small" style={{ flex: 1, minWidth: 0 }}>
             {headerBadge && (
-              <div className="mb-1">
-                {headerBadge}
-              </div>
+              <div>{headerBadge}</div>
             )}
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1 min-w-0">
-              <span data-testid={`text-product-name-${id}`} className="font-medium truncate">{productName}</span>
-              <span className="flex-shrink-0">•</span>
-              <span data-testid={`text-optimization-type-${id}`} className="flex-shrink-0">{formatOptimizationType(optimizationType)}</span>
-            </div>
-            <h3 className="text-sm font-semibold mb-1 line-clamp-2 break-words" data-testid={`text-recommendation-title-${id}`}>
+            <s-stack direction="inline" gap="small" blockAlign="center">
+              <s-text variant="bodySm" fontWeight="medium" tone="subdued" truncate data-testid={`text-product-name-${id}`}>
+                {productName}
+              </s-text>
+              <s-text variant="bodySm" tone="subdued">·</s-text>
+              <s-text variant="bodySm" tone="subdued" data-testid={`text-optimization-type-${id}`}>
+                {formatOptimizationType(optimizationType)}
+              </s-text>
+            </s-stack>
+            <s-text variant="bodySm" fontWeight="semibold" data-testid={`text-recommendation-title-${id}`}>
               {title}
-            </h3>
-            <p className="text-xs text-muted-foreground line-clamp-2 break-words" data-testid={`text-recommendation-description-${id}`}>
+            </s-text>
+            <s-text variant="bodyXs" tone="subdued" data-testid={`text-recommendation-description-${id}`}>
               {description}
-            </p>
-          </div>
-        </div>
+            </s-text>
+          </s-stack>
+        </s-stack>
 
         {customActions ? (
-          <div className="flex gap-2">
+          <s-button-group gap="small">
             {customActions}
-          </div>
+          </s-button-group>
         ) : (
-          <div className="flex gap-2">
-            <Button 
-              variant="outline"
-              size="sm"
+          <s-button-group gap="small">
+            <s-button
+              variant="secondary"
+              size="slim"
+              icon="view"
               onClick={handlePreview}
-              className="flex-1 gap-1.5"
+              disabled={isProcessing}
               data-testid={`button-preview-optimization-${id}`}
-              disabled={isProcessing}
             >
-              <Eye className="w-3.5 h-3.5" />
               Preview
-            </Button>
-            <Button 
-              size="sm"
-              onClick={handleAccept} 
-              className="flex-1 gap-1.5"
+            </s-button>
+            <s-button
+              variant="primary"
+              size="slim"
+              icon="check-circle"
+              onClick={handleAccept}
+              disabled={isProcessing}
               data-testid={`button-accept-recommendation-${id}`}
-              disabled={isProcessing}
             >
-              <CheckCircle2 className="w-3.5 h-3.5" />
               Accept
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm"
+            </s-button>
+            <s-button
+              variant="secondary"
+              size="slim"
+              icon="x-circle"
               onClick={handleReject}
-              data-testid={`button-reject-recommendation-${id}`}
               disabled={isProcessing}
-            >
-              <XCircle className="w-3.5 h-3.5" />
-            </Button>
-          </div>
+              data-testid={`button-reject-recommendation-${id}`}
+              accessibilityLabel="Dismiss recommendation"
+            />
+          </s-button-group>
         )}
         
         {isProcessing && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground justify-center">
-            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></div>
-            Processing...
-          </div>
+          <s-stack direction="inline" gap="small" align="center" blockAlign="center">
+            <s-spinner size="small" accessibilityLabel="Processing" />
+            <s-text variant="bodyXs" tone="subdued">Processing...</s-text>
+          </s-stack>
         )}
-      </div>
-    </Card>
+      </s-stack>
+    </s-section>
   );
 }

@@ -1,39 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import AIRecommendationCard from "@/components/AIRecommendationCard";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Sparkles, Plus, Archive as ArchiveIcon, RotateCcw, AlertCircle, Settings as SettingsIcon } from "lucide-react";
 import type { Product, Recommendation, Optimization } from "@shared/schema";
 import { Link } from "wouter";
 
@@ -43,6 +12,7 @@ export default function AIRecommendations() {
   const [storeIdeasDialogOpen, setStoreIdeasDialogOpen] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string>("");
   const [dismissingRecommendation, setDismissingRecommendation] = useState<Recommendation | null>(null);
+  const [activeTab, setActiveTab] = useState<"pending" | "archive">("pending");
 
   // Fetch quota data
   const { data: quotaData } = useQuery<{
@@ -987,268 +957,289 @@ export default function AIRecommendations() {
   const quotaTotal = quotaData?.quota ?? 20;
 
   return (
-    <div className="space-y-6 max-w-full overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <h1 className="text-2xl md:text-3xl font-bold" data-testid="text-page-title">AI Recommendations</h1>
-          <p className="text-sm md:text-base text-muted-foreground mt-1">
-            AI-powered optimization ideas for your products
-          </p>
-        </div>
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <Badge variant="secondary" className="gap-1 hidden sm:flex">
-            <Sparkles className="w-3 h-3" />
-            <span className="whitespace-nowrap">{quotaUsed} AI Ideas Used · Beta: Unlimited</span>
-          </Badge>
-          <Badge variant="secondary" className="gap-1 sm:hidden">
-            <Sparkles className="w-3 h-3" />
-            <span>{quotaUsed}</span>
-          </Badge>
-        </div>
-      </div>
+    <s-page>
+      <s-stack direction="block" gap="large">
+        {/* Header */}
+        <s-stack direction="inline" align="space-between" blockAlign="center" gap="base">
+          <s-stack direction="block" gap="small">
+            <s-text variant="headingLg" data-testid="text-page-title">AI Recommendations</s-text>
+            <s-text variant="bodySm" tone="subdued">
+              AI-powered optimization ideas for your products
+            </s-text>
+          </s-stack>
+          <s-badge tone="info" data-testid="badge-quota">
+            {quotaUsed} AI Ideas Used · Beta: Unlimited
+          </s-badge>
+        </s-stack>
 
-      {/* Action Buttons */}
-      <div className="flex items-center gap-3">
-        <Button
-          onClick={() => setStoreIdeasDialogOpen(true)}
-          disabled={generateStoreRecommendationsMutation.isPending}
-          data-testid="button-generate-store-ideas"
-        >
-          <Sparkles className="w-4 h-4 mr-2" />
-          {generateStoreRecommendationsMutation.isPending ? "Generating..." : "Generate Store Ideas"}
-        </Button>
-        <div className="flex items-center gap-2">
-          <Select value={selectedProductId} onValueChange={(value) => setSelectedProductId(value)}>
-            <SelectTrigger className="w-[250px]" data-testid="select-product">
-              <SelectValue placeholder="Select a product..." />
-            </SelectTrigger>
-            <SelectContent>
-              {products.map((product) => (
-                <SelectItem key={product.id} value={product.id}>
-                  {product.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            onClick={() => {
-              if (selectedProductId) {
-                generateProductRecommendationMutation.mutate(selectedProductId);
-              }
-            }}
-            disabled={!selectedProductId || generateProductRecommendationMutation.isPending}
-            variant="outline"
-            data-testid="button-generate-product-idea"
+        {/* Action Buttons */}
+        <s-stack direction="inline" gap="base" blockAlign="center" wrap>
+          <s-button
+            variant="primary"
+            onClick={() => setStoreIdeasDialogOpen(true)}
+            disabled={generateStoreRecommendationsMutation.isPending}
+            loading={generateStoreRecommendationsMutation.isPending}
+            data-testid="button-generate-store-ideas"
           >
-            <Plus className="w-4 h-4 mr-2" />
-            {generateProductRecommendationMutation.isPending ? "Generating..." : "Generate Idea"}
-          </Button>
-        </div>
-      </div>
+            {generateStoreRecommendationsMutation.isPending ? "Generating..." : "Generate Store Ideas"}
+          </s-button>
+          <s-stack direction="inline" gap="small" blockAlign="center">
+            <s-select
+              label="Product"
+              labelAccessibilityVisibility="hidden"
+              value={selectedProductId}
+              onChange={(e: any) => setSelectedProductId(e.target?.value || "")}
+              data-testid="select-product"
+            >
+              <option value="">Select a product...</option>
+              {products.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.title}
+                </option>
+              ))}
+            </s-select>
+            <s-button
+              onClick={() => {
+                if (selectedProductId) {
+                  generateProductRecommendationMutation.mutate(selectedProductId);
+                }
+              }}
+              disabled={!selectedProductId || generateProductRecommendationMutation.isPending}
+              loading={generateProductRecommendationMutation.isPending}
+              data-testid="button-generate-product-idea"
+            >
+              {generateProductRecommendationMutation.isPending ? "Generating..." : "Generate Idea"}
+            </s-button>
+          </s-stack>
+        </s-stack>
 
-      {/* SDK Installation Warning */}
-      <Alert variant="default" className="border-orange-200 bg-orange-50 dark:bg-orange-950 dark:border-orange-800">
-        <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-        <AlertTitle className="text-orange-900 dark:text-orange-100">Preview Feature Requires SDK Installation</AlertTitle>
-        <AlertDescription className="text-orange-800 dark:text-orange-200 flex items-start justify-between gap-4">
-          <span>
-            To use the "Preview Changes" button, install the Shoptimizer SDK on your Shopify theme. Without it, preview links will show a blank page.
-          </span>
-          <Button variant="outline" size="sm" asChild className="flex-shrink-0 border-orange-300 dark:border-orange-700 hover-elevate">
-            <Link href="/settings">
-              <SettingsIcon className="w-3 h-3 mr-1" />
+        {/* SDK Installation Warning */}
+        <s-banner tone="warning" heading="Preview Feature Requires SDK Installation">
+          <s-stack direction="inline" align="space-between" blockAlign="center" gap="base">
+            <s-text variant="bodySm">
+              To use the "Preview Changes" button, install the Shoptimizer SDK on your Shopify theme. Without it, preview links will show a blank page.
+            </s-text>
+            <s-button
+              variant="tertiary"
+              size="slim"
+              onClick={() => { window.location.href = '/settings'; }}
+              accessibilityLabel="View Setup in Settings"
+              data-testid="button-view-setup"
+            >
               View Setup
-            </Link>
-          </Button>
-        </AlertDescription>
-      </Alert>
+            </s-button>
+          </s-stack>
+        </s-banner>
 
-      {/* Tabs */}
-      <Tabs defaultValue="pending" className="w-full">
-        <TabsList>
-          <TabsTrigger value="pending" data-testid="tab-pending">
-            Pending ({recommendations.length})
-          </TabsTrigger>
-          <TabsTrigger value="archive" data-testid="tab-archive">
-            <ArchiveIcon className="w-4 h-4 mr-2" />
-            Archive ({archivedRecommendations.length})
-          </TabsTrigger>
-        </TabsList>
+        {/* Tabs */}
+        <s-stack direction="block" gap="base">
+          <s-button-group variant="segmented">
+            <s-button
+              variant={activeTab === "pending" ? "primary" : "secondary"}
+              onClick={() => setActiveTab("pending")}
+              data-testid="tab-pending"
+            >
+              Pending ({recommendations.length})
+            </s-button>
+            <s-button
+              variant={activeTab === "archive" ? "primary" : "secondary"}
+              onClick={() => setActiveTab("archive")}
+              data-testid="tab-archive"
+            >
+              Archive ({archivedRecommendations.length})
+            </s-button>
+          </s-button-group>
 
-        <TabsContent value="pending" className="space-y-4 mt-6">
-          {recommendations.length === 0 ? (
-            <Card className="p-12 text-center">
-              <Sparkles className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Recommendations Yet</h3>
-              <p className="text-muted-foreground mb-4">
-                Generate AI-powered optimization ideas for your store
-              </p>
-              <Button
-                onClick={() => setStoreIdeasDialogOpen(true)}
-              >
-                <Sparkles className="w-4 h-4 mr-2" />
-                Generate Store Ideas
-              </Button>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {recommendations.map((rec) => {
-                const product = products.find(p => p.id === rec.productId);
-                const productImage = product?.images?.[0];
-                return (
-                  <AIRecommendationCard
-                    key={rec.id}
-                    id={rec.id}
-                    title={rec.title}
-                    description={rec.description}
-                    productName={product?.title || 'Unknown Product'}
-                    productImage={productImage}
-                    optimizationType={rec.optimizationType}
-                    impactScore={rec.impactScore}
-                    onAccept={() => handleAccept(rec.id)}
-                    onReject={() => handleDismissClick(rec.id)}
-                    onPreview={() => handlePreview(rec.id)}
-                  />
-                );
-              })}
-            </div>
+          {activeTab === "pending" && (
+            <s-stack direction="block" gap="base">
+              {recommendations.length === 0 ? (
+                <s-section>
+                  <s-box padding="large">
+                    <s-stack direction="block" gap="base" align="center">
+                      <s-text variant="headingMd">No Recommendations Yet</s-text>
+                      <s-text variant="bodySm" tone="subdued">
+                        Generate AI-powered optimization ideas for your store
+                      </s-text>
+                      <s-button
+                        variant="primary"
+                        onClick={() => setStoreIdeasDialogOpen(true)}
+                      >
+                        Generate Store Ideas
+                      </s-button>
+                    </s-stack>
+                  </s-box>
+                </s-section>
+              ) : (
+                <s-grid columns="2" gap="base">
+                  {recommendations.map((rec) => {
+                    const product = products.find(p => p.id === rec.productId);
+                    const productImage = product?.images?.[0];
+                    return (
+                      <AIRecommendationCard
+                        key={rec.id}
+                        id={rec.id}
+                        title={rec.title}
+                        description={rec.description}
+                        productName={product?.title || 'Unknown Product'}
+                        productImage={productImage}
+                        optimizationType={rec.optimizationType}
+                        impactScore={rec.impactScore}
+                        onAccept={() => handleAccept(rec.id)}
+                        onReject={() => handleDismissClick(rec.id)}
+                        onPreview={() => handlePreview(rec.id)}
+                      />
+                    );
+                  })}
+                </s-grid>
+              )}
+            </s-stack>
           )}
-        </TabsContent>
 
-        <TabsContent value="archive" className="space-y-4 mt-6">
-          {archivedRecommendations.length === 0 ? (
-            <Card className="p-12 text-center">
-              <ArchiveIcon className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Archived Recommendations</h3>
-              <p className="text-muted-foreground">
-                Dismissed recommendations will appear here
-              </p>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {archivedRecommendations.map((rec) => {
-                const product = products.find(p => p.id === rec.productId);
-                const productImage = product?.images?.[0];
-                return (
-                  <AIRecommendationCard
-                    key={rec.id}
-                    id={rec.id}
-                    title={rec.title}
-                    description={rec.description}
-                    productName={product?.title || 'Unknown Product'}
-                    productImage={productImage}
-                    optimizationType={rec.optimizationType}
-                    impactScore={rec.impactScore}
-                    borderColor="border-l-muted"
-                    imageOpacity="opacity-60"
-                    headerBadge={
-                      <Badge variant="outline" className="gap-1">
-                        <ArchiveIcon className="w-3 h-3" />
-                        Archived
-                      </Badge>
-                    }
-                    customActions={
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handlePreview(rec.id)}
-                          data-testid={`button-preview-${rec.id}`}
-                        >
-                          Preview
-                        </Button>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => handleRestore(rec.id)}
-                          disabled={restoreRecommendationMutation.isPending}
-                          data-testid={`button-restore-${rec.id}`}
-                        >
-                          <RotateCcw className="w-3 h-3 mr-1" />
-                          Restore
-                        </Button>
-                      </>
-                    }
-                  />
-                );
-              })}
-            </div>
+          {activeTab === "archive" && (
+            <s-stack direction="block" gap="base">
+              {archivedRecommendations.length === 0 ? (
+                <s-section>
+                  <s-box padding="large">
+                    <s-stack direction="block" gap="base" align="center">
+                      <s-text variant="headingMd">No Archived Recommendations</s-text>
+                      <s-text variant="bodySm" tone="subdued">
+                        Dismissed recommendations will appear here
+                      </s-text>
+                    </s-stack>
+                  </s-box>
+                </s-section>
+              ) : (
+                <s-grid columns="2" gap="base">
+                  {archivedRecommendations.map((rec) => {
+                    const product = products.find(p => p.id === rec.productId);
+                    const productImage = product?.images?.[0];
+                    return (
+                      <AIRecommendationCard
+                        key={rec.id}
+                        id={rec.id}
+                        title={rec.title}
+                        description={rec.description}
+                        productName={product?.title || 'Unknown Product'}
+                        productImage={productImage}
+                        optimizationType={rec.optimizationType}
+                        impactScore={rec.impactScore}
+                        borderColor="border-l-muted"
+                        imageOpacity="opacity-60"
+                        headerBadge={
+                          <s-badge tone="read-only">Archived</s-badge>
+                        }
+                        customActions={
+                          <>
+                            <s-button
+                              variant="tertiary"
+                              size="slim"
+                              onClick={() => handlePreview(rec.id)}
+                              data-testid={`button-preview-${rec.id}`}
+                            >
+                              Preview
+                            </s-button>
+                            <s-button
+                              variant="secondary"
+                              size="slim"
+                              onClick={() => handleRestore(rec.id)}
+                              disabled={restoreRecommendationMutation.isPending}
+                              loading={restoreRecommendationMutation.isPending}
+                              data-testid={`button-restore-${rec.id}`}
+                            >
+                              Restore
+                            </s-button>
+                          </>
+                        }
+                      />
+                    );
+                  })}
+                </s-grid>
+              )}
+            </s-stack>
           )}
-        </TabsContent>
-      </Tabs>
+        </s-stack>
+      </s-stack>
 
-      {/* Store Ideas Confirmation Dialog */}
-      <AlertDialog open={storeIdeasDialogOpen} onOpenChange={setStoreIdeasDialogOpen}>
-        <AlertDialogContent data-testid="dialog-store-ideas">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Generate Store Ideas?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will analyze your top products and generate up to 10 AI recommendations.
-              <br />
-              <br />
-              <span className="text-muted-foreground">Beta: Unlimited AI ideas during beta period</span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-store-ideas">Cancel</AlertDialogCancel>
-            <AlertDialogAction
+      {/* Store Ideas Confirmation Modal */}
+      {storeIdeasDialogOpen && (
+        <s-modal heading="Generate Store Ideas?" open={storeIdeasDialogOpen} data-testid="dialog-store-ideas">
+          <s-box padding="base">
+            <s-stack direction="block" gap="base">
+              <s-text variant="bodyMd">
+                This will analyze your top products and generate up to 10 AI recommendations.
+              </s-text>
+              <s-text variant="bodySm" tone="subdued">
+                Beta: Unlimited AI ideas during beta period
+              </s-text>
+            </s-stack>
+          </s-box>
+          <s-modal-actions>
+            <s-button
+              onClick={() => setStoreIdeasDialogOpen(false)}
+              data-testid="button-cancel-store-ideas"
+            >
+              Cancel
+            </s-button>
+            <s-button
+              variant="primary"
               onClick={() => generateStoreRecommendationsMutation.mutate()}
               disabled={generateStoreRecommendationsMutation.isPending}
+              loading={generateStoreRecommendationsMutation.isPending}
               data-testid="button-confirm-store-ideas"
             >
               {generateStoreRecommendationsMutation.isPending ? "Generating..." : "Generate Ideas"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </s-button>
+          </s-modal-actions>
+        </s-modal>
+      )}
 
-      {/* Dismiss Dialog */}
-      <Dialog open={dismissDialogOpen} onOpenChange={setDismissDialogOpen}>
-        <DialogContent data-testid="dialog-dismiss">
-          <DialogHeader>
-            <DialogTitle>Dismiss Recommendation</DialogTitle>
-            <DialogDescription>
-              What would you like to do with this recommendation?
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <p className="text-sm">
-              <strong>Just Dismiss:</strong> Archive this recommendation
-            </p>
-            <p className="text-sm">
-              <strong>Dismiss & Replace:</strong> Archive this and generate a different recommendation for the same product
-            </p>
-          </div>
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button
-              variant="outline"
+      {/* Dismiss Modal */}
+      {dismissDialogOpen && (
+        <s-modal heading="Dismiss Recommendation" open={dismissDialogOpen} data-testid="dialog-dismiss">
+          <s-box padding="base">
+            <s-stack direction="block" gap="base">
+              <s-text variant="bodySm" tone="subdued">
+                What would you like to do with this recommendation?
+              </s-text>
+              <s-stack direction="block" gap="small">
+                <s-text variant="bodySm">
+                  <strong>Just Dismiss:</strong> Archive this recommendation
+                </s-text>
+                <s-text variant="bodySm">
+                  <strong>Dismiss &amp; Replace:</strong> Archive this and generate a different recommendation for the same product
+                </s-text>
+              </s-stack>
+            </s-stack>
+          </s-box>
+          <s-modal-actions>
+            <s-button
               onClick={() => {
                 if (dismissingRecommendation) {
                   dismissRecommendationMutation.mutate({ id: dismissingRecommendation.id, replace: false });
                 }
               }}
               disabled={dismissRecommendationMutation.isPending}
+              loading={dismissRecommendationMutation.isPending}
               data-testid="button-just-dismiss"
             >
-              <ArchiveIcon className="w-4 h-4 mr-2" />
               Just Dismiss
-            </Button>
-            <Button
+            </s-button>
+            <s-button
+              variant="primary"
               onClick={() => {
                 if (dismissingRecommendation) {
                   dismissRecommendationMutation.mutate({ id: dismissingRecommendation.id, replace: true });
                 }
               }}
               disabled={dismissRecommendationMutation.isPending}
+              loading={dismissRecommendationMutation.isPending}
               data-testid="button-dismiss-replace"
             >
-              <Sparkles className="w-4 h-4 mr-2" />
-              Dismiss & Replace
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+              Dismiss &amp; Replace
+            </s-button>
+          </s-modal-actions>
+        </s-modal>
+      )}
+    </s-page>
   );
 }
