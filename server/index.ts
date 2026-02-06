@@ -51,6 +51,24 @@ app.use(express.json({
 app.use(express.urlencoded({ extended: false }));
 
 app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+
+  const frameAncestors = [
+    'https://admin.shopify.com',
+    'https://*.myshopify.com',
+  ].join(' ');
+  res.setHeader(
+    'Content-Security-Policy',
+    `frame-ancestors ${frameAncestors};`
+  );
+
+  next();
+});
+
+app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;

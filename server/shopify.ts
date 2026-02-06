@@ -678,6 +678,179 @@ export async function fetchCurrentTheme(session: Session): Promise<{ id: string;
   }
 }
 
+export async function createAppSubscription(
+  session: Session,
+  planName: string,
+  price: number,
+  returnUrl: string,
+  trialDays: number = 0,
+  isTest: boolean = process.env.NODE_ENV !== 'production'
+): Promise<{ confirmationUrl: string; subscriptionId: string }> {
+  const client = new shopify.clients.Graphql({ session });
+  
+  const response = await client.request(
+    `mutation appSubscriptionCreate(
+      $name: String!,
+      $lineItems: [AppSubscriptionLineItemInput!]!,
+      $returnUrl: URL!,
+      $trialDays: Int,
+      $test: Boolean
+    ) {
+      appSubscriptionCreate(
+        name: $name,
+        returnUrl: $returnUrl,
+        lineItems: $lineItems,
+        trialDays: $trialDays,
+        test: $test
+      ) {
+        userErrors {
+          field
+          message
+        }
+        confirmationUrl
+        appSubscription {
+          id
+          status
+        }
+      }
+    }`,
+    {
+      variables: {
+        name: planName,
+        returnUrl: returnUrl,
+        trialDays: trialDays,
+        test: isTest,
+        lineItems: [
+          {
+            plan: {
+              appRecurringPricingDetails: {
+                price: {
+                  amount: price,
+                  currencyCode: "USD",
+                },
+                interval: "EVERY_30_DAYS",
+              },
+            },
+          },
+        ],
+      },
+    }
+  );
+
+  if (response.data?.appSubscriptionCreate?.userErrors?.length > 0) {
+    console.error('[Shopify Billing] Subscription creation errors:', response.data.appSubscriptionCreate.userErrors);
+    throw new Error(`Subscription creation failed: ${JSON.stringify(response.data.appSubscriptionCreate.userErrors)}`);
+  }
+
+  const result = response.data?.appSubscriptionCreate;
+  if (!result?.confirmationUrl) {
+    throw new Error('No confirmation URL returned from Shopify');
+  }
+
+  console.log(`[Shopify Billing] Created subscription: ${result.appSubscription?.id}`);
+  return {
+    confirmationUrl: result.confirmationUrl,
+    subscriptionId: result.appSubscription?.id || '',
+  };
+}
+
+export async function getActiveSubscription(session: Session): Promise<{
+  id: string;
+  name: string;
+  status: string;
+  createdAt: string;
+  trialDays: number;
+  currentPeriodEnd: string | null;
+  test: boolean;
+  lineItems: Array<{ 
+    id: string; 
+    plan: { 
+      pricingDetails: { 
+        price: { amount: string; currencyCode: string }; 
+        interval: string 
+      } 
+    } 
+  }>;
+} | null> {
+  const client = new shopify.clients.Graphql({ session });
+  
+  const response = await client.request(`
+    query {
+      currentAppInstallation {
+        activeSubscriptions {
+          id
+          name
+          status
+          createdAt
+          trialDays
+          currentPeriodEnd
+          test
+          lineItems {
+            id
+            plan {
+              pricingDetails {
+                ... on AppRecurringPricing {
+                  price {
+                    amount
+                    currencyCode
+                  }
+                  interval
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  `);
+
+  const subscriptions = response.data?.currentAppInstallation?.activeSubscriptions;
+  
+  if (!subscriptions || subscriptions.length === 0) {
+    console.log('[Shopify Billing] No active subscriptions found');
+    return null;
+  }
+
+  const active = subscriptions[0];
+  console.log(`[Shopify Billing] Active subscription: ${active.id} (${active.status})`);
+  return active;
+}
+
+export async function cancelAppSubscription(
+  session: Session,
+  subscriptionId: string
+): Promise<boolean> {
+  const client = new shopify.clients.Graphql({ session });
+  
+  const response = await client.request(
+    `mutation appSubscriptionCancel($id: ID!) {
+      appSubscriptionCancel(id: $id) {
+        userErrors {
+          field
+          message
+        }
+        appSubscription {
+          id
+          status
+        }
+      }
+    }`,
+    {
+      variables: {
+        id: subscriptionId,
+      },
+    }
+  );
+
+  if (response.data?.appSubscriptionCancel?.userErrors?.length > 0) {
+    console.error('[Shopify Billing] Cancellation errors:', response.data.appSubscriptionCancel.userErrors);
+    throw new Error(`Subscription cancellation failed: ${JSON.stringify(response.data.appSubscriptionCancel.userErrors)}`);
+  }
+
+  console.log(`[Shopify Billing] Cancelled subscription: ${subscriptionId}`);
+  return true;
+}
+
 // Helper function to convert database row to Session object
 function rowToSession(row: any): Session {
   const session = new Session({

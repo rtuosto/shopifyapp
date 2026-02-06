@@ -68,6 +68,20 @@ Shoptimizer utilizes a full-stack architecture. The frontend uses React with Sha
 - **Safe Rollback**: Deactivates optimizations and restores original product values in Shopify.
 - **Traffic & Conversion Simulator**: Validates A/B optimization tracking and performance through batch and live-streaming simulations using Server-Sent Events (SSE).
 - **Optimization Evolution Charts**: Visualizes optimization performance over time on the Optimizations page, showing RPV and allocation evolution.
+- **Shopify Billing API Integration**: All app charges go through Shopify's Billing API (required for App Store compliance):
+  - Plans: Free, Growth ($29.99/mo), Pro ($79.99/mo) with 14-day free trials
+  - GraphQL mutations: `appSubscriptionCreate`, `appSubscriptionCancel`, `currentAppInstallation` query
+  - API endpoints: `GET /api/billing/status`, `POST /api/billing/subscribe`, `POST /api/billing/cancel`
+  - Zod validation on all billing request bodies
+  - Subscription ownership verification before cancellation
+  - Plans & Billing page in the app sidebar
+  - Currently in beta mode (all features unlocked)
+- **Security Headers**: CSP and anti-clickjacking headers for embedded Shopify app compliance:
+  - `Content-Security-Policy: frame-ancestors https://admin.shopify.com https://*.myshopify.com`
+  - `X-Content-Type-Options: nosniff`
+  - `X-XSS-Protection: 1; mode=block`
+  - `Referrer-Policy: strict-origin-when-cross-origin`
+  - `Permissions-Policy: camera=(), microphone=(), geolocation=()`
 - **CORS Configuration**: App Proxy endpoints are configured with CORS headers for cross-origin storefront requests.
 - **UI/UX**: Utilizes Shadcn UI components and Tailwind CSS for an embedded Shopify app experience.
 - **GDPR Compliance (Level 1 Protected Customer Data)**: Implements mandatory Shopify GDPR webhooks:

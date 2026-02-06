@@ -11,6 +11,7 @@ import Optimizations from "@/pages/Optimizations";
 import AIRecommendations from "@/pages/AIRecommendations";
 import Simulator from "@/pages/Simulator";
 import Settings from "@/pages/Settings";
+import Billing from "@/pages/Billing";
 import NotFound from "@/pages/NotFound";
 
 function Router() {
@@ -21,6 +22,7 @@ function Router() {
       <Route path="/recommendations" component={AIRecommendations} />
       <Route path="/simulator" component={Simulator} />
       <Route path="/settings" component={Settings} />
+      <Route path="/billing" component={Billing} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -3,9 +3,10 @@ import { createServer, type Server } from "http";
 import cors from "cors";
 import { randomUUID, createHmac, timingSafeEqual } from "crypto";
 import { storage } from "./storage";
-import { shopify, fetchProducts, updateProduct, getProductVariants, sessionStorage } from "./shopify";
+import { shopify, fetchProducts, updateProduct, getProductVariants, sessionStorage, createAppSubscription, getActiveSubscription, cancelAppSubscription } from "./shopify";
 import { generateOptimizationRecommendations, generateBatchRecommendations } from "./ai-service";
 import { insertRecommendationSchema, insertOptimizationSchema } from "@shared/schema";
+import { z } from "zod";
 import { requireShopifySessionOrDev } from "./middleware/shopify-auth";
 import { syncProductsFromShopify, initializeShopData } from "./sync-service";
 import { getSyncStatus, completeSyncSuccess } from "./sync-status";
@@ -3460,6 +3461,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[Migration] Error migrating optimizations:", error);
       const errorMessage = error instanceof Error ? error.message : "Migration failed";
+      res.status(500).json({ error: errorMessage });
+    }
+  });
+
+  // Billing API routes
+  app.get("/api/billing/status", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const session = (req as any).shopifySession;
+      
+      if (!session?.accessToken) {
+        return res.json({
+          plan: "beta",
+          status: "active",
+          subscription: null,
+          message: "Beta access - all features unlocked",
+        });
+      }
+      
+      const subscription = await getActiveSubscription(session);
+      
+      if (!subscription) {
+        return res.json({
+          plan: "free",
+          status: "inactive",
+          subscription: null,
+          message: "No active subscription",
+        });
+      }
+      
+      const price = subscription.lineItems?.[0]?.plan?.pricingDetails?.price;
+      
+      res.json({
+        plan: subscription.name?.toLowerCase().includes("pro") ? "pro" : "growth",
+        status: subscription.status,
+        subscription: {
+          id: subscription.id,
+          name: subscription.name,
+          status: subscription.status,
+          createdAt: subscription.createdAt,
+          trialDays: subscription.trialDays,
+          currentPeriodEnd: subscription.currentPeriodEnd,
+          test: subscription.test,
+          price: price ? `${price.amount} ${price.currencyCode}` : null,
+        },
+      });
+    } catch (error) {
+      console.error("[Billing] Error fetching billing status:", error);
+      res.status(500).json({ error: "Failed to fetch billing status" });
+    }
+  });
+
+  app.post("/api/billing/subscribe", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const session = (req as any).shopifySession;
+      
+      if (!session?.accessToken) {
+        return res.status(400).json({ 
+          error: "Cannot create subscription in development mode without Shopify session" 
+        });
+      }
+      
+      const bodySchema = z.object({
+        plan: z.enum(["growth", "pro"]),
+      });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid plan. Choose 'growth' or 'pro'" });
+      }
+      const { plan } = parsed.data;
+      
+      const plans: Record<string, { name: string; price: number; trialDays: number }> = {
+        growth: { name: "Shoptimizer Growth", price: 29.99, trialDays: 14 },
+        pro: { name: "Shoptimizer Pro", price: 79.99, trialDays: 14 },
+      };
+      
+      const selectedPlan = plans[plan];
+      const appHost = process.env.SHOPIFY_APP_URL
+        || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000');
+      const returnUrl = `${appHost}/billing?shop=${encodeURIComponent(session.shop)}`;
+      
+      const result = await createAppSubscription(
+        session,
+        selectedPlan.name,
+        selectedPlan.price,
+        returnUrl,
+        selectedPlan.trialDays
+      );
+      
+      console.log(`[Billing] Subscription created for ${session.shop}: ${result.subscriptionId}`);
+      
+      res.json({
+        confirmationUrl: result.confirmationUrl,
+        subscriptionId: result.subscriptionId,
+      });
+    } catch (error) {
+      console.error("[Billing] Error creating subscription:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to create subscription";
+      res.status(500).json({ error: errorMessage });
+    }
+  });
+
+  app.post("/api/billing/cancel", requireShopifySessionOrDev, async (req, res) => {
+    try {
+      const session = (req as any).shopifySession;
+      
+      if (!session?.accessToken) {
+        return res.status(400).json({ 
+          error: "Cannot cancel subscription in development mode without Shopify session" 
+        });
+      }
+      
+      const cancelSchema = z.object({
+        subscriptionId: z.string().min(1),
+      });
+      const parsed = cancelSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Subscription ID required" });
+      }
+      const { subscriptionId } = parsed.data;
+      
+      const activeSubscription = await getActiveSubscription(session);
+      if (!activeSubscription || activeSubscription.id !== subscriptionId) {
+        return res.status(403).json({ error: "Subscription does not belong to this shop" });
+      }
+      
+      await cancelAppSubscription(session, subscriptionId);
+      
+      console.log(`[Billing] Subscription cancelled for ${session.shop}: ${subscriptionId}`);
+      
+      res.json({ success: true, message: "Subscription cancelled successfully" });
+    } catch (error) {
+      console.error("[Billing] Error cancelling subscription:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to cancel subscription";
       res.status(500).json({ error: errorMessage });
     }
   });

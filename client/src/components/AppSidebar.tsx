@@ -9,7 +9,7 @@ import {
   SidebarMenuItem,
   SidebarHeader,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, Beaker, TrendingUp, Settings, Sparkles, FlaskConical } from "lucide-react";
+import { LayoutDashboard, Beaker, TrendingUp, Settings, Sparkles, FlaskConical, CreditCard } from "lucide-react";
 import { Link, useLocation } from "wouter";
 
 const menuItems = [
@@ -37,6 +37,11 @@ const menuItems = [
     title: "Analytics",
     url: "/analytics",
     icon: TrendingUp,
+  },
+  {
+    title: "Plans & Billing",
+    url: "/billing",
+    icon: CreditCard,
   },
   {
     title: "Settings",
