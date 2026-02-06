@@ -1005,14 +1005,14 @@ export default function AIRecommendations() {
               onClick={() => setActiveTab("pending")}
               data-testid="tab-pending"
             >
-              Pending ({recommendations.length})
+              {`Pending (${recommendations.length})`}
             </Button>
             <Button
               variant={activeTab === "archive" ? "primary" : undefined}
               onClick={() => setActiveTab("archive")}
               data-testid="tab-archive"
             >
-              Archive ({archivedRecommendations.length})
+              {`Archive (${archivedRecommendations.length})`}
             </Button>
           </ButtonGroup>
 

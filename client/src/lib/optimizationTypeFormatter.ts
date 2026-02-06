@@ -1,10 +1,3 @@
-/**
- * Format optimization type for display
- * Converts internal optimization type names to user-friendly labels
- * 
- * @param optimizationType - The internal optimization type (e.g., "title", "description", "price")
- * @returns Formatted label (e.g., "Title Optimization", "Description Optimization")
- */
 export function formatOptimizationType(optimizationType: string): string {
   const typeMap: Record<string, string> = {
     'title': 'Title Optimization',
@@ -13,4 +6,20 @@ export function formatOptimizationType(optimizationType: string): string {
   };
 
   return typeMap[optimizationType] || `${optimizationType.charAt(0).toUpperCase()}${optimizationType.slice(1)} Optimization`;
+}
+
+export function getOptimizationTypeBadges(optimizationType: string): string[] {
+  const normalized = optimizationType.toLowerCase().trim();
+
+  if (normalized === 'title and description' || normalized === 'title_description') {
+    return ['Title', 'Description'];
+  }
+
+  const typeMap: Record<string, string> = {
+    'title': 'Title',
+    'description': 'Description',
+    'price': 'Price',
+  };
+
+  return [typeMap[normalized] || optimizationType.charAt(0).toUpperCase() + optimizationType.slice(1)];
 }

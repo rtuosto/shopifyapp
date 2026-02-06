@@ -330,6 +330,7 @@ export default function Dashboard() {
 
   return (
     <Page fullWidth>
+      <BlockStack gap="400">
       <DashboardHeader 
         activeOptimizations={activeOptimizationsCount} 
         lastSync={(() => {
@@ -448,6 +449,7 @@ export default function Dashboard() {
           />
         </Card>
       )}
+      </BlockStack>
     </Page>
   );
 }
