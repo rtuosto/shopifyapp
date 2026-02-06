@@ -63,7 +63,7 @@ Shoptimizer employs a full-stack architecture featuring a React frontend with Sh
 - **Impact Score Tracking**: AI recommendations are assigned impact scores (1-10) based on revenue potential for prioritization.
 - **Multi-Variant Price Optimization**: Supports A/B optimization for products with multiple variants, ensuring proportional price updates and safe rollbacks.
 - **UUID Session-Based Attribution**: Uses UUIDs for persistent variant assignments across user sessions for accurate conversion attribution.
-- **Bayesian A/B Optimization Engine**: All A/B optimizations use Bayesian allocation with Thompson Sampling for dynamic traffic distribution (up to 99/1 splits) with CVaR downside protection and safety budget controls.
+- **Bayesian A/B Optimization Engine**: All A/B optimizations use Bayesian allocation with Thompson Sampling for dynamic traffic distribution (up to 99/1 splits) with adaptive CVaR downside protection (session-based learning floors: 10% → 5% → 3% → 2% emergency brake), periodic challenge bursts (15% variant for 100 impressions every 500 throttled impressions), and safety budget controls.
 - **Settings Page**: Provides instructions for enabling the Theme App Extension (CRO Runtime App Embed) and adding Experiment Slot App Blocks.
 - **Auto-Activation Flow**: Accepted AI recommendations are automatically created and activated with 50/50 allocation.
 - **Dashboard & Optimizations Page**: Displays real-time metrics, performance charts, AI recommendations, and monitors optimizations with ARPU lift tracking. Features a redesigned card layout with inline change previews.
