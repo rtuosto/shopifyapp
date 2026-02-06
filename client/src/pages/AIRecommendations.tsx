@@ -118,22 +118,32 @@ export default function AIRecommendations() {
       return res.json();
     },
     onSuccess: (data, variables) => {
-      if (data.replacement) {
+      queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "archived"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/quota"] });
+      setDismissDialogOpen(false);
+      setDismissingRecommendation(null);
+
+      if (data.replacementPending) {
         toast({
-          title: "Recommendation Replaced",
-          description: "Archived old recommendation and generated a new one",
+          title: "Recommendation Dismissed",
+          description: "A replacement is being generated — it will appear shortly",
         });
+        const pollForReplacement = (attempts: number) => {
+          if (attempts <= 0) return;
+          setTimeout(() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "pending"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/quota"] });
+            pollForReplacement(attempts - 1);
+          }, 3000);
+        };
+        pollForReplacement(5);
       } else {
         toast({
           title: "Recommendation Dismissed",
           description: "Moved to archive",
         });
       }
-      queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "pending"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "archived"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/quota"] });
-      setDismissDialogOpen(false);
-      setDismissingRecommendation(null);
     },
     onError: (error: Error) => {
       toast({

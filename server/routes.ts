@@ -864,71 +864,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { replace = false } = req.body;
       
-      // Get the recommendation
       const rec = await storage.getRecommendation(shop, id);
       if (!rec) {
         return res.status(404).json({ error: "Recommendation not found" });
       }
       
-      // Mark as dismissed
       await storage.updateRecommendation(shop, id, {
         status: "dismissed",
         dismissedAt: new Date(),
       });
       
-      let replacement = null;
-      let quotaUsed = 0;
-      
-      // Generate replacement if requested (beta: unlimited usage)
-      if (replace) {
-        // Get product and active optimizations
-        const product = await storage.getProduct(shop, rec.productId);
-        if (product) {
-          const activeOptimizations = await storage.getActiveOptimizationsByProduct(shop, rec.productId);
-          const activeOptimizationTypes = new Set(activeOptimizations.map(t => t.optimizationType));
-          
-          // Increment quota BEFORE AI call
-          await storage.incrementQuota(shop, 1);
-          quotaUsed = 1;
-          
-          let aiRecommendations;
-          try {
-            // Generate new recommendations
-            aiRecommendations = await generateOptimizationRecommendations({
-              title: product.title,
-              description: product.description || "",
-              price: parseFloat(product.price),
-            });
-          } catch (aiError) {
-            // Rollback quota if AI fails
-            await storage.incrementQuota(shop, -1);
-            quotaUsed = 0;
-            throw aiError;
-          }
-          
-          // Filter conflicts and already-dismissed type
-          const availableRecommendations = aiRecommendations.filter(
-            r => !activeOptimizationTypes.has(r.optimizationType) && r.optimizationType !== rec.optimizationType
-          );
-          
-          if (availableRecommendations.length > 0) {
-            replacement = await storage.createRecommendation(shop, {
-              productId: product.id,
-              ...availableRecommendations[0],
-            });
-          } else {
-            // Rollback quota if no recommendations available
-            await storage.incrementQuota(shop, -1);
-            quotaUsed = 0;
-          }
-        }
-      }
-      
+      // Respond immediately — replacement generates in the background
       res.json({
         dismissed: true,
-        replacement,
-        quotaUsed,
+        replacementPending: replace,
       });
+      
+      // Generate replacement asynchronously (non-blocking)
+      if (replace) {
+        (async () => {
+          try {
+            const product = await storage.getProduct(shop, rec.productId);
+            if (!product) return;
+            
+            const activeOptimizations = await storage.getActiveOptimizationsByProduct(shop, rec.productId);
+            const activeOptimizationTypes = new Set(activeOptimizations.map(t => t.optimizationType));
+            
+            await storage.incrementQuota(shop, 1);
+            
+            let aiRecommendations;
+            try {
+              aiRecommendations = await generateOptimizationRecommendations({
+                title: product.title,
+                description: product.description || "",
+                price: parseFloat(product.price),
+              });
+            } catch (aiError) {
+              await storage.incrementQuota(shop, -1);
+              console.error("[Dismiss & Replace] AI generation failed:", aiError);
+              return;
+            }
+            
+            const availableRecommendations = aiRecommendations.filter(
+              r => !activeOptimizationTypes.has(r.optimizationType) && r.optimizationType !== rec.optimizationType
+            );
+            
+            if (availableRecommendations.length > 0) {
+              await storage.createRecommendation(shop, {
+                productId: product.id,
+                ...availableRecommendations[0],
+              });
+              console.log("[Dismiss & Replace] Replacement recommendation created for product:", product.id);
+            } else {
+              await storage.incrementQuota(shop, -1);
+              console.log("[Dismiss & Replace] No non-conflicting replacement available for product:", product.id);
+            }
+          } catch (bgError) {
+            console.error("[Dismiss & Replace] Background replacement error:", bgError);
+          }
+        })();
+      }
     } catch (error) {
       console.error("Error dismissing recommendation:", error);
       res.status(500).json({ error: "Failed to dismiss recommendation" });
