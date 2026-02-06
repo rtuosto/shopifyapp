@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import AIRecommendationCard from "@/components/AIRecommendationCard";
+import AIRecommendationCard, { AIRecommendationCardSkeleton } from "@/components/AIRecommendationCard";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Product, Recommendation, Optimization } from "@shared/schema";
@@ -28,6 +28,7 @@ export default function AIRecommendations() {
   const [selectedProductId, setSelectedProductId] = useState<string>("");
   const [dismissingRecommendation, setDismissingRecommendation] = useState<Recommendation | null>(null);
   const [activeTab, setActiveTab] = useState<"pending" | "archive">("pending");
+  const [replacementPending, setReplacementPending] = useState(false);
 
   const { data: quotaData } = useQuery<{
     quota: number;
@@ -125,16 +126,26 @@ export default function AIRecommendations() {
       setDismissingRecommendation(null);
 
       if (data.replacementPending) {
+        setReplacementPending(true);
         toast({
           title: "Recommendation Dismissed",
           description: "A replacement is being generated — it will appear shortly",
         });
+        const initialCount = recommendations.length;
         const pollForReplacement = (attempts: number) => {
-          if (attempts <= 0) return;
-          setTimeout(() => {
-            queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "pending"] });
+          if (attempts <= 0) {
+            setReplacementPending(false);
+            return;
+          }
+          setTimeout(async () => {
+            await queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "pending"] });
             queryClient.invalidateQueries({ queryKey: ["/api/quota"] });
-            pollForReplacement(attempts - 1);
+            const updated = queryClient.getQueryData<Recommendation[]>(["/api/recommendations", "pending"]);
+            if (updated && updated.length >= initialCount) {
+              setReplacementPending(false);
+            } else {
+              pollForReplacement(attempts - 1);
+            }
           }, 3000);
         };
         pollForReplacement(5);
@@ -1028,7 +1039,7 @@ export default function AIRecommendations() {
 
           {activeTab === "pending" && (
             <BlockStack gap="400">
-              {recommendations.length === 0 ? (
+              {recommendations.length === 0 && !generateStoreRecommendationsMutation.isPending && !generateProductRecommendationMutation.isPending && !replacementPending ? (
                 <Card>
                   <Box padding="600">
                     <BlockStack gap="400" align="center">
@@ -1066,6 +1077,17 @@ export default function AIRecommendations() {
                       />
                     );
                   })}
+                  {(generateStoreRecommendationsMutation.isPending || generateProductRecommendationMutation.isPending || replacementPending) && (
+                    <>
+                      <AIRecommendationCardSkeleton />
+                      {(generateStoreRecommendationsMutation.isPending || generateProductRecommendationMutation.isPending) && (
+                        <AIRecommendationCardSkeleton />
+                      )}
+                      {generateStoreRecommendationsMutation.isPending && (
+                        <AIRecommendationCardSkeleton />
+                      )}
+                    </>
+                  )}
                 </InlineGrid>
               )}
             </BlockStack>

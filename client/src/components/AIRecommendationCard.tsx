@@ -1,7 +1,43 @@
 import { useState, type ReactNode } from "react";
 import { getOptimizationTypeBadges } from "@/lib/optimizationTypeFormatter";
-import { Card, BlockStack, InlineStack, Text, Button, ButtonGroup, Spinner, Box, Badge, Divider } from "@shopify/polaris";
+import { Card, BlockStack, InlineStack, Text, Button, ButtonGroup, Spinner, Box, Badge, Divider, SkeletonBodyText, SkeletonDisplayText, SkeletonThumbnail } from "@shopify/polaris";
 import { ViewIcon, CheckCircleIcon, XCircleIcon } from "@shopify/polaris-icons";
+
+export function AIRecommendationCardSkeleton() {
+  return (
+    <Card>
+      <BlockStack gap="400">
+        <InlineStack gap="400" blockAlign="start" wrap={false}>
+          <div style={{ borderRadius: '8px', overflow: 'hidden', width: '88px', height: '88px', flexShrink: 0 }}>
+            <SkeletonThumbnail size="large" />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <BlockStack gap="200">
+              <SkeletonDisplayText size="small" />
+              <InlineStack gap="200">
+                <div style={{ width: '52px', height: '20px', borderRadius: '10px', background: 'var(--p-color-bg-fill-tertiary)' }} />
+                <div style={{ width: '72px', height: '20px', borderRadius: '10px', background: 'var(--p-color-bg-fill-tertiary)' }} />
+              </InlineStack>
+            </BlockStack>
+          </div>
+        </InlineStack>
+        <Divider />
+        <BlockStack gap="200">
+          <SkeletonDisplayText size="small" />
+          <SkeletonBodyText lines={3} />
+        </BlockStack>
+        <Divider />
+        <InlineStack align="space-between" blockAlign="center" gap="200">
+          <div style={{ width: '80px', height: '28px', borderRadius: '6px', background: 'var(--p-color-bg-fill-tertiary)' }} />
+          <InlineStack gap="200">
+            <div style={{ width: '80px', height: '28px', borderRadius: '6px', background: 'var(--p-color-bg-fill-tertiary)' }} />
+            <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'var(--p-color-bg-fill-tertiary)' }} />
+          </InlineStack>
+        </InlineStack>
+      </BlockStack>
+    </Card>
+  );
+}
 
 interface AIRecommendationCardProps {
   id: string;
