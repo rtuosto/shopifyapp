@@ -916,27 +916,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
               r => !activeOptimizationTypes.has(r.optimizationType) && !existingTypesForProduct.has(r.optimizationType)
             );
             
+            console.log("[Dismiss & Replace] Dismissed rec productId:", rec.productId, "product.id:", product.id, "product.title:", product.title);
+
             if (availableRecommendations.length > 0) {
+              const { optimizationType, title, description, proposedChanges, insights, impactScore } = availableRecommendations[0];
               await storage.createRecommendation(shop, {
-                productId: product.id,
-                ...availableRecommendations[0],
+                productId: rec.productId,
+                optimizationType,
+                title,
+                description,
+                proposedChanges,
+                insights,
+                impactScore,
               });
-              console.log("[Dismiss & Replace] Replacement recommendation created for product:", product.id);
+              console.log("[Dismiss & Replace] Replacement created for product:", rec.productId, "(", product.title, ") type:", optimizationType);
             } else if (aiRecommendations.length > 0) {
               const fallback = aiRecommendations.filter(r => !activeOptimizationTypes.has(r.optimizationType));
               if (fallback.length > 0) {
+                const { optimizationType, title, description, proposedChanges, insights, impactScore } = fallback[0];
                 await storage.createRecommendation(shop, {
-                  productId: product.id,
-                  ...fallback[0],
+                  productId: rec.productId,
+                  optimizationType,
+                  title,
+                  description,
+                  proposedChanges,
+                  insights,
+                  impactScore,
                 });
-                console.log("[Dismiss & Replace] Fallback replacement created for product:", product.id);
+                console.log("[Dismiss & Replace] Fallback replacement created for product:", rec.productId, "(", product.title, ") type:", optimizationType);
               } else {
                 await storage.incrementQuota(shop, -1);
-                console.log("[Dismiss & Replace] No non-conflicting replacement available for product:", product.id);
+                console.log("[Dismiss & Replace] No non-conflicting replacement available for product:", rec.productId);
               }
             } else {
               await storage.incrementQuota(shop, -1);
-              console.log("[Dismiss & Replace] No replacement available for product:", product.id);
+              console.log("[Dismiss & Replace] No replacement available for product:", rec.productId);
             }
           } catch (bgError) {
             console.error("[Dismiss & Replace] Background replacement error:", bgError);

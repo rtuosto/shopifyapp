@@ -28,7 +28,7 @@ export default function AIRecommendations() {
   const [selectedProductId, setSelectedProductId] = useState<string>("");
   const [dismissingRecommendation, setDismissingRecommendation] = useState<Recommendation | null>(null);
   const [activeTab, setActiveTab] = useState<"pending" | "archive">("pending");
-  const [replacementPendingForProduct, setReplacementPendingForProduct] = useState<string | null>(null);
+  const [replacementPendingInfo, setReplacementPendingInfo] = useState<{ productId: string; dismissedIndex: number } | null>(null);
 
   const { data: quotaData } = useQuery<{
     quota: number;
@@ -120,6 +120,7 @@ export default function AIRecommendations() {
     },
     onSuccess: (data, variables) => {
       const { productId } = variables;
+      const dismissedIndex = recommendations.findIndex(r => r.id === variables.id);
 
       const preExistingRecIds = new Set(
         recommendations
@@ -128,7 +129,10 @@ export default function AIRecommendations() {
       );
 
       if (data.replacementPending && productId) {
-        setReplacementPendingForProduct(productId);
+        setReplacementPendingInfo({
+          productId,
+          dismissedIndex: dismissedIndex >= 0 ? dismissedIndex : 0,
+        });
       }
 
       setDismissDialogOpen(false);
@@ -145,24 +149,34 @@ export default function AIRecommendations() {
         });
         const pollForReplacement = (attempts: number) => {
           if (attempts <= 0) {
-            setReplacementPendingForProduct(null);
+            setReplacementPendingInfo(null);
+            queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "pending"] });
             return;
           }
           setTimeout(async () => {
-            await queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "pending"] });
-            queryClient.invalidateQueries({ queryKey: ["/api/quota"] });
-            const updated = queryClient.getQueryData<Recommendation[]>(["/api/recommendations", "pending"]);
-            const hasNewRecForProduct = updated?.some(
-              r => r.productId === productId && !preExistingRecIds.has(r.id) && r.id !== variables.id
-            );
-            if (hasNewRecForProduct) {
-              setReplacementPendingForProduct(null);
-            } else {
+            try {
+              const res = await fetch("/api/recommendations?status=pending");
+              if (!res.ok) {
+                pollForReplacement(attempts - 1);
+                return;
+              }
+              const freshRecs: Recommendation[] = await res.json();
+              const hasNewRecForProduct = freshRecs.some(
+                r => r.productId === productId && !preExistingRecIds.has(r.id) && r.id !== variables.id
+              );
+              if (hasNewRecForProduct) {
+                setReplacementPendingInfo(null);
+                queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "pending"] });
+                queryClient.invalidateQueries({ queryKey: ["/api/quota"] });
+              } else {
+                pollForReplacement(attempts - 1);
+              }
+            } catch {
               pollForReplacement(attempts - 1);
             }
-          }, 3000);
+          }, 4000);
         };
-        pollForReplacement(5);
+        pollForReplacement(8);
       } else {
         toast({
           title: "Recommendation Dismissed",
@@ -1053,7 +1067,7 @@ export default function AIRecommendations() {
 
           {activeTab === "pending" && (
             <BlockStack gap="400">
-              {recommendations.length === 0 && !generateStoreRecommendationsMutation.isPending && !generateProductRecommendationMutation.isPending && !replacementPendingForProduct ? (
+              {recommendations.length === 0 && !generateStoreRecommendationsMutation.isPending && !generateProductRecommendationMutation.isPending && !replacementPendingInfo ? (
                 <Card>
                   <Box padding="600">
                     <BlockStack gap="400" align="center">
@@ -1074,14 +1088,12 @@ export default function AIRecommendations() {
                 <InlineGrid columns={2} gap="400">
                   {(() => {
                     const cards: React.ReactNode[] = [];
-                    let replacementSkeletonInserted = false;
                     recommendations.forEach((rec, index) => {
+                      if (replacementPendingInfo && index === replacementPendingInfo.dismissedIndex) {
+                        cards.push(<AIRecommendationCardSkeleton key="replacement-skeleton" />);
+                      }
                       const product = products.find(p => p.id === rec.productId);
                       const productImage = product?.images?.[0];
-                      if (replacementPendingForProduct && rec.productId === replacementPendingForProduct && !replacementSkeletonInserted) {
-                        cards.push(<AIRecommendationCardSkeleton key="replacement-skeleton" />);
-                        replacementSkeletonInserted = true;
-                      }
                       cards.push(
                         <AIRecommendationCard
                           key={rec.id}
@@ -1098,7 +1110,7 @@ export default function AIRecommendations() {
                         />
                       );
                     });
-                    if (replacementPendingForProduct && !replacementSkeletonInserted) {
+                    if (replacementPendingInfo && replacementPendingInfo.dismissedIndex >= recommendations.length) {
                       cards.push(<AIRecommendationCardSkeleton key="replacement-skeleton" />);
                     }
                     return cards;
