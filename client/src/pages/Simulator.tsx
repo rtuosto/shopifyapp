@@ -148,6 +148,12 @@ export default function Simulator() {
         allocationAfter: data.allocationAfter,
         variantPerformance: data.variantPerformance,
         bayesianUpdate: data.bayesianUpdate,
+        metrics: {
+          totalImpressions: Number(data.impressions) || 0,
+          totalConversions: Number(data.conversions) || 0,
+          totalRevenue: String(data.revenue || "0"),
+          arpu: String(data.arpu || "0"),
+        },
       };
       setLastSimulationResult(result);
       
@@ -222,6 +228,12 @@ export default function Simulator() {
         allocationAfter: data.allocationAfter,
         variantPerformance: data.variantPerformance,
         bayesianUpdate: data.bayesianUpdate,
+        metrics: {
+          totalImpressions: Number(data.impressions) || 0,
+          totalConversions: Number(data.conversions) || 0,
+          totalRevenue: String(data.revenue || "0"),
+          arpu: String(data.arpu || "0"),
+        },
       };
       setLastSimulationResult(result);
 

@@ -2678,13 +2678,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Update optimization metrics with aggregate counters
-      const newControlConversions = (optimization.controlConversions || 0) + controlOrders;
-      const newVariantConversions = (optimization.variantConversions || 0) + variantOrders;
-      const newConversions = (optimization.conversions || 0) + orders;
-      const newControlRevenue = parseFloat(optimization.controlRevenue || "0") + controlRevenue;
-      const newVariantRevenue = parseFloat(optimization.variantRevenue || "0") + variantRevenue;
-      const newRevenue = parseFloat(optimization.revenue || "0") + totalRevenue;
+      const newControlConversions = (Number(optimization.controlConversions) || 0) + controlOrders;
+      const newVariantConversions = (Number(optimization.variantConversions) || 0) + variantOrders;
+      const newConversions = (Number(optimization.conversions) || 0) + orders;
+      const newControlRevenue = parseFloat(String(optimization.controlRevenue || "0")) + controlRevenue;
+      const newVariantRevenue = parseFloat(String(optimization.variantRevenue || "0")) + variantRevenue;
+      const newRevenue = parseFloat(String(optimization.revenue || "0")) + totalRevenue;
       
       // Calculate ARPU for each variant
       const controlArpu = newControlConversions > 0 ? newControlRevenue / newControlConversions : 0;
@@ -3251,9 +3250,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newControlRevenue = parseFloat(optimization.controlRevenue || "0") + controlRevenue;
       const newVariantRevenue = parseFloat(optimization.variantRevenue || "0") + variantRevenue;
       
-      const newImpressions = (Number(optimization.impressions) || 0) + visitors;
+      const newImpressions = (Number(optimization.impressions) || 0) + visitorsNum;
       const newConversions = (Number(optimization.conversions) || 0) + totalConversions;
-      const newRevenue = parseFloat(optimization.revenue || "0") + totalRevenue;
+      const newRevenue = parseFloat(String(optimization.revenue || "0")) + totalRevenue;
       const arpu = newConversions > 0 ? newRevenue / newConversions : 0;
 
       const updatedOptimization = await storage.updateOptimization(shop, optimizationIdStr, {
@@ -3512,7 +3511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       for (const optimization of legacyOptimizations) {
         // Get product for price estimation
-        const product = await storage.getProduct(shop, optimization.productId);
+        const product = await storage.getProduct(shop, optimization.productId!);
         if (!product) {
           console.log(`[Migration] Skipping optimization ${optimization.id} - product not found`);
           continue;
