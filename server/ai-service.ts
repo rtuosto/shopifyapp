@@ -38,13 +38,33 @@ interface OptimizationRecommendation {
     title: string;
     description: string;
   }>;
-  impactScore?: number; // 1-10 score for revenue impact (optional for single-product generation)
+  impactScore?: number;
 }
+
+const ANTI_HALLUCINATION_RULES = `
+STRICT ANTI-HALLUCINATION RULES — VIOLATION OF THESE WILL RENDER THE RECOMMENDATION UNUSABLE:
+1. You may ONLY reference facts explicitly provided in the Product Details above.
+2. NEVER invent, assume, or imply product specifications (materials, dimensions, weight, technical details, features, ingredients, compatibility).
+3. NEVER invent warranty terms, return policies, shipping details, or guarantees.
+4. NEVER invent variant details (sizes, colors, SKUs) unless explicitly listed above.
+5. NEVER fabricate customer reviews, ratings, testimonials, or sales figures.
+6. NEVER invent competitor names, competitor prices, or market data.
+7. For DESCRIPTION recommendations: propose a structural outline and tone — use "[insert specific details]" placeholders where the merchant needs to add their own product facts. Do NOT write fictional product specs.
+8. For TITLE recommendations: only rearrange, rephrase, or add general power words to the existing title. Do NOT add claims about the product you cannot verify.
+9. For PRICE recommendations: base suggestions only on the actual current price. Do NOT reference imaginary competitor pricing or market research.
+10. The "description" field (your reasoning) must explain your STRATEGY and WHY it works — not repeat invented product details.
+
+GOOD example of a description recommendation proposedChanges:
+{"description": "Introducing the [Product Name]\\n\\nKey Benefits:\\n• [Insert primary benefit]\\n• [Insert secondary benefit]\\n• [Insert unique selling point]\\n\\nSpecifications:\\n• [Insert material/specs]\\n• [Insert dimensions/size]\\n\\nOrder with confidence — [insert your return/warranty policy]."}
+
+BAD example (invents specs):
+{"description": "This premium carbon fiber snowboard features a 158cm camber profile with sintered base technology and a 2-year warranty..."}
+`;
 
 export async function generateOptimizationRecommendations(
   product: ProductData
 ): Promise<OptimizationRecommendation[]> {
-  const prompt = `You are an expert e-commerce conversion rate optimization specialist. Analyze this Shopify product and provide 2-3 specific, actionable optimization recommendations.
+  const prompt = `Analyze this Shopify product and provide 2-3 specific, actionable optimization recommendations.
 
 Product Details:
 - Title: ${product.title}
@@ -54,42 +74,27 @@ ${product.category ? `- Category: ${product.category}` : ''}
 ${product.variantCount ? `- Number of Variants: ${product.variantCount}` : ''}
 ${product.imageCount ? `- Number of Images: ${product.imageCount}` : ''}
 
-CRITICAL ANTI-HALLUCINATION RULES:
-1. NEVER invent product specifications (materials, dimensions, technical details, features)
-2. NEVER invent warranty, return, or shipping policies
-3. NEVER invent specific variant details (sizes, colors, SKUs) unless explicitly provided above
-4. NEVER make up customer reviews, ratings, or testimonials
-5. For description recommendations: suggest STRUCTURE, TONE, and APPROACH only - do NOT write full descriptions with invented specs
-6. For price recommendations: base suggestions on the actual price provided, not imaginary competitor data
-7. Only reference information explicitly provided in the Product Details section above
-
-If the current description is missing or weak, recommend adding GENERAL benefit-focused copy, SEO keywords, and persuasive structure - but NEVER invent specific product features or technical specifications.
+${ANTI_HALLUCINATION_RULES}
 
 For each recommendation, provide:
-1. optimizationType: What to change ("title", "price", "description", or "image")
-2. title: A brief title for the recommendation
-3. description: Why this change will work
-4. proposedChanges: An object containing the ACTUAL new values (e.g., {"title": "new title here"} or {"price": 99.99} or {"description": "new description"})
-5. insights: Array of objects with type, title, and description explaining the psychology/SEO/competitive reasoning
-6. impactScore: A 1-10 score representing expected revenue impact (1=low impact, 10=transformative)
-
-CRITICAL: 
-- The proposedChanges object MUST contain the actual new value(s), not instructions or descriptions
-- Always include impactScore based on expected conversion lift and revenue impact
-
-Examples:
-- For title change: {"title": "Premium Snowboard - Professional Quality"}
-- For price change: {"price": 899.95}
-- For description change: {"description": "This premium snowboard features..."}
+1. optimizationType: What to change ("title", "price", or "description")
+2. title: A brief, actionable title for the recommendation (e.g., "Add benefit-driven keywords to title")
+3. description: A concise explanation of your STRATEGY and why it improves conversions. Keep this focused on the approach, not on invented product details.
+4. proposedChanges: An object containing the proposed new value:
+   - For title: {"title": "Your Proposed New Title Here"}
+   - For price: {"price": 99.99}
+   - For description: {"description": "A structured template with [placeholder] markers where the merchant inserts their own facts"}
+5. insights: Array of 1-2 objects with type ("psychology"|"seo"|"data"), title, and description explaining the reasoning
+6. impactScore: 1-10 score of expected revenue impact
 
 Focus on:
-- Power words and psychological triggers
-- SEO optimization
-- Price psychology (e.g., charm pricing, prestige pricing)
-- Clear value propositions
-- Competitive positioning
+- Structural improvements (better layout, scannable formatting, clear hierarchy)
+- Power words and psychological triggers based on the EXISTING title/description
+- SEO keyword positioning using words already present or obviously relevant to the product category
+- Price psychology (charm pricing, anchoring) based on the ACTUAL listed price
+- Clarity and value proposition improvements
 
-Return your response as a JSON object with a "recommendations" array.`;
+Return a JSON object with a "recommendations" array.`;
 
   try {
     const response = await openai.chat.completions.create({
@@ -97,14 +102,13 @@ Return your response as a JSON object with a "recommendations" array.`;
       messages: [
         {
           role: "system",
-          content: "You are an expert e-commerce optimization AI that provides data-driven, actionable recommendations to improve product conversion rates. You always respond with valid JSON.",
+          content: "You are an expert e-commerce conversion rate optimization specialist. You give strategic advice on how to improve product listings. You NEVER invent product specifications, policies, or details that were not provided to you. You always respond with valid JSON.",
         },
         {
           role: "user",
           content: prompt,
         },
       ],
-      // GPT-5-mini uses default temperature (1.0) - custom temperature not supported
       response_format: { type: "json_object" },
     });
 
@@ -114,11 +118,8 @@ Return your response as a JSON object with a "recommendations" array.`;
     }
 
     const parsed = JSON.parse(content);
-    
-    // Handle both array and object responses
     const recommendations = Array.isArray(parsed) ? parsed : (parsed.recommendations || []);
 
-    // Log GPT response for debugging impact scores
     console.log("[AI Service] Single-product recommendations received:", JSON.stringify(recommendations, null, 2));
 
     return recommendations.map((rec: any) => ({
@@ -127,42 +128,37 @@ Return your response as a JSON object with a "recommendations" array.`;
       optimizationType: rec.optimizationType || "title",
       proposedChanges: rec.proposedChanges || {},
       insights: rec.insights || [],
-      impactScore: rec.impactScore || 5, // Extract impact score from GPT response
+      impactScore: rec.impactScore || 5,
     }));
   } catch (error) {
     console.error("Error generating recommendations:", error);
     
-    // Fallback recommendations if AI fails
     return [
       {
         title: "Optimize Product Title for SEO",
-        description: "Enhance your product title with relevant keywords and power words to improve search visibility and click-through rates.",
+        description: "Restructure the title to lead with high-intent keywords, improving search visibility and click-through rates.",
         optimizationType: "title",
         proposedChanges: {
-          title: `Premium ${product.title} - Professional Quality`,
+          title: `${product.title} — Premium Quality`,
         },
         insights: [
           {
             type: "seo",
-            title: "Keyword Optimization",
-            description: "Adding descriptive keywords improves search engine visibility and organic traffic.",
+            title: "Keyword Positioning",
+            description: "Leading with descriptive keywords improves search engine visibility and organic traffic.",
           },
           {
             type: "psychology",
-            title: "Power Words",
-            description: "Words like 'Premium' and 'Professional' create perceived value and quality.",
+            title: "Value Signaling",
+            description: "Appending quality descriptors reinforces perceived value without inventing product claims.",
           },
         ],
-        impactScore: 5, // Default fallback score
+        impactScore: 5,
       },
     ];
   }
 }
 
-/**
- * Generate batch recommendations for store-wide analysis
- * Analyzes multiple products in a single AI call and returns prioritized recommendations
- */
 export async function generateBatchRecommendations(
   products: BatchProductData[],
   targetCount: number = 10
@@ -177,35 +173,37 @@ export async function generateBatchRecommendations(
 - Description: ${p.description ? (p.description.substring(0, 150) + '...') : 'None'}`
   ).join('\n\n');
 
-  const prompt = `You are an expert e-commerce conversion rate optimization specialist analyzing a Shopify store's product catalog.
-
-You have ${products.length} products to analyze. Your goal is to identify the ${targetCount} HIGHEST-IMPACT optimization opportunities across the entire store.
+  const prompt = `Analyze this Shopify store's product catalog and identify the ${targetCount} HIGHEST-IMPACT optimization opportunities.
 
 Product Catalog:
 ${productSummaries}
 
+${ANTI_HALLUCINATION_RULES}
+
 Prioritization Criteria:
-1. **Revenue Impact**: Products with high margins or sales volumes have bigger impact potential
-2. **Quick Wins**: Products with obvious gaps (no description, weak titles) are easy to improve
-3. **Hidden Gems**: High-margin products with low sales need better messaging
-4. **Top Performers**: Best-sellers with room for improvement can drive major gains
+1. Revenue Impact: Products with high margins or sales volumes benefit most from optimization
+2. Quick Wins: Products with missing descriptions or weak titles are easy to improve
+3. Hidden Gems: High-margin products with low sales need better messaging
+4. Top Performers: Best-sellers with room for improvement can drive major gains
 
 For each of your TOP ${targetCount} recommendations, provide:
-1. productId: The ID of the product from the list above (e.g., "ID: abc-123" → use "abc-123")
-2. optimizationType: What to change ("title", "price", "description")
-3. title: A brief title for the recommendation
-4. description: Why this change will work and its expected impact
-5. proposedChanges: An object with the ACTUAL new values (not instructions)
-6. insights: Array of objects explaining the psychology/SEO/data reasoning
-7. impactScore: 1-10 score of expected revenue impact
+1. productId: The exact ID from the product list above
+2. optimizationType: What to change ("title", "price", or "description")
+3. title: A brief, actionable title for the recommendation
+4. description: A concise explanation of your STRATEGY and why it will improve conversions. Focus on the approach (e.g., "restructure title to lead with category keyword"), not on invented product details.
+5. proposedChanges: An object with the proposed new value:
+   - For title: {"title": "Your Proposed New Title"}
+   - For price: {"price": 99.99}
+   - For description: {"description": "Structured template with [placeholder] markers for merchant-specific facts"}
+6. insights: Array of 1-2 objects with type ("psychology"|"seo"|"data"), title, and description
+7. impactScore: 1-10 score based on margin x sales x improvement potential
 
-CRITICAL: 
+CRITICAL:
 - Return EXACTLY ${targetCount} recommendations
 - Focus on products with highest profit/revenue potential
-- proposedChanges must contain actual new values, not descriptions
-- Include impactScore (1-10) based on margin × sales × improvement potential
+- NEVER invent product features, specs, materials, policies, or any facts not provided above
 
-Return your response as a JSON object with a "recommendations" array, sorted by impactScore descending.`;
+Return a JSON object with a "recommendations" array, sorted by impactScore descending.`;
 
   try {
     const response = await openai.chat.completions.create({
@@ -213,14 +211,13 @@ Return your response as a JSON object with a "recommendations" array, sorted by 
       messages: [
         {
           role: "system",
-          content: "You are an expert e-commerce optimization AI that analyzes entire product catalogs and identifies the highest-impact optimization opportunities. You always respond with valid JSON and prioritize recommendations by revenue impact.",
+          content: "You are an expert e-commerce optimization specialist analyzing product catalogs. You identify high-impact optimization opportunities based ONLY on the data provided. You NEVER invent product specifications, policies, or details. You always respond with valid JSON and prioritize by revenue impact.",
         },
         {
           role: "user",
           content: prompt,
         },
       ],
-      // GPT-5-mini uses default temperature (1.0) - custom temperature not supported
       response_format: { type: "json_object" },
     });
 
@@ -232,7 +229,6 @@ Return your response as a JSON object with a "recommendations" array, sorted by 
     const parsed = JSON.parse(content);
     const recommendations = Array.isArray(parsed) ? parsed : (parsed.recommendations || []);
 
-    // Log GPT response for debugging impact scores
     console.log("[AI Service] Batch recommendations received:", JSON.stringify({
       count: recommendations.length,
       impactScores: recommendations.map((r: any) => ({ title: r.title, impactScore: r.impactScore }))
@@ -245,25 +241,24 @@ Return your response as a JSON object with a "recommendations" array, sorted by 
       optimizationType: rec.optimizationType || "title",
       proposedChanges: rec.proposedChanges || {},
       insights: rec.insights || [],
-      impactScore: rec.impactScore || 5, // AI's 1-10 revenue impact score (default to 5 if missing)
-    })).slice(0, targetCount); // Ensure we don't exceed target count
+      impactScore: rec.impactScore || 5,
+    })).slice(0, targetCount);
   } catch (error) {
     console.error("Error generating batch recommendations:", error);
     
-    // Fallback: generate one recommendation per product (up to targetCount)
     return products.slice(0, targetCount).map(product => ({
       productId: product.id,
       title: `Optimize "${product.title}" for Better Conversions`,
-      description: "Enhance this product's messaging to improve click-through and conversion rates.",
+      description: "Restructure this product's title and messaging to improve search visibility and click-through rates.",
       optimizationType: "title" as const,
       proposedChanges: {
-        title: `Premium ${product.title} - Professional Quality`,
+        title: `${product.title} — Premium Quality`,
       },
       insights: [
         {
           type: "psychology" as const,
-          title: "Power Words",
-          description: "Adding 'Premium' and 'Professional' creates perceived value.",
+          title: "Value Signaling",
+          description: "Clear value language reinforces perceived quality.",
         },
         {
           type: "seo" as const,
@@ -271,8 +266,7 @@ Return your response as a JSON object with a "recommendations" array, sorted by 
           description: "Descriptive keywords improve search visibility.",
         },
       ],
-      impactScore: 5, // Default middle score for fallback recommendations
+      impactScore: 5,
     }));
   }
 }
-
