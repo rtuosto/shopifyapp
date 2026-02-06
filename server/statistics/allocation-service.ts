@@ -14,6 +14,10 @@ import {
 import { computeTTTSAllocation, applyAllocationConstraints, AllocationResult } from './policy';
 import {
   shouldThrottleVariant,
+  evaluateThrottle,
+  computeAdaptiveThrottleCap,
+  evaluateChallengeBurst,
+  ChallengeBurstState,
   getVariantFloorFromRamp,
   getControlFloorFromConfidence,
   calculateEOC,
@@ -51,7 +55,8 @@ export interface BayesianState {
   variantStart?: number;
   lastAllocationUpdate?: string;
   promotionCheckCount?: number;
-  lastTotalImpressions?: number; // Track impressions from last update to calculate delta
+  lastTotalImpressions?: number;
+  challengeBurst?: ChallengeBurstState;
 }
 
 export interface AllocationUpdateResult {
@@ -102,6 +107,11 @@ export function initializeBayesianState(params?: {
     lastAllocationUpdate: new Date().toISOString(),
     promotionCheckCount: 0,
     lastTotalImpressions: 0,
+    challengeBurst: {
+      lastChallengeAt: 0,
+      burstActive: false,
+      burstTargetImpressions: 0,
+    },
   };
 }
 
@@ -220,10 +230,10 @@ export function computeAllocationUpdate(
   const meanVariantARPU = calculateMeanARPU(variantModel);
   const eocPer1000 = calculateEOC(controlModel, variantModel, 4096, seed);
 
-  // Check CVaR throttle
-  const shouldThrottle = shouldThrottleVariant(controlModel, variantModel, 0.05, 2048, seed);
+  const totalImpressions = metrics.controlImpressions + metrics.variantImpressions;
 
-  // Compute raw TTTS allocation
+  const throttleResult = evaluateThrottle(controlModel, variantModel, 0.05, 2048, seed);
+
   let rawAllocation = computeTTTSAllocation(
     controlModel,
     variantModel,
@@ -231,19 +241,35 @@ export function computeAllocationUpdate(
     seed
   );
 
-  // CVaR throttle: if variant shows excessive downside risk, cap at 2%
-  if (shouldThrottle) {
-    rawAllocation = {
-      control: Math.max(0.98, rawAllocation.control),
-      variant: Math.min(0.02, rawAllocation.variant),
-    };
+  const burstEval = evaluateChallengeBurst(
+    bayesianState.challengeBurst,
+    totalImpressions,
+    throttleResult.shouldThrottle
+  );
+
+  let throttleActive = false;
+  if (throttleResult.shouldThrottle) {
+    if (burstEval.inBurst) {
+      rawAllocation = {
+        control: 1 - burstEval.burstAllocation,
+        variant: burstEval.burstAllocation,
+      };
+    } else {
+      const adaptiveCap = computeAdaptiveThrottleCap(
+        metrics.variantImpressions,
+        totalImpressions
+      );
+      rawAllocation = {
+        control: Math.max(1 - adaptiveCap, rawAllocation.control),
+        variant: Math.min(adaptiveCap, rawAllocation.variant),
+      };
+      throttleActive = true;
+    }
   }
 
-  // Apply minimal floors for statistical validity only (1% each)
-  const controlFloor = 0.01; // 1% minimum for valid statistics
-  const variantFloor = 0.01; // 1% minimum for valid statistics
+  const controlFloor = 0.01;
+  const variantFloor = 0.01;
 
-  // Apply minimal floors
   const allocation = applyAllocationConstraints(
     rawAllocation,
     controlFloor,
@@ -311,28 +337,33 @@ export function computeAllocationUpdate(
   // Determine if we should stop (safety budget exhausted)
   const shouldStop = safetyBudgetRemaining <= 0 && !promotionCheck.shouldPromote;
 
-  // Build reasoning
   let reasoning = `P(variant wins) = ${(probabilityVariantWins * 100).toFixed(1)}%. `;
   reasoning += `Control floor = ${(controlFloor * 100).toFixed(1)}%, `;
   reasoning += `Variant floor = ${(variantFloor * 100).toFixed(1)}%. `;
-  if (shouldThrottle) {
-    reasoning += `CVaR throttle active (downside risk). `;
+  if (throttleResult.shouldThrottle) {
+    if (burstEval.inBurst) {
+      reasoning += `CVaR throttle active but in challenge burst (${(burstEval.burstAllocation * 100).toFixed(0)}% variant). `;
+    } else if (throttleActive) {
+      const adaptiveCap = computeAdaptiveThrottleCap(metrics.variantImpressions, totalImpressions);
+      reasoning += `Adaptive CVaR throttle active (cap ${(adaptiveCap * 100).toFixed(0)}%, severity ${(throttleResult.severity * 100).toFixed(0)}%). `;
+    }
   }
   if (promotionCheck.shouldPromote) {
-    reasoning += `✓ PROMOTION READY: All criteria met. `;
+    reasoning += `PROMOTION READY: All criteria met. `;
   }
   if (shouldStop) {
-    reasoning += `⚠ STOP: Safety budget exhausted ($${safetyBudgetRemaining.toFixed(2)} remaining).`;
+    reasoning += `STOP: Safety budget exhausted ($${safetyBudgetRemaining.toFixed(2)} remaining).`;
   }
 
   return {
     allocation,
     bayesianState: {
       ...bayesianState,
-      controlFloor, // Store the calculated dynamic control floor
+      controlFloor,
       safetyBudgetRemaining,
       promotionCheckCount: (bayesianState.promotionCheckCount || 0) + 1,
       lastTotalImpressions: currentTotalImpressions,
+      challengeBurst: burstEval.burst,
     },
     metrics: {
       probabilityVariantWins,

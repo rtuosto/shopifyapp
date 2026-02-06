@@ -43,25 +43,22 @@ export function calculateCVaR(samples: number[], quantile: number): number {
   return tailSamples.reduce((sum, x) => sum + x, 0) / tailSamples.length;
 }
 
-/**
- * Check if variant should be throttled based on CVaR
- * @param controlModel Control arm model
- * @param variantModel Variant arm model
- * @param cvarQuantile CVaR quantile (default 0.05 for 5%)
- * @param numSamples Number of Monte Carlo samples
- * @param seed RNG seed
- * @returns true if variant CVaR is worse than control (should throttle)
- */
-export function shouldThrottleVariant(
+export interface ThrottleResult {
+  shouldThrottle: boolean;
+  controlCVaR: number;
+  variantCVaR: number;
+  severity: number;
+}
+
+export function evaluateThrottle(
   controlModel: ARPUModel,
   variantModel: ARPUModel,
   cvarQuantile: number = 0.05,
   numSamples: number = 2048,
   seed?: number
-): boolean {
+): ThrottleResult {
   const rng = new XorShift32(seed);
 
-  // Generate samples
   const controlSamples: number[] = [];
   const variantSamples: number[] = [];
 
@@ -70,12 +67,114 @@ export function shouldThrottleVariant(
     variantSamples.push(sampleARPU(variantModel, rng));
   }
 
-  // Calculate CVaR
   const controlCVaR = calculateCVaR(controlSamples, cvarQuantile);
   const variantCVaR = calculateCVaR(variantSamples, cvarQuantile);
 
-  // Throttle if variant's downside is worse than control
-  return variantCVaR < controlCVaR;
+  const shouldThrottle = variantCVaR < controlCVaR;
+
+  let severity = 0;
+  if (shouldThrottle && controlCVaR > 0) {
+    severity = Math.min(1, (controlCVaR - variantCVaR) / controlCVaR);
+  }
+
+  return { shouldThrottle, controlCVaR, variantCVaR, severity };
+}
+
+export function shouldThrottleVariant(
+  controlModel: ARPUModel,
+  variantModel: ARPUModel,
+  cvarQuantile: number = 0.05,
+  numSamples: number = 2048,
+  seed?: number
+): boolean {
+  return evaluateThrottle(controlModel, variantModel, cvarQuantile, numSamples, seed).shouldThrottle;
+}
+
+export function computeAdaptiveThrottleCap(
+  variantSessions: number,
+  totalImpressions: number
+): number {
+  const EMERGENCY_FLOOR = 0.02;
+  const LEARNING_TARGET_SESSIONS = 200;
+
+  let learningFloor: number;
+  if (variantSessions < LEARNING_TARGET_SESSIONS) {
+    learningFloor = Math.max(0.10, LEARNING_TARGET_SESSIONS / Math.max(totalImpressions, 1));
+    learningFloor = Math.min(learningFloor, 0.20);
+  } else if (variantSessions < 500) {
+    learningFloor = 0.05;
+  } else if (variantSessions < 1000) {
+    learningFloor = 0.03;
+  } else {
+    learningFloor = EMERGENCY_FLOOR;
+  }
+
+  return Math.max(EMERGENCY_FLOOR, learningFloor);
+}
+
+export interface ChallengeBurstState {
+  lastChallengeAt: number;
+  burstActive: boolean;
+  burstTargetImpressions: number;
+}
+
+export function evaluateChallengeBurst(
+  currentState: ChallengeBurstState | undefined,
+  totalImpressions: number,
+  isThrottled: boolean
+): { burst: ChallengeBurstState; inBurst: boolean; burstAllocation: number } {
+  const BURST_INTERVAL = 500;
+  const BURST_SIZE = 100;
+  const BURST_VARIANT_SHARE = 0.15;
+
+  const state: ChallengeBurstState = currentState || {
+    lastChallengeAt: 0,
+    burstActive: false,
+    burstTargetImpressions: 0,
+  };
+
+  if (!isThrottled) {
+    return {
+      burst: { ...state, burstActive: false, burstTargetImpressions: 0 },
+      inBurst: false,
+      burstAllocation: 0,
+    };
+  }
+
+  if (state.burstActive && totalImpressions < state.burstTargetImpressions) {
+    return {
+      burst: state,
+      inBurst: true,
+      burstAllocation: BURST_VARIANT_SHARE,
+    };
+  }
+
+  if (state.burstActive && totalImpressions >= state.burstTargetImpressions) {
+    return {
+      burst: { ...state, burstActive: false, burstTargetImpressions: 0 },
+      inBurst: false,
+      burstAllocation: 0,
+    };
+  }
+
+  const impressionsSinceLastChallenge = totalImpressions - state.lastChallengeAt;
+  if (impressionsSinceLastChallenge >= BURST_INTERVAL) {
+    return {
+      burst: {
+        lastChallengeAt: totalImpressions,
+        burstActive: true,
+        burstTargetImpressions: totalImpressions + BURST_SIZE,
+      },
+      inBurst: true,
+      burstAllocation: BURST_VARIANT_SHARE,
+    };
+  }
+
+  return {
+    burst: state,
+    inBurst: false,
+    burstAllocation: 0,
+  };
 }
 
 /**
