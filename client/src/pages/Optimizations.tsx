@@ -228,6 +228,7 @@ export default function Optimizations() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [productSearch, setProductSearch] = useState<string>("");
+  const [upgradeMessage, setUpgradeMessage] = useState<string | null>(null);
 
   const { data: optimizations = [], isLoading: optimizationsLoading } = useQuery<Optimization[]>({
     queryKey: ["/api/optimizations"],
@@ -278,16 +279,20 @@ export default function Optimizations() {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
     },
     onError: (error: Error) => {
-      let title = "Activation Failed";
-      let description = error.message || "Failed to activate optimization";
-      if (description.includes("active") && description.includes("optimization")) {
-        title = "Conflicting Optimization Active";
+      if ((error as any).upgradeRequired) {
+        setUpgradeMessage(error.message);
+      } else {
+        let title = "Activation Failed";
+        let description = error.message || "Failed to activate optimization";
+        if (description.includes("active") && description.includes("optimization")) {
+          title = "Conflicting Optimization Active";
+        }
+        toast({
+          title,
+          description,
+          variant: "destructive",
+        });
       }
-      toast({
-        title,
-        description,
-        variant: "destructive",
-      });
     },
   });
 
@@ -394,6 +399,17 @@ export default function Optimizations() {
             Manage all your A/B optimizations - draft, active, paused, and completed
           </Text>
         </BlockStack>
+
+        {upgradeMessage && (
+          <Banner
+            title="Plan limit reached"
+            tone="warning"
+            onDismiss={() => setUpgradeMessage(null)}
+            action={{ content: "View Plans", url: "/billing" }}
+          >
+            <Text as="p" variant="bodyMd">{upgradeMessage}</Text>
+          </Banner>
+        )}
 
         <Card data-testid="card-filters">
           <Box padding="400">

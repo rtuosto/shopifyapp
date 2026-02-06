@@ -1,13 +1,11 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-// Get shop parameter from current URL
 function getShopParam(): string | null {
   if (typeof window === 'undefined') return null;
   const urlParams = new URLSearchParams(window.location.search);
   return urlParams.get('shop');
 }
 
-// Add shop parameter to URL if it exists in the current page URL
 function addShopToUrl(url: string): string {
   const shop = getShopParam();
   if (!shop) return url;
@@ -16,17 +14,34 @@ function addShopToUrl(url: string): string {
   return `${url}${separator}shop=${encodeURIComponent(shop)}`;
 }
 
+let authErrorCallback: ((redirectUrl: string) => void) | null = null;
+
+export function setAuthErrorCallback(cb: (redirectUrl: string) => void) {
+  authErrorCallback = cb;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
+    let errorMessage = res.statusText || "Request failed";
+    let redirectUrl: string | null = null;
+    let upgradeRequired = false;
     try {
       const json = await res.json();
-      const errorMessage = json.error || res.statusText;
-      throw new Error(errorMessage);
-    } catch (parseError) {
-      // If JSON parsing fails, fall back to status text
-      const text = res.statusText || "Request failed";
-      throw new Error(text);
+      errorMessage = json.error || errorMessage;
+      redirectUrl = json.redirectUrl || null;
+      upgradeRequired = json.upgradeRequired || false;
+    } catch {
     }
+
+    if (res.status === 401 && redirectUrl && authErrorCallback) {
+      authErrorCallback(redirectUrl);
+    }
+
+    const err = new Error(errorMessage);
+    (err as any).status = res.status;
+    (err as any).redirectUrl = redirectUrl;
+    (err as any).upgradeRequired = upgradeRequired;
+    throw err;
   }
 }
 

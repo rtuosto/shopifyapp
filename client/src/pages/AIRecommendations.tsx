@@ -29,6 +29,7 @@ export default function AIRecommendations() {
   const [dismissingRecommendation, setDismissingRecommendation] = useState<Recommendation | null>(null);
   const [activeTab, setActiveTab] = useState<"pending" | "archive">("pending");
   const [replacementPendingInfo, setReplacementPendingInfo] = useState<{ productId: string; dismissedIndex: number } | null>(null);
+  const [upgradeMessage, setUpgradeMessage] = useState<string | null>(null);
 
   const { data: quotaData } = useQuery<{
     quota: number;
@@ -36,6 +37,12 @@ export default function AIRecommendations() {
     remaining: number;
     planTier: string;
     resetDate: string;
+    plan: string;
+    limits: {
+      maxActiveOptimizations: number;
+      maxAIIdeasPerMonth: number;
+      slotExperiments: boolean;
+    };
   }>({
     queryKey: ["/api/quota"],
   });
@@ -81,11 +88,15 @@ export default function AIRecommendations() {
       setStoreIdeasDialogOpen(false);
     },
     onError: (error: Error) => {
-      toast({
-        title: "Failed to Generate Ideas",
-        description: error.message || "Could not generate store-wide recommendations",
-        variant: "destructive",
-      });
+      if ((error as any).upgradeRequired) {
+        setUpgradeMessage(error.message);
+      } else {
+        toast({
+          title: "Failed to Generate Ideas",
+          description: error.message || "Could not generate store-wide recommendations",
+          variant: "destructive",
+        });
+      }
       setStoreIdeasDialogOpen(false);
     },
   });
@@ -105,11 +116,15 @@ export default function AIRecommendations() {
       setSelectedProductId("");
     },
     onError: (error: Error) => {
-      toast({
-        title: "Failed to Generate Idea",
-        description: error.message || "Could not generate product recommendation",
-        variant: "destructive",
-      });
+      if ((error as any).upgradeRequired) {
+        setUpgradeMessage(error.message);
+      } else {
+        toast({
+          title: "Failed to Generate Idea",
+          description: error.message || "Could not generate product recommendation",
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -971,9 +986,12 @@ export default function AIRecommendations() {
     restoreRecommendationMutation.mutate(id);
   };
 
-  const quotaRemaining = quotaData?.remaining ?? 0;
   const quotaUsed = quotaData?.used ?? 0;
-  const quotaTotal = quotaData?.quota ?? 20;
+  const currentPlan = quotaData?.plan || "beta";
+  const isBeta = currentPlan === "beta";
+  const isUnlimited = quotaData?.quota === -1 || isBeta;
+  const quotaLimit = quotaData?.limits?.maxAIIdeasPerMonth ?? -1;
+  const quotaRemaining = isUnlimited ? Infinity : Math.max(0, quotaLimit - quotaUsed);
 
   return (
     <Page>
@@ -985,10 +1003,23 @@ export default function AIRecommendations() {
               AI-powered optimization ideas for your products
             </Text>
           </BlockStack>
-          <Badge tone="info" data-testid="badge-quota">
-            {`${quotaUsed} AI Ideas Used · Beta: Unlimited`}
+          <Badge tone={isUnlimited || quotaRemaining > 5 ? "info" : quotaRemaining > 0 ? "attention" : "critical"} data-testid="badge-quota">
+            {isUnlimited 
+              ? `${quotaUsed} AI Ideas Used · Beta: Unlimited`
+              : `${quotaUsed} / ${quotaLimit} AI Ideas Used`}
           </Badge>
         </InlineStack>
+
+        {upgradeMessage && (
+          <Banner
+            title="Plan limit reached"
+            tone="warning"
+            onDismiss={() => setUpgradeMessage(null)}
+            action={{ content: "View Plans", url: "/billing" }}
+          >
+            <Text as="p" variant="bodyMd">{upgradeMessage}</Text>
+          </Banner>
+        )}
 
         <InlineStack gap="400" blockAlign="center" wrap>
           <Button

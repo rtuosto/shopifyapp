@@ -2,8 +2,9 @@ import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Card, BlockStack, InlineStack, Text, Button, Badge, Divider, Spinner, Banner, ButtonGroup, Box } from "@shopify/polaris";
+import { Card, BlockStack, InlineStack, Text, Button, Badge, Divider, Spinner, Banner, ButtonGroup, Box, ProgressBar } from "@shopify/polaris";
 import { SettingsIcon } from "@shopify/polaris-icons";
+import type { Optimization } from "@shared/schema";
 
 interface WebhookStatus {
   ordersWebhook: any | null;
@@ -16,6 +17,10 @@ export default function SetupGuide() {
   
   const { data: webhookStatus, isLoading: webhookLoading } = useQuery<WebhookStatus>({
     queryKey: ['/api/webhooks/status'],
+  });
+
+  const { data: optimizations = [] } = useQuery<Optimization[]>({
+    queryKey: ['/api/optimizations'],
   });
 
   const registerWebhookMutation = useMutation({
@@ -43,6 +48,15 @@ export default function SetupGuide() {
 
   const webhookRegistered = webhookStatus?.status === 'registered';
   const webhookUnknown = webhookStatus?.status === 'unknown';
+  const hasOptimization = optimizations.length > 0;
+
+  const completedSteps = [
+    true,
+    webhookRegistered || webhookUnknown,
+    hasOptimization,
+  ].filter(Boolean).length;
+  const totalSteps = 3;
+  const progressPercent = Math.round((completedSteps / totalSteps) * 100);
 
   return (
     <Card data-testid="card-setup-guide">
@@ -60,6 +74,14 @@ export default function SetupGuide() {
             </Button>
           </Link>
         </InlineStack>
+
+        <BlockStack gap="200">
+          <InlineStack align="space-between" gap="200">
+            <Text as="p" variant="bodySm" tone="subdued">Setup progress</Text>
+            <Text as="p" variant="bodySm" tone="subdued">{completedSteps} of {totalSteps} complete</Text>
+          </InlineStack>
+          <ProgressBar progress={progressPercent} size="small" tone={progressPercent === 100 ? "success" : "highlight"} />
+        </BlockStack>
 
         <Divider />
 
@@ -120,11 +142,13 @@ export default function SetupGuide() {
         <Divider />
 
         <InlineStack gap="400" blockAlign="start">
-          <Badge tone="info">Next</Badge>
+          <Badge tone={hasOptimization ? "success" : "info"}>{hasOptimization ? "Done" : "Next"}</Badge>
           <BlockStack gap="200">
             <Text as="h3" variant="headingSm">Step 3: Create Your First Optimization</Text>
             <Text as="p" variant="bodySm" tone="subdued">
-              Accept AI recommendations to automatically create and activate product optimizations. Changes are applied directly to your Shopify products.
+              {hasOptimization 
+                ? `You have ${optimizations.length} optimization${optimizations.length === 1 ? '' : 's'} created. Great progress!`
+                : "Accept AI recommendations to automatically create and activate product optimizations. Changes are applied directly to your Shopify products."}
             </Text>
             <Banner tone="info">
               <p><strong>Product optimizations</strong> (price, title, description) modify your actual Shopify product data and work immediately - no additional setup required.</p>

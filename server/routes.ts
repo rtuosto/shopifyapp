@@ -12,6 +12,7 @@ import { syncProductsFromShopify, initializeShopData } from "./sync-service";
 import { getSyncStatus, completeSyncSuccess } from "./sync-status";
 import { selectTopProducts } from "./recommendation-engine";
 import type { BayesianState } from "./statistics/allocation-service";
+import { getEffectivePlan, getPlanLimits } from "./plan-limits";
 
 function escapeHtml(text: string | null | undefined): string {
   if (!text) return '';
@@ -658,14 +659,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         shopData = await storage.createOrUpdateShop(shop, {});
       }
       
-      const remaining = shopData.recommendationQuota - shopData.recommendationsUsed;
+      const plan = await getEffectivePlan(req);
+      const limits = getPlanLimits(plan);
+      const remaining = limits.maxAIIdeasPerMonth === Infinity 
+        ? Infinity 
+        : Math.max(0, limits.maxAIIdeasPerMonth - shopData.recommendationsUsed);
       
       res.json({
-        quota: shopData.recommendationQuota,
+        quota: limits.maxAIIdeasPerMonth === Infinity ? -1 : limits.maxAIIdeasPerMonth,
         used: shopData.recommendationsUsed,
-        remaining: Math.max(0, remaining), // Never return negative remaining
-        planTier: shopData.planTier,
+        remaining: remaining === Infinity ? -1 : remaining,
+        planTier: plan,
         resetDate: shopData.quotaResetDate,
+        plan,
+        limits: {
+          maxActiveOptimizations: limits.maxActiveOptimizations === Infinity ? -1 : limits.maxActiveOptimizations,
+          maxAIIdeasPerMonth: limits.maxAIIdeasPerMonth === Infinity ? -1 : limits.maxAIIdeasPerMonth,
+          slotExperiments: limits.slotExperiments,
+        },
       });
     } catch (error) {
       console.error("Error fetching quota:", error);
@@ -713,9 +724,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         shopData = await storage.createOrUpdateShop(shop, {});
       }
       
-      const quotaNeeded = 10; // Store-wide analysis generates 10 recommendations
+      const quotaNeeded = 10;
       
-      // Beta: Unlimited usage - still tracking for analytics & future pricing
+      const plan = await getEffectivePlan(req);
+      const limits = getPlanLimits(plan);
+      const quotaUsed = shopData.recommendationsUsed;
+      if (quotaUsed + quotaNeeded > limits.maxAIIdeasPerMonth && limits.maxAIIdeasPerMonth !== Infinity) {
+        const remaining = Math.max(0, limits.maxAIIdeasPerMonth - quotaUsed);
+        return res.status(403).json({
+          error: `Your ${plan === 'free' ? 'Free' : plan.charAt(0).toUpperCase() + plan.slice(1)} plan allows ${limits.maxAIIdeasPerMonth} AI ideas per month. You've used ${quotaUsed} and have ${remaining} remaining. This action needs ${quotaNeeded}.`,
+          upgradeRequired: true,
+          currentPlan: plan,
+          limit: limits.maxAIIdeasPerMonth,
+          currentUsage: quotaUsed,
+          remaining,
+        });
+      }
       
       // Get all products and active optimizations
       const products = await storage.getProducts(shop);
@@ -794,15 +818,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const shop = (req as any).shop;
       const { productId } = req.params;
       
-      // Get shop data (beta testing: quota enforcement disabled)
       let shopData = await storage.getShop(shop);
       if (!shopData) {
         shopData = await storage.createOrUpdateShop(shop, {});
       }
       
-      // Beta: Unlimited usage - still tracking for analytics & future pricing
+      const plan = await getEffectivePlan(req);
+      const limits = getPlanLimits(plan);
+      const quotaUsed = shopData.recommendationsUsed;
+      if (quotaUsed + 1 > limits.maxAIIdeasPerMonth && limits.maxAIIdeasPerMonth !== Infinity) {
+        const remaining = Math.max(0, limits.maxAIIdeasPerMonth - quotaUsed);
+        return res.status(403).json({
+          error: `Your ${plan === 'free' ? 'Free' : plan.charAt(0).toUpperCase() + plan.slice(1)} plan allows ${limits.maxAIIdeasPerMonth} AI ideas per month. You've used ${quotaUsed} and have ${remaining} remaining.`,
+          upgradeRequired: true,
+          currentPlan: plan,
+          limit: limits.maxAIIdeasPerMonth,
+          currentUsage: quotaUsed,
+          remaining,
+        });
+      }
       
-      // Get product
       const product = await storage.getProduct(shop, productId);
       if (!product) {
         return res.status(404).json({ error: "Product not found" });
@@ -1156,6 +1191,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Optimization has no associated product" });
       }
       
+      const plan = await getEffectivePlan(req);
+      const limits = getPlanLimits(plan);
+      const allActive = await storage.getOptimizations(shop, 'active');
+      if (allActive.length >= limits.maxActiveOptimizations) {
+        return res.status(403).json({ 
+          error: `Your ${plan === 'free' ? 'Free' : plan.charAt(0).toUpperCase() + plan.slice(1)} plan allows up to ${limits.maxActiveOptimizations} active optimization${limits.maxActiveOptimizations === 1 ? '' : 's'}. Please upgrade or stop an existing optimization.`,
+          upgradeRequired: true,
+          currentPlan: plan,
+          limit: limits.maxActiveOptimizations,
+          currentUsage: allActive.length,
+        });
+      }
+      
       // Check for conflicting active optimizations (same product + optimization type)
       const conflictingOptimizations = await storage.getActiveOptimizationsByProduct(shop, optimization.productId, optimization.optimizationType);
       if (conflictingOptimizations.length > 0) {
@@ -1168,10 +1216,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Get the product
       const product = await storage.getProduct(shop, optimization.productId);
       if (!product) {
-        return res.status(404).json({ error: "Product not found" });
+        await storage.updateOptimization(shop, optimizationId, { status: "cancelled" });
+        return res.status(404).json({ 
+          error: "Product no longer exists in your store. This optimization has been cancelled.",
+          cancelled: true,
+        });
       }
       
       console.log(`[Optimization Activation] Activating optimization ${optimizationId} for product ${product.title}`);
@@ -1261,10 +1312,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Optimization has no associated product" });
       }
       
-      // Get the product
       const product = await storage.getProduct(shop, optimization.productId);
       if (!product) {
-        return res.status(404).json({ error: "Product not found" });
+        console.log(`[Optimization Deactivation] Product deleted, completing optimization without rollback`);
+        await storage.updateOptimization(shop, optimizationId, {
+          status: "completed",
+          endDate: new Date(),
+        });
+        return res.json({
+          success: true,
+          optimization: await storage.getOptimization(shop, optimizationId),
+          message: "Optimization stopped. Product was deleted from your store, so no rollback was needed.",
+          productDeleted: true,
+        });
       }
       
       console.log(`[Optimization Deactivation] Stopping optimization ${optimizationId}`);

@@ -132,30 +132,8 @@ Return a JSON object with a "recommendations" array.`;
     }));
   } catch (error) {
     console.error("Error generating recommendations:", error);
-    
-    return [
-      {
-        title: "Optimize Product Title for SEO",
-        description: "Restructure the title to lead with high-intent keywords, improving search visibility and click-through rates.",
-        optimizationType: "title",
-        proposedChanges: {
-          title: `${product.title} — Premium Quality`,
-        },
-        insights: [
-          {
-            type: "seo",
-            title: "Keyword Positioning",
-            description: "Leading with descriptive keywords improves search engine visibility and organic traffic.",
-          },
-          {
-            type: "psychology",
-            title: "Value Signaling",
-            description: "Appending quality descriptors reinforces perceived value without inventing product claims.",
-          },
-        ],
-        impactScore: 5,
-      },
-    ];
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    throw new Error(`AI recommendation generation failed: ${errorMessage}`);
   }
 }
 
@@ -245,28 +223,7 @@ Return a JSON object with a "recommendations" array, sorted by impactScore desce
     })).slice(0, targetCount);
   } catch (error) {
     console.error("Error generating batch recommendations:", error);
-    
-    return products.slice(0, targetCount).map(product => ({
-      productId: product.id,
-      title: `Optimize "${product.title}" for Better Conversions`,
-      description: "Restructure this product's title and messaging to improve search visibility and click-through rates.",
-      optimizationType: "title" as const,
-      proposedChanges: {
-        title: `${product.title} — Premium Quality`,
-      },
-      insights: [
-        {
-          type: "psychology" as const,
-          title: "Value Signaling",
-          description: "Clear value language reinforces perceived quality.",
-        },
-        {
-          type: "seo" as const,
-          title: "SEO Enhancement",
-          description: "Descriptive keywords improve search visibility.",
-        },
-      ],
-      impactScore: 5,
-    }));
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    throw new Error(`AI batch recommendation generation failed: ${errorMessage}`);
   }
 }
