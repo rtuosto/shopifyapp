@@ -76,7 +76,10 @@ Shoptimizer employs a full-stack architecture featuring a React frontend with Sh
 - **Safe Rollback**: Deactivates optimizations and restores original product values.
 - **Traffic & Conversion Simulator**: Validates A/B optimization tracking and performance through batch and live-streaming simulations.
 - **Optimization Evolution Charts**: Visualizes optimization performance over time.
-- **Shopify Billing API Integration**: Manages Free, Growth, and Pro subscription plans with a 14-day free trial, all via Shopify's Billing API.
+- **Shopify Billing API Integration**: Manages Free, Growth, and Pro subscription plans with a 14-day free trial, all via Shopify's Billing API. Plan limits enforced server-side on optimization activation (Free: 3, Growth: 10, Pro: unlimited) and AI idea generation (Free: 10/mo, Growth: 50/mo, Pro: unlimited). Currently in beta with unlimited usage.
+- **Plan Enforcement & Upgrade Prompts**: Server returns 403 with `upgradeRequired: true` when plan limits are hit. Frontend detects this via `queryClient.ts` error propagation and shows dismissible warning banners with "View Plans" links on AI Recommendations and Optimizations pages.
+- **Error Handling**: Global 401 auth error detection with AuthBanner, React ErrorBoundary for UI crash recovery, product deletion edge case handling on activate/deactivate, and proper AI error surfacing without fallback recommendations.
+- **Onboarding Progress Tracking**: SetupGuide component shows a progress bar with dynamic step completion detection (products synced, webhook registered, first optimization created).
 - **Security Headers**: Implements CSP and anti-clickjacking headers for embedded Shopify app compliance.
 - **CORS Configuration**: App Proxy endpoints are configured with CORS headers.
 - **UI/UX**: Utilizes Shopify Polaris React components (`@shopify/polaris`) for native Shopify admin look and feel.
