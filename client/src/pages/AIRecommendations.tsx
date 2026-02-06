@@ -28,7 +28,7 @@ export default function AIRecommendations() {
   const [selectedProductId, setSelectedProductId] = useState<string>("");
   const [dismissingRecommendation, setDismissingRecommendation] = useState<Recommendation | null>(null);
   const [activeTab, setActiveTab] = useState<"pending" | "archive">("pending");
-  const [replacementPending, setReplacementPending] = useState(false);
+  const [replacementPendingForProduct, setReplacementPendingForProduct] = useState<string | null>(null);
 
   const { data: quotaData } = useQuery<{
     quota: number;
@@ -114,35 +114,49 @@ export default function AIRecommendations() {
   });
 
   const dismissRecommendationMutation = useMutation({
-    mutationFn: async ({ id, replace }: { id: string; replace: boolean }) => {
+    mutationFn: async ({ id, replace, productId }: { id: string; replace: boolean; productId: string }) => {
       const res = await apiRequest("POST", `/api/recommendations/${id}/dismiss`, { replace });
       return res.json();
     },
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "pending"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "archived"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/quota"] });
+      const { productId } = variables;
+
+      const preExistingRecIds = new Set(
+        recommendations
+          .filter(r => r.productId === productId && r.id !== variables.id)
+          .map(r => r.id)
+      );
+
+      if (data.replacementPending && productId) {
+        setReplacementPendingForProduct(productId);
+      }
+
       setDismissDialogOpen(false);
       setDismissingRecommendation(null);
 
-      if (data.replacementPending) {
-        setReplacementPending(true);
+      queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "pending"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "archived"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/quota"] });
+
+      if (data.replacementPending && productId) {
         toast({
           title: "Recommendation Dismissed",
           description: "A replacement is being generated — it will appear shortly",
         });
-        const initialCount = recommendations.length;
         const pollForReplacement = (attempts: number) => {
           if (attempts <= 0) {
-            setReplacementPending(false);
+            setReplacementPendingForProduct(null);
             return;
           }
           setTimeout(async () => {
             await queryClient.invalidateQueries({ queryKey: ["/api/recommendations", "pending"] });
             queryClient.invalidateQueries({ queryKey: ["/api/quota"] });
             const updated = queryClient.getQueryData<Recommendation[]>(["/api/recommendations", "pending"]);
-            if (updated && updated.length >= initialCount) {
-              setReplacementPending(false);
+            const hasNewRecForProduct = updated?.some(
+              r => r.productId === productId && !preExistingRecIds.has(r.id) && r.id !== variables.id
+            );
+            if (hasNewRecForProduct) {
+              setReplacementPendingForProduct(null);
             } else {
               pollForReplacement(attempts - 1);
             }
@@ -1039,7 +1053,7 @@ export default function AIRecommendations() {
 
           {activeTab === "pending" && (
             <BlockStack gap="400">
-              {recommendations.length === 0 && !generateStoreRecommendationsMutation.isPending && !generateProductRecommendationMutation.isPending && !replacementPending ? (
+              {recommendations.length === 0 && !generateStoreRecommendationsMutation.isPending && !generateProductRecommendationMutation.isPending && !replacementPendingForProduct ? (
                 <Card>
                   <Box padding="600">
                     <BlockStack gap="400" align="center">
@@ -1058,31 +1072,41 @@ export default function AIRecommendations() {
                 </Card>
               ) : (
                 <InlineGrid columns={2} gap="400">
-                  {recommendations.map((rec) => {
-                    const product = products.find(p => p.id === rec.productId);
-                    const productImage = product?.images?.[0];
-                    return (
-                      <AIRecommendationCard
-                        key={rec.id}
-                        id={rec.id}
-                        title={rec.title}
-                        description={rec.description}
-                        productName={product?.title || 'Unknown Product'}
-                        productImage={productImage}
-                        optimizationType={rec.optimizationType}
-                        impactScore={rec.impactScore}
-                        onAccept={() => handleAccept(rec.id)}
-                        onReject={() => handleDismissClick(rec.id)}
-                        onPreview={() => handlePreview(rec.id)}
-                      />
-                    );
-                  })}
-                  {(generateStoreRecommendationsMutation.isPending || generateProductRecommendationMutation.isPending || replacementPending) && (
+                  {(() => {
+                    const cards: React.ReactNode[] = [];
+                    let replacementSkeletonInserted = false;
+                    recommendations.forEach((rec, index) => {
+                      const product = products.find(p => p.id === rec.productId);
+                      const productImage = product?.images?.[0];
+                      if (replacementPendingForProduct && rec.productId === replacementPendingForProduct && !replacementSkeletonInserted) {
+                        cards.push(<AIRecommendationCardSkeleton key="replacement-skeleton" />);
+                        replacementSkeletonInserted = true;
+                      }
+                      cards.push(
+                        <AIRecommendationCard
+                          key={rec.id}
+                          id={rec.id}
+                          title={rec.title}
+                          description={rec.description}
+                          productName={product?.title || 'Unknown Product'}
+                          productImage={productImage}
+                          optimizationType={rec.optimizationType}
+                          impactScore={rec.impactScore}
+                          onAccept={() => handleAccept(rec.id)}
+                          onReject={() => handleDismissClick(rec.id)}
+                          onPreview={() => handlePreview(rec.id)}
+                        />
+                      );
+                    });
+                    if (replacementPendingForProduct && !replacementSkeletonInserted) {
+                      cards.push(<AIRecommendationCardSkeleton key="replacement-skeleton" />);
+                    }
+                    return cards;
+                  })()}
+                  {(generateStoreRecommendationsMutation.isPending || generateProductRecommendationMutation.isPending) && (
                     <>
                       <AIRecommendationCardSkeleton />
-                      {(generateStoreRecommendationsMutation.isPending || generateProductRecommendationMutation.isPending) && (
-                        <AIRecommendationCardSkeleton />
-                      )}
+                      <AIRecommendationCardSkeleton />
                       {generateStoreRecommendationsMutation.isPending && (
                         <AIRecommendationCardSkeleton />
                       )}
@@ -1197,7 +1221,7 @@ export default function AIRecommendations() {
           content: "Dismiss & Replace",
           onAction: () => {
             if (dismissingRecommendation) {
-              dismissRecommendationMutation.mutate({ id: dismissingRecommendation.id, replace: true });
+              dismissRecommendationMutation.mutate({ id: dismissingRecommendation.id, replace: true, productId: dismissingRecommendation.productId });
             }
           },
           disabled: dismissRecommendationMutation.isPending,
@@ -1207,7 +1231,7 @@ export default function AIRecommendations() {
           content: "Just Dismiss",
           onAction: () => {
             if (dismissingRecommendation) {
-              dismissRecommendationMutation.mutate({ id: dismissingRecommendation.id, replace: false });
+              dismissRecommendationMutation.mutate({ id: dismissingRecommendation.id, replace: false, productId: dismissingRecommendation.productId });
             }
           },
           disabled: dismissRecommendationMutation.isPending,

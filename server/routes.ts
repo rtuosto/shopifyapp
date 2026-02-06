@@ -905,8 +905,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
               return;
             }
             
+            const existingPendingRecs = await storage.getRecommendations(shop, "pending");
+            const existingTypesForProduct = new Set(
+              existingPendingRecs
+                .filter(r => r.productId === rec.productId)
+                .map(r => r.optimizationType)
+            );
+
             const availableRecommendations = aiRecommendations.filter(
-              r => !activeOptimizationTypes.has(r.optimizationType) && r.optimizationType !== rec.optimizationType
+              r => !activeOptimizationTypes.has(r.optimizationType) && !existingTypesForProduct.has(r.optimizationType)
             );
             
             if (availableRecommendations.length > 0) {
@@ -915,9 +922,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 ...availableRecommendations[0],
               });
               console.log("[Dismiss & Replace] Replacement recommendation created for product:", product.id);
+            } else if (aiRecommendations.length > 0) {
+              const fallback = aiRecommendations.filter(r => !activeOptimizationTypes.has(r.optimizationType));
+              if (fallback.length > 0) {
+                await storage.createRecommendation(shop, {
+                  productId: product.id,
+                  ...fallback[0],
+                });
+                console.log("[Dismiss & Replace] Fallback replacement created for product:", product.id);
+              } else {
+                await storage.incrementQuota(shop, -1);
+                console.log("[Dismiss & Replace] No non-conflicting replacement available for product:", product.id);
+              }
             } else {
               await storage.incrementQuota(shop, -1);
-              console.log("[Dismiss & Replace] No non-conflicting replacement available for product:", product.id);
+              console.log("[Dismiss & Replace] No replacement available for product:", product.id);
             }
           } catch (bgError) {
             console.error("[Dismiss & Replace] Background replacement error:", bgError);
