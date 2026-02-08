@@ -1,19 +1,49 @@
 import "@shopify/shopify-api/adapters/node";
 import { shopifyApi, Session, LogSeverity, ApiVersion } from "@shopify/shopify-api";
 
+const appUrl = new URL(process.env.APP_URL!);
+
 // Initialize Shopify API
 export const shopify = shopifyApi({
   apiKey: process.env.SHOPIFY_API_KEY!,
   apiSecretKey: process.env.SHOPIFY_API_SECRET!,
   scopes: ["read_products", "write_products", "read_orders"],
-  hostName: process.env.REPLIT_DEV_DOMAIN || "localhost:5000",
-  hostScheme: process.env.REPLIT_DEV_DOMAIN ? "https" : "http",
+  hostName: appUrl.host,
+  hostScheme: appUrl.protocol.replace(":", ""),
   apiVersion: ApiVersion.October24,
   isEmbeddedApp: true,
   logger: {
     level: LogSeverity.Info,
   },
 });
+
+/** Fail fast if ENABLE_MUTATIONS is not 'true'. Use for beta read-only mode. */
+function requireMutationsEnabled(): void {
+  if (process.env.ENABLE_MUTATIONS !== "true") {
+    throw new Error("Mutations are disabled (ENABLE_MUTATIONS is not true)");
+  }
+}
+
+/** Log mutation for audit/support. */
+function logMutationAudit(
+  op: string,
+  shop: string,
+  resourceId: string,
+  oldValue: unknown,
+  newValue: unknown
+): void {
+  console.log(
+    JSON.stringify({
+      mutation_audit: true,
+      op,
+      shop,
+      resourceId,
+      oldValue,
+      newValue,
+      timestamp: new Date().toISOString(),
+    })
+  );
+}
 
 // GraphQL query helpers
 export async function fetchProducts(session: Session) {
@@ -127,6 +157,7 @@ export async function updateProduct(session: Session, productId: string, updates
     price?: string;
   }>;
 }) {
+  requireMutationsEnabled();
   const client = new shopify.clients.Graphql({ session });
 
   // Separate variant updates from product updates
@@ -178,12 +209,14 @@ export async function updateProduct(session: Session, productId: string, updates
       await updateVariantPrices(session, productId, variantsWithPrices);
     }
   }
-  
+
+  logMutationAudit("productUpdate", session.shop, productId, undefined, updates);
   return response.data;
 }
 
 // Update variant prices using bulk update mutation
 async function updateVariantPrices(session: Session, productId: string, variants: Array<{ id: string; price: string }>) {
+  requireMutationsEnabled();
   const client = new shopify.clients.Graphql({ session });
   
   const response = await client.request(
@@ -212,6 +245,7 @@ async function updateVariantPrices(session: Session, productId: string, variants
     throw new Error(`Variant update failed: ${JSON.stringify(response.data.productVariantsBulkUpdate.userErrors)}`);
   }
 
+  logMutationAudit("variantPricesUpdate", session.shop, productId, undefined, variants);
   return response.data;
 }
 
@@ -504,6 +538,7 @@ export const sessionStorage = {
  * Product is marked as draft and unlisted so it doesn't appear in the store
  */
 export async function createTemplateCloneProduct(session: Session): Promise<{ id: string; handle: string }> {
+  requireMutationsEnabled();
   const client = new shopify.clients.Graphql({ session });
   
   const response = await client.request(`
@@ -562,6 +597,7 @@ export async function createTemplateCloneProduct(session: Session): Promise<{ id
     throw new Error('Clone product creation returned no product data');
   }
 
+  logMutationAudit("productCreate", session.shop, product.id, null, { id: product.id, handle: product.handle });
   console.log(`[Shopify API] Created template clone product: ${product.id} (${product.handle})`);
   return {
     id: product.id,
@@ -573,6 +609,7 @@ export async function createTemplateCloneProduct(session: Session): Promise<{ id
  * Delete a clone product by ID
  */
 export async function deleteCloneProduct(session: Session, productId: string): Promise<boolean> {
+  requireMutationsEnabled();
   const client = new shopify.clients.Graphql({ session });
   
   const response = await client.request(`
@@ -598,6 +635,7 @@ export async function deleteCloneProduct(session: Session, productId: string): P
     return false;
   }
 
+  logMutationAudit("productDelete", session.shop, productId, undefined, { deletedProductId: productId });
   console.log(`[Shopify API] Deleted clone product: ${productId}`);
   return true;
 }
