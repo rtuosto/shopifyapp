@@ -39,7 +39,7 @@ Add **one line** to your theme's `theme.liquid` file before the closing `</head>
 
 **Replace `YOUR-APP-URL`** with your actual app URL (e.g. Railway or production domain):
 - Production: `https://your-app.railway.app` or your custom domain
-- Local dev: Use a tunnel URL (e.g. ngrok) or `http://localhost:5000`
+- Local dev: Use a tunnel URL (e.g. ngrok) or `http://localhost:3000`
 
 **That's it!** The SDK automatically:
 - ✅ Uses the script URL host as the backend

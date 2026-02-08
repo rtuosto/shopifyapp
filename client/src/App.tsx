@@ -94,13 +94,8 @@ function AuthBanner() {
         title="Session expired"
         action={{
           content: "Re-authenticate",
-          onAction: () => {
-            if (window.top) {
-              window.top.location.assign(authRedirectUrl);
-            } else {
-              window.location.assign(authRedirectUrl);
-            }
-          },
+          url: authRedirectUrl,
+          target: "_top",
         }}
         onDismiss={() => setAuthRedirectUrl(null)}
       >

@@ -32,7 +32,7 @@ npm install
 # Push database schema
 npm run db:push
 
-# Start development server (Express + Vite on port 5000)
+# Start development server (Express + Vite on port 3000)
 npm run dev
 ```
 

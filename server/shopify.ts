@@ -519,6 +519,22 @@ export const sessionStorage = {
       );
       
       if (result.rows.length === 0) {
+        // In development, allow using a dev store Admin API token so sync/ideas work without OAuth
+        const devToken = process.env.SHOPIFY_DEV_ACCESS_TOKEN;
+        const devStore = process.env.SHOPIFY_DEV_STORE || "cro-autopilot-dev-store.myshopify.com";
+        if (process.env.NODE_ENV === "development" && devToken && shop === devStore) {
+          const session = new Session({
+            id: `dev-${shop}`,
+            shop,
+            state: "dev",
+            isOnline: false,
+          });
+          session.scope = shopify.config.scopes?.join(",") ?? "";
+          session.accessToken = devToken;
+          session.expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year
+          console.log(`[Session Storage] Using dev access token for shop: ${shop}`);
+          return session;
+        }
         console.log(`[Session Storage] No session found for shop: ${shop}`);
         return undefined;
       }

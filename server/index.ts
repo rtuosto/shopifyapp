@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
@@ -120,16 +121,16 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
+  // Serve on the port specified in PORT; default 3000.
+  const port = parseInt(process.env.PORT || '3000', 10);
+  const host = process.env.HOST ?? (process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1');
   server.listen({
     port,
-    host: "0.0.0.0",
-    reusePort: true,
+    host,
+    ...(process.env.NODE_ENV === 'production' && { reusePort: true }),
   }, () => {
-    log(`serving on port ${port}`);
+    const dbHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "(not set)";
+    log(`serving at http://${host}:${port}`);
+    log(`database: ${dbHost}`);
   });
 })();

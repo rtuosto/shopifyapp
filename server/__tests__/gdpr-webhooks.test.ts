@@ -21,7 +21,7 @@ async function makeWebhookRequest(
   const bodyString = JSON.stringify(payload);
   const hmac = generateHmac(bodyString, TEST_API_SECRET);
   
-  const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:5000';
+  const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:3000';
   
   const response = await fetch(`${baseUrl}${endpoint}`, {
     method: 'POST',
@@ -71,7 +71,7 @@ describe('GDPR Compliance Webhooks', () => {
     });
     
     it('should return 401 for missing HMAC header', async () => {
-      const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:5000';
+      const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:3000';
       
       const response = await fetch(`${baseUrl}/api/webhooks/customers/data_request`, {
         method: 'POST',
@@ -114,7 +114,7 @@ describe('GDPR Compliance Webhooks', () => {
     });
     
     it('should return 401 for invalid HMAC signature', async () => {
-      const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:5000';
+      const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:3000';
       
       const response = await fetch(`${baseUrl}/api/webhooks/customers/redact`, {
         method: 'POST',
@@ -152,7 +152,7 @@ describe('GDPR Compliance Webhooks', () => {
     });
     
     it('should return 401 for missing shop domain header', async () => {
-      const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:5000';
+      const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:3000';
       
       const response = await fetch(`${baseUrl}/api/webhooks/shop/redact`, {
         method: 'POST',

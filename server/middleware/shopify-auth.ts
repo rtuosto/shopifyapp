@@ -68,7 +68,7 @@ export async function requireShopifySessionOrDev(
   
   // If no shop provided in development, use default dev store without session
   if (process.env.NODE_ENV === "development") {
-    (req as any).shop = "cro-autopilot-dev-store.myshopify.com";
+    (req as any).shop = process.env.SHOPIFY_DEV_STORE || "cro-autopilot-dev-store.myshopify.com";
     console.log("[Dev Mode] No shop param - using default shop without session validation");
     return next();
   }

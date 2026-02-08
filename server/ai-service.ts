@@ -1,10 +1,17 @@
 import OpenAI from "openai";
 import { Product } from "@shared/schema";
 
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+/** Lazy OpenAI client so app can start without an API key (e.g. install flow). Use OPENAI_API_KEY or AI_INTEGRATIONS_OPENAI_API_KEY in Railway. */
+function getOpenAI(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY || process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OpenAI API key required. Set OPENAI_API_KEY or AI_INTEGRATIONS_OPENAI_API_KEY in your environment.");
+  }
+  return new OpenAI({
+    apiKey,
+    baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+  });
+}
 
 interface ProductData {
   title: string;
@@ -97,6 +104,7 @@ Focus on:
 Return a JSON object with a "recommendations" array.`;
 
   try {
+    const openai = getOpenAI();
     const response = await openai.chat.completions.create({
       model: "gpt-5-mini",
       messages: [
@@ -184,6 +192,7 @@ CRITICAL:
 Return a JSON object with a "recommendations" array, sorted by impactScore descending.`;
 
   try {
+    const openai = getOpenAI();
     const response = await openai.chat.completions.create({
       model: "gpt-5-mini",
       messages: [

@@ -368,7 +368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Register webhook for order tracking
       try {
         const { registerOrderWebhook } = await import("./shopify");
-        const webhookBase = (process.env.APP_URL || 'http://localhost:5000').replace(/\/$/, '');
+        const webhookBase = (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
         const webhookUrl = `${webhookBase}/api/webhooks/orders/create`;
         console.log(`[OAuth Callback] Registering webhook: ${webhookUrl}`);
         await registerOrderWebhook(session, webhookUrl);
@@ -445,7 +445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const { registerOrderWebhook } = await import("./shopify");
-      const webhookBase = (process.env.APP_URL || 'http://localhost:5000').replace(/\/$/, '');
+      const webhookBase = (process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '');
       const webhookUrl = `${webhookBase}/api/webhooks/orders/create`;
       
       console.log(`[Webhook Registration] Registering webhook: ${webhookUrl}`);
@@ -3630,7 +3630,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       const selectedPlan = plans[plan];
-      const appHost = (process.env.APP_URL || process.env.SHOPIFY_APP_URL || 'http://localhost:5000').replace(/\/$/, '');
+      const appHost = (process.env.APP_URL || process.env.SHOPIFY_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
       const returnUrl = `${appHost}/billing?shop=${encodeURIComponent(session.shop)}`;
       
       const result = await createAppSubscription(

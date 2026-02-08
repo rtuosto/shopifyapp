@@ -8,13 +8,13 @@ ok #!/usr/bin/env npx tsx
  * Usage: npx tsx server/__tests__/gdpr-webhooks-manual.ts
  * 
  * Prerequisites:
- * - Server must be running on localhost:5000
+ * - Server must be running on localhost:3000
  * - SHOPIFY_API_SECRET must be set in environment
  */
 
 import crypto from 'crypto';
 
-const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:5000';
+const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3000';
 const API_SECRET = process.env.SHOPIFY_API_SECRET;
 const TEST_SHOP = 'test-gdpr-shop.myshopify.com';
 

@@ -8,11 +8,11 @@
 npm run dev
 ```
 
-This starts a single Express server on port 5000 that serves both the Vite-compiled frontend and the API backend. The Vite dev server is integrated via middleware (`server/vite.ts`).
+This starts a single Express server on port 3000 that serves both the Vite-compiled frontend and the API backend. The Vite dev server is integrated via middleware (`server/vite.ts`).
 
 ### Dev Mode Behavior
 
-The app uses `APP_URL` for host and webhook URLs (no trailing slash). In development, set `APP_URL=http://localhost:5000` or use your tunnel URL.
+The app uses `APP_URL` for host and webhook URLs (no trailing slash). In development, set `APP_URL=http://localhost:3000` or use your tunnel URL.
 
 When `NODE_ENV === "development"`:
 - The `requireShopifySessionOrDev` middleware falls back to `"default-shop"` if no shop parameter is provided

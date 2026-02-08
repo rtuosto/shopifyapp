@@ -27,7 +27,7 @@ Add this single line to your theme's `theme.liquid` file **before the closing `<
 
 **Replace `YOUR-APP-URL`** with your actual app URL (e.g. your Railway or production domain):
 - **Production**: `https://your-app.railway.app` or your custom domain
-- **Local dev**: Use your tunnel URL (e.g. ngrok) or `http://localhost:5000` for same-origin testing
+- **Local dev**: Use your tunnel URL (e.g. ngrok) or `http://localhost:3000` for same-origin testing
 
 **Example:**
 ```liquid
