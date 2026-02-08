@@ -1,7 +1,7 @@
 # Shoptimizer Deployment Guide
 
 **✨ NEW: Automatic Configuration**
-The SDK now automatically detects your Replit URL and Shopify store domain. Just add one line to your theme - no manual configuration needed!
+The SDK uses the script URL host as the backend and detects your Shopify store domain. Just add one line to your theme - no manual configuration needed!
 
 ---
 
@@ -21,7 +21,7 @@ The Shoptimizer system consists of three components:
 - Shopify store with API access
 - Shoptimizer app installed via OAuth
 - Access to Shopify theme code (Admin → Online Store → Themes → Actions → Edit code)
-- Your Replit app URL (e.g., `https://your-app-name.replit.dev`)
+- Your app URL (e.g., `https://your-app.railway.app` or your production domain)
 
 ---
 
@@ -33,16 +33,16 @@ Add **one line** to your theme's `theme.liquid` file before the closing `</head>
 
 ```liquid
 {% if template == 'product' %}
-  <script src="https://YOUR-REPLIT-APP-URL/shoptimizer.js" defer></script>
+  <script src="https://YOUR-APP-URL/shoptimizer.js" defer></script>
 {% endif %}
 ```
 
-**Replace `YOUR-REPLIT-APP-URL`** with your actual Replit app URL:
-- Published apps: `https://your-app-name.replit.app`
-- Dev mode: Check your Replit environment variable `REPLIT_DOMAINS` for the exact URL
+**Replace `YOUR-APP-URL`** with your actual app URL (e.g. Railway or production domain):
+- Production: `https://your-app.railway.app` or your custom domain
+- Local dev: Use a tunnel URL (e.g. ngrok) or `http://localhost:5000`
 
 **That's it!** The SDK automatically:
-- ✅ Detects your Replit backend URL from environment
+- ✅ Uses the script URL host as the backend
 - ✅ Detects your Shopify store domain from Shopify context
 - ✅ Generates persistent UUID session IDs (90-day expiry)
 - ✅ Fetches active optimizations and modifies product pages
@@ -76,20 +76,20 @@ Body:
 {
   "script_tag": {
     "event": "onload",
-    "src": "https://YOUR-REPLIT-APP-URL/shoptimizer.js",
+    "src": "https://YOUR-APP-URL/shoptimizer.js",
     "display_scope": "online_store"
   }
 }
 ```
 
-Replace `YOUR-REPLIT-APP-URL` with your actual Replit app URL.
+Replace `YOUR-APP-URL` with your actual app URL.
 
 ### Verification
 
 Visit any product page and check browser console (F12). You should see:
 
 ```
-[SDK] Serving auto-configured SDK with API URL: https://your-app.replit.app
+[SDK] Serving auto-configured SDK with API URL: https://your-app.railway.app
 [Shoptimizer] Session ID: abc-123-def-456
 [Shoptimizer] Checking for active optimizations on product: gid://shopify/Product/123456
 ```
@@ -109,7 +109,7 @@ The webhook is automatically registered when you install the app via OAuth. No m
 **Verification:**
 1. Go to Shopify Admin → Settings → Notifications
 2. Scroll to "Webhooks"
-3. Look for webhook with URL: `https://your-replit-app.replit.app/api/webhooks/orders/create`
+3. Look for webhook with URL: `https://your-app.railway.app/api/webhooks/orders/create`
 4. Event should be: "Order creation"
 
 ### Manual Registration (If Needed)
@@ -120,7 +120,7 @@ If the webhook wasn't auto-registered, create it manually:
 1. Settings → Notifications → Webhooks → Create webhook
 2. Event: "Order creation"
 3. Format: JSON
-4. URL: `https://your-replit-app.replit.app/api/webhooks/orders/create`
+4. URL: `https://your-app.railway.app/api/webhooks/orders/create`
 5. API version: 2024-01 (or latest)
 
 **Via API:**
@@ -136,7 +136,7 @@ Body:
 {
   "webhook": {
     "topic": "orders/create",
-    "address": "https://your-replit-app.replit.app/api/webhooks/orders/create",
+    "address": "https://your-app.railway.app/api/webhooks/orders/create",
     "format": "json"
   }
 }

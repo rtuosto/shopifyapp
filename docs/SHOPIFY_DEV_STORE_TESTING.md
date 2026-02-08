@@ -7,7 +7,7 @@ This guide provides step-by-step instructions to test the complete Shoptimizer a
 ## Prerequisites
 
 - ✅ Shopify development store with admin access
-- ✅ Shoptimizer backend running and accessible via HTTPS (e.g., `https://your-replit-app.replit.app`)
+- ✅ Shoptimizer backend running and accessible via HTTPS (e.g., your Railway or deployed app URL)
 - ✅ Shoptimizer app installed on your dev store via OAuth
 - ✅ At least one product in your Shopify store
 
@@ -21,23 +21,23 @@ Add this single line to your theme's `theme.liquid` file **before the closing `<
 
 ```liquid
 {% if template == 'product' %}
-  <script src="https://YOUR-REPLIT-APP-URL/shoptimizer.js" defer></script>
+  <script src="https://YOUR-APP-URL/shoptimizer.js" defer></script>
 {% endif %}
 ```
 
-**Replace `YOUR-REPLIT-APP-URL`** with your actual Replit app URL:
-- **Published apps**: `https://your-app-name.replit.app`
-- **Dev mode**: Find your URL in Replit's address bar or check the `REPLIT_DOMAINS` environment variable
+**Replace `YOUR-APP-URL`** with your actual app URL (e.g. your Railway or production domain):
+- **Production**: `https://your-app.railway.app` or your custom domain
+- **Local dev**: Use your tunnel URL (e.g. ngrok) or `http://localhost:5000` for same-origin testing
 
 **Example:**
 ```liquid
 {% if template == 'product' %}
-  <script src="https://shoptimizer.replit.app/shoptimizer.js" defer></script>
+  <script src="https://your-app.railway.app/shoptimizer.js" defer></script>
 {% endif %}
 ```
 
 **That's it!** The SDK automatically:
-- ✅ Detects your Replit backend URL (no manual config needed)
+- ✅ Uses the host from the script URL as the backend (no manual config needed)
 - ✅ Detects your Shopify store domain (from Shopify's context)
 - ✅ Generates and persists session IDs
 - ✅ Fetches active optimizations and modifies product pages
@@ -254,7 +254,7 @@ Check if the page content changed based on your assignment:
 Immediately after completing the order, check your backend logs:
 
 ```bash
-# In your Replit console or logs viewer
+# In your deployment logs or local console
 grep "Webhook" /path/to/logs
 ```
 

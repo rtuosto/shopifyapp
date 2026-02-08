@@ -368,7 +368,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Register webhook for order tracking
       try {
         const { registerOrderWebhook } = await import("./shopify");
-        const webhookUrl = `${process.env.REPLIT_DEV_DOMAIN ? 'https://' : 'http://'}${process.env.REPLIT_DEV_DOMAIN || 'localhost:5000'}/api/webhooks/orders/create`;
+        const webhookBase = (process.env.APP_URL || 'http://localhost:5000').replace(/\/$/, '');
+        const webhookUrl = `${webhookBase}/api/webhooks/orders/create`;
         console.log(`[OAuth Callback] Registering webhook: ${webhookUrl}`);
         await registerOrderWebhook(session, webhookUrl);
         console.log(`[OAuth Callback] Webhook registered successfully`);
@@ -444,7 +445,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const { registerOrderWebhook } = await import("./shopify");
-      const webhookUrl = `${process.env.REPLIT_DEV_DOMAIN ? 'https://' : 'http://'}${process.env.REPLIT_DEV_DOMAIN || 'localhost:5000'}/api/webhooks/orders/create`;
+      const webhookBase = (process.env.APP_URL || 'http://localhost:5000').replace(/\/$/, '');
+      const webhookUrl = `${webhookBase}/api/webhooks/orders/create`;
       
       console.log(`[Webhook Registration] Registering webhook: ${webhookUrl}`);
       await registerOrderWebhook(session, webhookUrl);
@@ -1711,8 +1713,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const storeDomain = urlObj.origin;
       
       // For password-protected stores, we need to authenticate first
-      // Get store password from environment or use default for dev
-      const storePassword = process.env.SHOPIFY_STORE_PASSWORD || "saotsu";
+      const storePassword = process.env.NODE_ENV === "development"
+        ? (process.env.SHOPIFY_STORE_PASSWORD || "saotsu")
+        : process.env.SHOPIFY_STORE_PASSWORD;
+      if (!storePassword) {
+        return res.status(400).json({ error: "SHOPIFY_STORE_PASSWORD required for password-protected store preview" });
+      }
       
       console.log(`[Preview Proxy] Authenticating with password-protected store: ${storeDomain}`);
       
@@ -3624,8 +3630,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       const selectedPlan = plans[plan];
-      const appHost = process.env.SHOPIFY_APP_URL
-        || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'http://localhost:5000');
+      const appHost = (process.env.APP_URL || process.env.SHOPIFY_APP_URL || 'http://localhost:5000').replace(/\/$/, '');
       const returnUrl = `${appHost}/billing?shop=${encodeURIComponent(session.shop)}`;
       
       const result = await createAppSubscription(

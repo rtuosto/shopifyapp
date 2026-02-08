@@ -6,12 +6,11 @@ export default function Settings() {
   const { toast } = useToast();
   const [copiedWebhook, setCopiedWebhook] = useState(false);
 
-  const replitDomain = typeof window !== 'undefined' 
-    ? window.location.hostname 
-    : 'your-app.replit.app';
-  const apiUrl = `https://${replitDomain}`;
-  const webhookUrl = `${apiUrl}/api/webhooks/orders/create`;
-  const isDev = replitDomain.includes('replit.dev') || replitDomain === 'localhost';
+  const appOrigin = typeof window !== 'undefined'
+    ? window.location.origin
+    : '';
+  const webhookUrl = `${appOrigin}/api/webhooks/orders/create`;
+  const isDev = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || !window.location.origin.startsWith('https'));
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -223,7 +222,7 @@ export default function Settings() {
               <Text as="p" variant="bodySm" fontWeight="semibold">Backend URL</Text>
               <Box padding="400" background="bg-surface-secondary" borderRadius="300">
                 <Text as="p" variant="bodySm">
-                  <code data-testid="text-api-url">{apiUrl}</code>
+                  <code data-testid="text-api-url">{appOrigin || '(loading…)'}</code>
                 </Text>
               </Box>
               <Text as="p" variant="bodySm" tone="subdued">

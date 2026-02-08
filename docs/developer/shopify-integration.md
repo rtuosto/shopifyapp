@@ -7,12 +7,13 @@
 The app uses the standard Shopify OAuth flow via `@shopify/shopify-api`:
 
 ```typescript
+const appUrl = new URL(process.env.APP_URL!);
 export const shopify = shopifyApi({
   apiKey: process.env.SHOPIFY_API_KEY!,
   apiSecretKey: process.env.SHOPIFY_API_SECRET!,
   scopes: ["read_products", "write_products", "read_orders"],
-  hostName: process.env.REPLIT_DEV_DOMAIN || "localhost:5000",
-  hostScheme: process.env.REPLIT_DEV_DOMAIN ? "https" : "http",
+  hostName: appUrl.host,
+  hostScheme: appUrl.protocol.replace(":", ""),
   apiVersion: ApiVersion.October24,
   isEmbeddedApp: true,
 });
@@ -247,10 +248,9 @@ function verifyShopifyWebhookHmac(req) {
 |----------|----------|-------------|
 | `SHOPIFY_API_KEY` | Yes | Shopify app API key |
 | `SHOPIFY_API_SECRET` | Yes | Shopify app API secret (used for OAuth, HMAC verification) |
-| `SHOPIFY_APP_URL` | Production | Full app URL (e.g., `https://your-app.replit.app`) |
-| `AI_INTEGRATIONS_OPENAI_API_KEY` | Yes | OpenAI API key (managed by Replit integration) |
-| `AI_INTEGRATIONS_OPENAI_BASE_URL` | Yes | OpenAI API base URL (managed by Replit integration) |
+| `APP_URL` | Yes | Full app URL (e.g., `https://your-app.railway.app`), no trailing slash |
+| `AI_INTEGRATIONS_OPENAI_API_KEY` | Yes | OpenAI API key |
+| `AI_INTEGRATIONS_OPENAI_BASE_URL` | Optional | OpenAI API base URL override |
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `SESSION_SECRET` | Yes | Express session secret (must be stable across restarts) |
-| `REPLIT_DEV_DOMAIN` | Auto | Automatically set by Replit in dev mode |
 | `NODE_ENV` | Auto | `"development"` or `"production"` |

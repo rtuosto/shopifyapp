@@ -12,10 +12,7 @@ This starts a single Express server on port 5000 that serves both the Vite-compi
 
 ### Dev Mode Behavior
 
-When `REPLIT_DEV_DOMAIN` is detected (automatic in Replit):
-- `hostName` is set to the Replit dev domain
-- `hostScheme` is set to `"https"`
-- Webhook URLs use `https://{REPLIT_DEV_DOMAIN}`
+The app uses `APP_URL` for host and webhook URLs (no trailing slash). In development, set `APP_URL=http://localhost:5000` or use your tunnel URL.
 
 When `NODE_ENV === "development"`:
 - The `requireShopifySessionOrDev` middleware falls back to `"default-shop"` if no shop parameter is provided
@@ -70,32 +67,25 @@ The `session` table (for Express sessions) is created automatically by `connect-
 
 | Variable | Description |
 |----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string (provided by Replit) |
+| `DATABASE_URL` | PostgreSQL connection string (e.g. from Neon or Railway) |
 | `SESSION_SECRET` | Stable secret for Express session cookies |
 | `SHOPIFY_API_KEY` | From Shopify Partner Dashboard → App → API credentials |
 | `SHOPIFY_API_SECRET` | From Shopify Partner Dashboard → App → API credentials |
-| `AI_INTEGRATIONS_OPENAI_API_KEY` | OpenAI API key (managed by Replit AI integration) |
-| `AI_INTEGRATIONS_OPENAI_BASE_URL` | OpenAI base URL (managed by Replit AI integration) |
+| `AI_INTEGRATIONS_OPENAI_API_KEY` | OpenAI API key |
+| `AI_INTEGRATIONS_OPENAI_BASE_URL` | OpenAI base URL (optional override) |
 
 ### Production Only
 
 | Variable | Description |
 |----------|-------------|
-| `SHOPIFY_APP_URL` | Full public URL of the app (e.g., `https://your-app.replit.app`) |
+| `APP_URL` | Full public URL of the app (e.g., `https://your-app.railway.app`), no trailing slash |
 | `NODE_ENV` | Set to `"production"` |
-
-### Automatically Set
-
-| Variable | Description |
-|----------|-------------|
-| `REPLIT_DEV_DOMAIN` | Replit dev domain (auto-detected in dev mode) |
-| `REPLIT_DOMAINS` | All domains associated with the Repl |
 
 ## Production Checklist
 
 ### App Configuration
 
-- [ ] `SHOPIFY_APP_URL` is set to the published Replit app URL
+- [ ] `APP_URL` is set to your deployed app URL (e.g. Railway)
 - [ ] `SESSION_SECRET` is set to a stable, random value
 - [ ] `NODE_ENV` is set to `"production"`
 
