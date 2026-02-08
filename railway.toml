@@ -1,0 +1,5 @@
+# Railway deploy config (https://docs.railway.app/config-as-code/reference)
+# Run Node directly so it receives SIGTERM and listens on PORT (8080).
+[deploy]
+startCommand = "node dist/index.js"
+healthcheckPath = "/health"

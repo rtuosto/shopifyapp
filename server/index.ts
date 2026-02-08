@@ -27,6 +27,12 @@ app.get("/health", (_req, res) => {
   res.status(200).json({ ok: true });
 });
 
+// Log every request so we can see in Railway logs if traffic reaches the app
+app.use((req, _res, next) => {
+  console.log("[request]", req.method, req.path);
+  next();
+});
+
 // Configure PostgreSQL session store
 const PgSession = connectPgSimple(session);
 const pgPool = new pg.Pool({
