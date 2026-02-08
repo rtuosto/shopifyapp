@@ -5,6 +5,8 @@ import pg from "pg";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
+if (!process.env.APP_URL) throw new Error("APP_URL required");
+
 const app = express();
 
 // Configure PostgreSQL session store
